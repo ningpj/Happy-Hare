@@ -127,7 +127,7 @@ class MmuSyncFeedbackManager:
     # Sync feedback manager public access...
     #
 
-    def set_default_rd(self, gate):
+    def set_default_rd(self, gate=None):
         """
         Ensure correct starting rotation distance
         """
