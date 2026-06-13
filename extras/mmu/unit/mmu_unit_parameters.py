@@ -68,6 +68,16 @@ class MmuUnitParameters(TunableParametersBase):
         if new != old:
             self._mmu_unit.calibrator.adjust_bowden_lengths_on_homing_change()
 
+    def _on_flowguard_tuning_change(self, old, new):
+        # Push live FlowGuard tuning (relief) to a running controller
+        if new != old:
+            self._mmu_unit.sync_feedback.apply_flowguard_tuning()
+
+    def _on_sync_feedback_extrude_threshold_change(self, old, new):
+        # Apply new extruder sampling threshold immediately if we're active
+        if new != old:
+            self._mmu_unit.sync_feedback.apply_extrude_threshold()
+
 
     # ---- Specs ----
 
@@ -154,7 +164,7 @@ class MmuUnitParameters(TunableParametersBase):
         ParamSpec('sync_feedback_enabled',            'int',       0, section="SYNC FEEDBACK BUFFER", limits=dict(minval=0, maxval=1),    guard=_guard_has_buffer, fmt="%d"),
         ParamSpec('sync_feedback_speed_multiplier',   'float',   5.0, section="SYNC FEEDBACK BUFFER", limits=dict(minval=1.0, maxval=50), guard=_guard_has_buffer, fmt="%.1f"),
         ParamSpec('sync_feedback_boost_multiplier',   'float',   5.0, section="SYNC FEEDBACK BUFFER", limits=dict(minval=1.0, maxval=50), guard=_guard_has_buffer, fmt="%.1f"),
-        ParamSpec('sync_feedback_extrude_threshold',  'float',   5.0, section="SYNC FEEDBACK BUFFER", limits=dict(above=1.0),             guard=_guard_has_buffer, fmt="%.1f"),
+        ParamSpec('sync_feedback_extrude_threshold',  'float',   5.0, section="SYNC FEEDBACK BUFFER", limits=dict(above=1.0),             guard=_guard_has_buffer, on_change=_on_sync_feedback_extrude_threshold_change, fmt="%.1f"),
         ParamSpec('sync_feedback_debug_log',          'int',       0, section="SYNC FEEDBACK BUFFER", limits=dict(minval=0, maxval=1),    guard=_guard_has_buffer, fmt="%d"),
         ParamSpec('sync_feedback_force_twolevel',     'int',       0, section="SYNC FEEDBACK BUFFER", limits=dict(minval=0, maxval=1),    guard=_guard_has_buffer, hidden=True),
 
@@ -165,7 +175,7 @@ class MmuUnitParameters(TunableParametersBase):
 
         # FlowGuard
         ParamSpec('flowguard_enabled',                'int',       1, section="FLOWGUARD", limits=dict(minval=0, maxval=1), on_change=_on_flowguard_enabled, fmt="%d"),
-        ParamSpec('flowguard_max_relief',             'float',   8.0, section="FLOWGUARD", limits=dict(above=1.0),          guard=_guard_has_buffer, fmt="%.1f"),
+        ParamSpec('flowguard_max_relief',             'float',   8.0, section="FLOWGUARD", limits=dict(above=1.0),          guard=_guard_has_buffer, on_change=_on_flowguard_tuning_change, fmt="%.1f"),
         ParamSpec('flowguard_encoder_mode',           'int',       2, section="FLOWGUARD", limits=dict(minval=0, maxval=2), guard=_guard_has_encoder, on_change=_on_encoder_change, fmt="%d"),
         ParamSpec('flowguard_encoder_max_motion',     'float',  20.0, section="FLOWGUARD", limits=dict(above=0.0),          guard=_guard_has_encoder, on_change=_on_encoder_change, fmt="%.1f"),
 
