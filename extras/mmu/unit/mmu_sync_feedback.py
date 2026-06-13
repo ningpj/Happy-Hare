@@ -73,11 +73,31 @@ class MmuSyncFeedback:
             self.printer.register_event_handler("mmu:synced", self._handle_mmu_synced)
             self.printer.register_event_handler("mmu:unsynced", self._handle_mmu_unsynced)
             self.printer.register_event_handler("mmu:sync_feedback", self._handle_sync_feedback)
+            self.printer.register_event_handler("mmu:printing", self._handle_printing)
 
 
     def handle_mmu_initialized(self):
         if self.mmu_unit.has_buffer():
             self._init_controller()
+
+
+    def _handle_printing(self, print_time=None):
+        """
+        On transition into the printing state: clear stale telemetry logs and, if a gate
+        is already synced/active (so no sync transition will reset the controller), start
+        a fresh telemetry log for it. This ensures each print produces clean telemetry.
+        """
+        if not self.mmu_unit.has_buffer(): return
+
+        # Wipe any stale telemetry from previous prints
+        self.wipe_telemetry_logs()
+
+        # If already synced/active the controller won't reset (no sync transition occurs),
+        # so begin a fresh log here for the active gate. Otherwise the upcoming sync will
+        # create it via _reset_controller.
+        if self.active and self.ctrl is not None and self.ctrl.cfg.log_sync:
+            self.ctrl._current_log_file = self._telemetry_log_path()
+            self.ctrl._init_log()
 
 
     def is_enabled(self):
@@ -187,7 +207,6 @@ class MmuSyncFeedback:
                 if os.path.exists(log_path):
                     try:
                         os.remove(log_path)
-                        self.mmu.log_error("REMOVED log_path=%s" % log_path)
                     except OSError as e:
                         self.mmu.log_debug("Unable to wipe sync feedback debug log: %s" % log_path)
 
