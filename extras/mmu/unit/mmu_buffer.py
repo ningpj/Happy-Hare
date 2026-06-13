@@ -181,7 +181,7 @@ class MmuProportionalSensor:
         mid_point = (max_tension + max_compression) / 2.0
 
         self._neutral_point     = config.getfloat('analog_neutral_point', mid_point, minval=raw_min, maxval=raw_max)
-        self._vsensor_threshold = config.getfloat('analog_sensor_threshold', 0.75, minval=0.5, maxval=1.0)
+        self.analog_sensor_threshold = config.getfloat('analog_sensor_threshold', 0.9, minval=0.5, maxval=1.0)
         self._gamma        = config.getfloat('analog_gamma', 1)
         self._sample_time  = config.getfloat('analog_sample_time', 0.005) # Not exposed
         self._sample_count = config.getint('analog_sample_count', 5)      # Not exposed
@@ -204,9 +204,9 @@ class MmuProportionalSensor:
         self.value = 0.0     # In [-1.0, 1.0]
 
         # Virtual sensor setup
-        h = abs(self._vsensor_threshold) * self._vsensor_hysteresis
-        self._vsensor_threshold_low = self._vsensor_threshold - h
-        self._vsensor_threshold_high = self._vsensor_threshold + h
+        h = abs(self.analog_sensor_threshold) * self._vsensor_hysteresis
+        self._vsensor_threshold_low = self.analog_sensor_threshold - h
+        self._vsensor_threshold_high = self.analog_sensor_threshold + h
         self._vsensor_state = None
 
         # Setup ADC
