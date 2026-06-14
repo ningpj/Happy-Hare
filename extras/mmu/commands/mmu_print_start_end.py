@@ -84,6 +84,17 @@ class MmuPrintEndCommand(BaseCommand):
         end_state = gcmd.get('STATE', "complete")
 
         if not mmu.is_in_endstate():
+            # If an MMU error has paused us (typically MMU_UNLOAD failing inside
+            # the slicer's end-gcode), the slicer's PRINT_END has been skipped
+            # by pause_resume. Tearing down the safety net here would leave the
+            # heaters on with no further owner. Defer the end-state transition
+            # until the user recovers via MMU_UNLOCK / MMU_RECOVER / RESUME, at
+            # which point PRINT_END will run and the automatic print_stats ->
+            # complete transition will re-queue this command in a clean state.
+            if mmu.is_mmu_paused():
+                mmu.log_debug("MMU_PRINT_END(STATE=%s) ignored while in %s state; deferring end-state transition until print is resumed/cancelled"
+                              % (end_state, mmu.psm.print_state))
+                return
             if end_state in ["complete", "error", "cancelled", "ready", "standby"]:
                 if not idle_timeout and end_state in ["complete"]:
                     mmu._save_toolhead_position_and_park("complete")
