@@ -724,6 +724,9 @@ class MmuCalibratePsensorCommand(CalibrationMixin, BaseCommand):
             return (avg)
 
         def _seek_limit(msg, steps, step_size, prev_val, ramp, log_label):
+            PLATEAU_EPSILON = 0.005
+            PLATEAU_COUNT = 2
+            plateau_steps = 0
             mmu.log_always(msg)
             for i in range(steps):
                 _ = mmu.move_filament(msg, step_size, motor="gear", speed=MOVE_SPEED, wait=True)
@@ -732,16 +735,24 @@ class MmuCalibratePsensorCommand(CalibrationMixin, BaseCommand):
                 delta = val - prev_val
 
                 if ramp is None:
-                    if delta == 0:
+                    if abs(delta) < PLATEAU_EPSILON:
                         mmu.log_always("No sensor change. Retrying")
                         continue
                     ramp = (delta > 0)
 
                 if (ramp and val >= prev_val) or (not ramp and val <= prev_val):
+                    # Check for saturation — value has plateaued
+                    if abs(delta) < PLATEAU_EPSILON:
+                        plateau_steps += 1
+                        if plateau_steps >= PLATEAU_COUNT:
+                            mmu.log_always("Sensor saturated at %.4f — limit found" % val)
+                            return val, ramp, True
+                    else:
+                        plateau_steps = 0
                     prev_val = val
                     mmu.log_always("Seeking ... ADC %s limit: %.4f" % (log_label, val))
                 else:
-                    # Limit found
+                    # Limit found — value reversed direction
                     return prev_val, ramp, True
 
             # Ran out of steps without detecting a clear limit
