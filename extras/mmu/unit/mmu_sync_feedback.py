@@ -271,7 +271,7 @@ class MmuSyncFeedback:
         max_move = max_move or self.mmu_unit.buffer.buffer_maxrange
 
         if has_proportional:
-            return self._adjust_filament_tension_proportional() # Doesn't yet support extruder stepper or max_move parameter
+            return self._adjust_filament_tension_proportional() # Tension relax only (gear); entry validation handled separately
 
         if has_tension or has_compression:
             return self._adjust_filament_tension_switch(use_gear_motor=use_gear_motor, max_move=max_move)

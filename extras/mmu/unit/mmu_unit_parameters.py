@@ -127,6 +127,7 @@ class MmuUnitParameters(TunableParametersBase):
         ParamSpec('gear_short_move_accel',            'float', 400.0, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=10.0)),
         ParamSpec('gear_short_move_threshold',        'float', lambda self: self.gate_homing_max, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=1.0)),
         ParamSpec('gear_homing_speed',                'float', 150.0, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=1.0)),
+        ParamSpec('proportional_homing_speed',        'float',  15.0, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=1.0, maxval=40.0), guard=_guard_has_buffer, hidden=True),
         ParamSpec('gear_buzz_accel',                  'float',1000.0, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=10.0), hidden=True),
 
         # Encoder
