@@ -494,6 +494,7 @@ class MmuStepper(ExtruderStepper):
         self.homing_accel = config.getfloat('homing_accel', self.accel, minval=0.)
         self.next_cmd_time = 0.
         self.commanded_pos = 0.
+        self._mode_pos_offset = 0. # Re-anchors mode_position while in (slaved) extruder mode
         self.pos_min = config.getfloat('position_min', None)
         self.pos_max = config.getfloat('position_max', None)
 
@@ -556,7 +557,7 @@ class MmuStepper(ExtruderStepper):
                 if source is not None and isinstance(source, MmuStepper):
                     return source.commanded_pos
             return self.commanded_pos
-        return self.stepper.get_commanded_position()
+        return self.stepper.get_commanded_position() - self._mode_pos_offset # Extruder pos with re-anchor offset
 
 
     # ----------------------------------------------------------------------
@@ -654,6 +655,7 @@ class MmuStepper(ExtruderStepper):
             self.stepper.set_position([pos, 0., 0.])
 
         self.commanded_pos = pos
+        self._mode_pos_offset = 0. # Clear anchor on mode entry
         self.motion_mode = self.MODE_EXTRUDER
         self.motion_queue = None
         self.manual_motion_queue = None
@@ -672,6 +674,7 @@ class MmuStepper(ExtruderStepper):
         self.stepper.set_trapq(extruder.get_trapq())
 
         self.commanded_pos = extruder.last_position
+        self._mode_pos_offset = 0. # Clear anchor on mode entry
         self.motion_mode = self.MODE_EXTRUDER
         self.motion_queue = extruder.get_name()
         self.manual_motion_queue = None
@@ -812,6 +815,10 @@ class MmuStepper(ExtruderStepper):
             for follower in self._manual_followers:
                 follower.commanded_pos = setpos
                 follower.rail.set_position([setpos, 0., 0.])
+        elif self.motion_mode == self.MODE_EXTRUDER:
+            # Can't rebase the slaved extruder rail, so track offset to re-anchor position
+            self.commanded_pos = setpos
+            self._mode_pos_offset = self.stepper.get_commanded_position() - setpos
         else:
             self.commanded_pos = setpos
 
