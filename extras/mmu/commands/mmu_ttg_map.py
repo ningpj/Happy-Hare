@@ -26,16 +26,21 @@ class MmuTtgMapCommand(BaseCommand):
     HELP_BRIEF = "aka MMU_REMAP_TTG Display or remap a tool to a specific gate and set gate availability"
     HELP_PARAMS = (
         f"{CMD}: {HELP_BRIEF}\n"
-        + "QUIET     = [0|1]\n"
-        + "RESET     = [0|1]\n"
-        + "DETAIL    = [0|1]\n"
-        + "MAP       = comma,separated,tool,map\n"
-        + "GATE      = g\n"
-        + "TOOL      = t\n"
-        + "AVAILABLE = [GATE_EMPTY|GATE_AVAILABLE|...]\n"
+        + "QUIET     = 1 To minimize console reporting\n"
+        + "RESET     = 1 To reset filament attributes to configured defaults\n"
+        + "DETAIL    = 1 Include additional details like EndlessSpool grouping\n"
+        + "MAP       = g,g,g Comma separated list of gates where index is the tool number. For bulk update\n"
+        + "GATE      = g \n"
+        + "GATE      = g Specify the gate\n"
+        + "TOOL      = t Specify the tool\n"
+        + "AVAILABLE = [0|1] Optionally specify the filament availablity in the gate\n"
+        + "(no parameters for status report)\n"
     )
     HELP_SUPPLEMENT = (
-        ""  # add examples here if desired
+        "Examples:\n"
+        + f"{CMD} TOOL=2 GATES=5 ...Map T2 to gate 5\n"
+        + f"{CMD} RESET=1        ...Reset TTG map to configured default (generally, Tx > gate_x for all gates\n"
+        + f"{CMD} MAP=0,0,0,0    ...Quickly map all tools (on 4 gate MMU) to the same gate 0 (forced MMU print to single filament)\n"
     )
 
     def __init__(self, mmu):

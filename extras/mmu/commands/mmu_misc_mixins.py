@@ -19,6 +19,7 @@
 # Happy Hare imports
 from ..mmu_constants   import * 
 from ..mmu_utils       import MmuError
+from ..unit.mmu_leds   import MmuLeds
 
 
 class ClogTangleMixin:
@@ -166,3 +167,47 @@ class MoveMixin:
 
         mmu.log_debug("Homing '%s' motor to '%s' endstop, up to %.1fmm..." % (motor, endstop, move))
         return mmu.move_filament(trace_str, move, speed=speed, accel=accel, motor=motor, homing_move=stop_on_endstop, endstop_name=endstop)
+
+
+class LedMixin:
+    """
+    Mixin providing shared logic for led commands
+
+    Intended for use by:
+      MMU_LED, MMU_SET_LED
+    """
+
+    EXIT_OPTIONS =   ["off", "gate_status", "filament_color", "slicer_color"]
+    ENTRY_OPTIONS =  ["off", "gate_status", "filament_color", "slicer_color"]
+    STATUS_OPTIONS = ["off", "on",          "filament_color", "slicer_color"]
+    LOGO_OPTIONS =   ["off"]
+
+
+    def _validate_effect(self, gcmd, name, mmu_unit, effect, options):
+        if effect is None:
+            return None
+
+        if isinstance(effect, str):
+            effect = effect.strip()
+
+        # Standard option?
+        if effect in options:
+            return effect
+
+        # RGB value?
+        try:
+            return MmuLeds.string_to_rgb(effect)
+        except Exception:
+            pass
+
+        # User configured effect name?
+        effect_names = sorted(mmu_unit.leds.get_effect_names())
+        if effect in effect_names:
+            return effect
+
+        raise gcmd.error(
+            f"{name} has invalid value '{effect}'\n"
+            f"Valid values are: {', '.join(options)}, (r,g,b), "
+            f"or one of the configured effects:\n"
+            f"{', '.join(effect_names)}"
+        )

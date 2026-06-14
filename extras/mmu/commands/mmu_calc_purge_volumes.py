@@ -32,7 +32,10 @@ class MmuCalcPurgeVolumesCommand(BaseCommand):
         + "SOURCE     = [gatemap|slicer]  Color source to build matrix from\n"
     )
     HELP_SUPPLEMENT = (
-        ""  # add examples here if desired
+        "Examples:\n"
+        + f"{CMD} SOURCE=gatemap MULTIPLIER=1.1 ...calc purge matrix colors defined in the gate map with scaling\n"
+        + f"{CMD} SOURCE=slicer MIN=50          ...calc purge matrix colors defined by slicer with minimum\n"
+        + f"(Use MMU_SLICER_TOOL_MAP PURGE_MAP=1 to see result)\n"
     )
 
     def __init__(self, mmu):
@@ -83,7 +86,7 @@ class MmuCalcPurgeVolumesCommand(BaseCommand):
                 mmu.slicer_tool_map['purge_volumes'] = self._generate_purge_matrix(
                     tool_rgb_colors, min_purge, max_purge, multiplier
                 )
-                mmu.log_always("Purge map updated. Use 'MMU_SLICER_TOOL_MAP PURGE_MAP=1' to view")
+                mmu.gcode.run_script_from_command("MMU_SLICER_TOOL_MAP PURGE_MAP=1")
             except Exception as e:
                 # Convert unexpected exceptions into MmuError so caller wrapper handles them consistently
                 raise MmuError("Error generating purge volues: %s" % str(e))

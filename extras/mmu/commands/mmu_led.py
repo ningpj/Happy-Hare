@@ -18,16 +18,16 @@
 from ..mmu_constants   import *
 from ..mmu_utils       import MmuError
 from .mmu_base_command import *
+from .mmu_misc_mixins  import LedMixin
 
 
-class MmuLedCommand(BaseCommand):
+class MmuLedCommand(LedMixin, BaseCommand):
 
     CMD = "MMU_LED"
 
     HELP_BRIEF = "Manage mode of operation of optional MMU LED's"
     HELP_PARAMS = (
         f"{CMD}: {HELP_BRIEF}\n"
-        + "UNIT          = #(int)|_name_|ALL Specify unit by name, number or all-units (optional if single unit)\n"
         + "ENABLE        = [0|1] Enable/disable\n"
         + "ANIMATION     = [0|1] Enable/disable animations\n"
         + "EXIT_EFFECT   = [off|gate_status|filament_color|slicer_color|r,g,b|_effect_]\n"
@@ -36,10 +36,14 @@ class MmuLedCommand(BaseCommand):
         + "LOGO_EFFECT   = [off|r,g,b|_effect_]\n"
         + "REFRESH       = [0|1] Force refresh of LED\n"
         + "QUIET         = [0|1] Don't report non-essential status\n"
+        + "UNIT          = #(int)|_name_ Specify unit by name, number else will operate on all-units\n"
         + "(no parameters for status report)\n"
     )
     HELP_SUPPLEMENT = (
-        ""  # add examples here if desired
+        "Examples:\n"
+        + f"{CMD} EXIT_EFFECT=filament_color LOGO_EFFECT=(.5,0,0) ...Set exit effect to filament_color and logo to dim red\n"
+        + f"{CMD} ANIMATION=0 UNIT=1                              ...Turn off animation for LED's on unit 1\n"
+        + f"{CMD} ENABLE=0                                        ...Turn off LED's\n"
     )
 
     def __init__(self, mmu):
@@ -51,37 +55,45 @@ class MmuLedCommand(BaseCommand):
             help_params=self.HELP_PARAMS,
             help_supplement=self.HELP_SUPPLEMENT,
             category=CATEGORY_GENERAL,
-            per_unit=True,
         )
 
-    def _run(self, gcmd, mmu_unit):
+    def _run(self, gcmd):
         # Note: BaseCommand wrapper already logs commandline + handles HELP=1.
         mmu = self.mmu
 
         quiet = bool(gcmd.get_int('QUIET', 0, minval=0, maxval=1))
         refresh = bool(gcmd.get_int('REFRESH', 0, minval=0, maxval=1))
 
-        if not mmu_unit.has_leds():
-            mmu.log_error("No MMU LEDs configured on %s" % unit.name)
-            return
-
-        msg = ""
         led_manager = mmu.led_manager
-        leds = mmu_unit.leds
-        unit = mmu_unit.unit_index
 
-        if leds:
+        mmu_unit = self.get_unit(gcmd, mode="optional")
+        for u in ([mmu_unit] if mmu_unit is not None else mmu.mmu_machine.units):
+
+            if not u.has_leds():
+                if not quiet:
+                    mmu.log_error("No MMU LEDs configured on %s" % u.name)
+                continue
+
+            msg = ""
+            leds = u.leds
+
             exit_effect = gcmd.get('EXIT_EFFECT', leds.exit_effect)
             entry_effect = gcmd.get('ENTRY_EFFECT', leds.entry_effect)
             status_effect = gcmd.get('STATUS_EFFECT', leds.status_effect)
             logo_effect = gcmd.get('LOGO_EFFECT', leds.logo_effect)
+
+            exit_effect = self._validate_effect(gcmd, "EXIT_EFFECT", u, exit_effect, self.EXIT_OPTIONS)
+            entry_effect = self._validate_effect(gcmd, "ENTRY_EFFECT", u, entry_effect, self.ENTRY_OPTIONS)
+            status_effect = self._validate_effect(gcmd, "STATUS_EFFECT", u, status_effect, self.STATUS_OPTIONS)
+            logo_effect = self._validate_effect(gcmd, "LOGO_EFFECT", u, logo_effect, self.LOGO_OPTIONS)
+
             enabled = bool(gcmd.get_int('ENABLE', leds.enabled, minval=0, maxval=1))
             animation = bool(gcmd.get_int('ANIMATION', leds.animation, minval=0, maxval=1))
 
             if leds.enabled and not enabled or refresh:
                 # Enabled to disabled or refresh
                 led_manager._set_led(
-                    mmu_unit.unit_index, None,
+                    u.unit_index, None,
                     exit_effect='off',
                     entry_effect='off',
                     status_effect='off',
@@ -91,7 +103,7 @@ class MmuLedCommand(BaseCommand):
                 if leds.animation and not animation:
                     # Turning animation off so clear existing effects
                     led_manager._set_led(
-                        mmu_unit.unit_index, None,
+                        u.unit_index, None,
                         exit_effect='off',
                         entry_effect='off',
                         status_effect='off',
@@ -116,7 +128,7 @@ class MmuLedCommand(BaseCommand):
 
                 if enabled:
                     led_manager._set_led(
-                        mmu_unit.unit_index, None,
+                        u.unit_index, None,
                         exit_effect='default',
                         entry_effect='default',
                         status_effect='default',
@@ -125,11 +137,11 @@ class MmuLedCommand(BaseCommand):
 
             if not quiet:
                 available = lambda effect, enabled : ("'%s'" % str(effect)) if enabled else "unavailable"
-                msg += "\nUnit %s LEDs (%s)\n" % (mmu_unit.unit_index, ("enabled" if enabled else "disabled"))
+                msg += "\nUnit %s LEDs (%s)\n" % (u.unit_index, ("enabled" if enabled else "disabled"))
                 msg += "  Animation: %s\n" % ("enabled" if animation else "disabled")
                 msg += "  Exit effect: %s\n" % available(exit_effect, leds.get_status()['exit'])
                 msg += "  Entry effect: %s\n" % available(entry_effect, leds.get_status()['entry'])
                 msg += "  Status effect: %s\n" % available(status_effect, leds.get_status()['status'])
                 msg += "  Logo effect: %s\n" % available(logo_effect, leds.get_status()['logo'])
 
-        mmu.log_always(msg)
+            mmu.log_always(msg)
