@@ -761,7 +761,7 @@ class MmuCalibratePsensorCommand(CalibrationMixin, BaseCommand):
 
         try:
             with mmu.wrap_sync_gear_to_extruder():
-                with mmu.wrap_gear_current(percent=mmu_unit.p.sync_gear_current, reason="while calibrating sync feedback buffer psensor"):
+                with mmu.wrap_gear_current(percent=100, reason="while calibrating sync feedback buffer psensor"):
                     mmu.calibrating = True
 
                     raw0 = _avg_raw()
