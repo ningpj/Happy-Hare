@@ -126,7 +126,7 @@ class MmuSensorManager:
             s = self.gate_sensors[gate]
             for old, new in (
                 ('mmu_pre_gate', SENSOR_ENTRY_PREFIX),
-                ('mmu_post_gear', SENSOR_EXIT_PREFIX),
+                ('mmu_gear', SENSOR_EXIT_PREFIX),
                 ('mmu_gate', SENSOR_SHARED_EXIT),
             ):
                 value = s.get(new)
