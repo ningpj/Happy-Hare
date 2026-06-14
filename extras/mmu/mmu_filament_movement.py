@@ -1853,6 +1853,7 @@ class MmuFilamentMovement:
                     self.toolhead.move(ext_pos, speed)
                     actual = dist
 
+                self.toolhead.flush_step_generation() # TTC mitigation
                 if wait:
                     self.movequeue_wait()
 

@@ -386,8 +386,10 @@ class MmuVirtualEndstopSensor(MmuSensor):
 
 
     def trigger_handler(self, eventtime, state):
+        # Update sensor functionality
         self.runout_helper.note_filament_present(eventtime, state)
 
+        # Process endstop if homing
         if self._homing and state == self._triggered:
             if self._trigger_completion is not None:
                 self._last_trigger_time = eventtime
