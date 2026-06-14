@@ -145,13 +145,13 @@ if MMU_HAS_SYNC_FEEDBACK_BUFFER
 
         config PARAM_ANALOG_SENSOR_THRESHOLD
           float "Sensor trigger threshold     "
-          default 0.7
+          default 0.5
           help
             analog_sensor_threshold
             The point at which the virtual compression/tension sensors are triggered (on 0-1 scale)
-            The roportional scale is always normalized from -1.0 to +1.0, so a setting of 0.7 means:
-              the virtual filament_compression sensor will trigger at 0.7
-              the virtual filament_tension sensor will trigger at -0.7
+            The roportional scale is always normalized from -1.0 to +1.0, so a setting of 0.5 means:
+              the virtual filament_compression sensor will trigger at 0.5
+              the virtual filament_tension sensor will trigger at -0.5
             This is extremely useful as the extruder homing endstop.
 
         comment "_"
