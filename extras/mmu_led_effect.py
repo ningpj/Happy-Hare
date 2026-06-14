@@ -689,7 +689,7 @@ class _ledEffect:
         if self.enabled != state:
             self.enabled = state
             self.nextEventTime = self.handler.reactor.NOW
-            self.handler._getFrames(self.handler.reactor.NOW)
+            self.handler.reactor.update_timer(self.handler.frameTimer, self.handler.reactor.NOW)
     
     def reset_frame(self):
         for layer in self.layers:
