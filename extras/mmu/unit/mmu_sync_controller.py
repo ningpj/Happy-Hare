@@ -981,6 +981,12 @@ class SyncController:
         self._last_time_s = None
         self._log_ready = False
 
+        # Cached jsonl log handle (kept open and flushed periodically to avoid
+        # per-tick open()+close() I/O on the reactor thread - a TTC contributor)
+        self._log_fh = None
+        self._log_write_counter = 0
+        self._log_flush_every = 20
+
         self.K = 2.0 / cfg.buffer_range_mm   # mm => normalized delta in x
         self.state = EKFState()
         self.state.c = max(cfg.c_min, min(cfg.c_max, c0))
@@ -1027,7 +1033,7 @@ class SyncController:
         cfg = self.cfg
         self._set_twolevel_active()
 
-        self._log_ready = False
+        self.close_log() # Release any cached handle before log path may change
         self._current_log_file = log_file or cfg.log_file
 
         # Rotation distance & baseline (always rebase)
@@ -1630,8 +1636,8 @@ class SyncController:
 
     def _init_log(self, log_file=None):
         """
-        (Re)create the log file and write a single header entry.
-        Clears any existing file.
+        (Re)create the log file with a header entry and open a cached handle that
+        subsequent _append_log_entry() calls reuse (open/close cost once per reset)
         """
         header = {
             "header": {
@@ -1643,19 +1649,58 @@ class SyncController:
             }
         }
 
-        with io.open(self._current_log_file, "a", encoding="utf-8") as f:
-            json.dump(header, f, ensure_ascii=False)
-            f.write("\n")
-        self._log_ready = True
+        self.close_log() # Don't leak an fd if reset() changed _current_log_file
+
+        try:
+            self._log_fh = io.open(self._current_log_file, "a", encoding="utf-8", buffering=8192)
+            json.dump(header, self._log_fh, ensure_ascii=False)
+            self._log_fh.write("\n")
+            self._log_fh.flush()
+            self._log_write_counter = 0
+            self._log_ready = True
+        except Exception:
+            # A bad log path just disables logging, doesn't kill the controller
+            if self._log_fh is not None:
+                try:
+                    self._log_fh.close()
+                except Exception:
+                    pass
+            self._log_fh = None
+            self._log_ready = False
 
 
     def _append_log_entry(self, record):
         """
-        Append a single JSON object to the log as one line.
+        Append a single JSON object to the log as one line, reusing the cached
+        handle and flushing only every self._log_flush_every ticks
         """
-        if not self._log_ready:
+        if not self._log_ready or self._log_fh is None:
             return
 
-        with io.open(self._current_log_file, "a", encoding="utf-8") as f:
-            json.dump(record, f, ensure_ascii=False)
-            f.write("\n")
+        try:
+            json.dump(record, self._log_fh, ensure_ascii=False)
+            self._log_fh.write("\n")
+            self._log_write_counter += 1
+            if self._log_write_counter >= self._log_flush_every:
+                self._log_fh.flush()
+                self._log_write_counter = 0
+        except Exception:
+            self.close_log() # Disable logging if the fs goes away mid-print
+
+
+    def close_log(self):
+        """
+        Flush and close the cached log handle if any. Safe to call repeatedly.
+        """
+        self._log_ready = False
+        if self._log_fh is not None:
+            try:
+                self._log_fh.flush()
+            except Exception:
+                pass
+            try:
+                self._log_fh.close()
+            except Exception:
+                pass
+            self._log_fh = None
+        self._log_write_counter = 0

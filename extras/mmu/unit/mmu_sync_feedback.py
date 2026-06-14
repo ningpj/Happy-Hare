@@ -53,8 +53,20 @@ class MmuSyncFeedback:
         self.ctrl = None
         self.flow_rate = 100.         # Estimated % flowrate (calc only for proportional sensors)
 
+        # Coalescing state for deferred gear rd updates: keep only the latest
+        # target with a single in-flight lookahead callback (all on reactor greenlet)
+        self._pending_rd = None
+        self._rd_cb_scheduled = False
+
+        # Fractional dead-band so sub-0.3% EKF chatter doesn't schedule an update
+        # every tick. Gated against the last committed rd, so sustained drift still
+        # accumulates and crosses the band (controller envelope clamp bounds excursions)
+        self._last_scheduled_rd = None
+        self._rd_deadband_frac = 0.003
+
         # Event handlers
         self.printer.register_event_handler('klippy:connect', self.handle_connect)
+        self.printer.register_event_handler('klippy:disconnect', self.handle_disconnect)
         self.printer.register_event_handler('mmu:initialized', self.handle_mmu_initialized)
 
         # Initial flowguard status (when using sync-feedback controller)
@@ -74,6 +86,16 @@ class MmuSyncFeedback:
             self.printer.register_event_handler("mmu:unsynced", self._handle_mmu_unsynced)
             self.printer.register_event_handler("mmu:sync_feedback", self._handle_sync_feedback)
             self.printer.register_event_handler("mmu:printing", self._handle_printing)
+            self.printer.register_event_handler("mmu:gate_selected", self._handle_gate_selected)
+
+
+    def handle_disconnect(self):
+        # Release any cached sync-controller jsonl log handle
+        if self.ctrl is not None:
+            try:
+                self.ctrl.close_log()
+            except Exception:
+                pass
 
 
     def handle_mmu_initialized(self):
@@ -254,6 +276,17 @@ class MmuSyncFeedback:
     # Internal implementation --------------------------------------------------
     #
 
+    def _invalidate_rd_scheduler(self):
+        """
+        Drop scheduler memory after the stepper rd was snapped outside _schedule_rd_update
+        (unsync, controller reset, gate change). Clearing _last_scheduled_rd makes the
+        dead-band fire on the next tick to re-cohere model and stepper; clearing _pending_rd
+        makes any in-flight lookahead callback early-exit. _rd_cb_scheduled is left to drain.
+        """
+        self._last_scheduled_rd = None
+        self._pending_rd = None
+
+
     def _telemetry_log_path(self, gate=None):
         if gate is None: gate = self.mmu.gate_selected
 
@@ -319,26 +352,91 @@ class MmuSyncFeedback:
         if self.new_autotuned_rd is not None:
             self.mmu_unit.calibrator.note_rd_telemetry(self.mmu.gate_selected, self.new_autotuned_rd)
 
-        # Restore default (last tuned) rotation distance in case it wasn't "autotune-saved" above
+        # Restore default (last tuned) rotation distance in case it wasn't "autotune-saved" above.
+        # This snaps rd outside the scheduler so invalidate its memory
         self.mmu_unit.calibrator.restore_gear_rd()
+        self._invalidate_rd_scheduler()
 
         # Optional but let's turn off extruder movement events
         self.mmu_unit.extruder_monitor().remove_callback(self._handle_extruder_movement)
 
 
+    def _handle_gate_selected(self, gate, prev_gate):
+        """
+        On gate swap the calibrator snaps the stepper to the new gate's calibrated rd
+        outside the scheduler (incl. type-B swaps that keep sync active), so invalidate.
+        Log handle is left to the controller's reset()/_init_log() to close+reopen.
+        """
+        if not self.mmu_unit.has_buffer(): return
+        self._invalidate_rd_scheduler()
+
+
     def _handle_extruder_movement(self, eventtime, move):
         """
         Event call when extruder has moved more than threshold. This also allows for
-        periodic rotation_distance adjustment, autotune and flowguard checking
+        periodic rotation_distance adjustment, autotune and flowguard checking.
+
+        Keeps the ExtruderMonitor timer body short by capturing the coherent
+        (move, state) pair and deferring the heavy EKF/FlowGuard/rd work to _do_update().
         """
         if not (self.mmu.is_enabled and self.p.sync_feedback_enabled and self.active): return
         if eventtime is None: eventtime = self.mmu.reactor.monotonic()
 
         self.mmu.log_trace("MmuSyncFeedback: Extruder movement event, move=%.1f" % move)
 
+        # Read sensor state now so (move, state) stays coherent if the deferred update lags
         state = self._get_sensor_state()
+        self.mmu.reactor.register_callback(
+            lambda pt, et=eventtime, m=move, s=state: self._do_update(et, m, s))
+
+
+    def _do_update(self, eventtime, move, state):
+        """
+        Deferred worker for _handle_extruder_movement. Re-checks gating since state
+        may have changed between scheduling and execution (e.g. unsync or reset)
+        """
+        if not (self.mmu.is_enabled and self.p.sync_feedback_enabled and self.active): return
+        if self.ctrl is None: return
         status = self.ctrl.update(eventtime, move, state)
         self._process_status(eventtime, status)
+
+
+    def _schedule_rd_update(self, rd):
+        """
+        Defer a gear stepper rd change to the printer toolhead's lookahead queue so it
+        lands between moves rather than mutating step_dist on an actively-stepping stepper.
+        Coalesces to the latest target with a single outstanding callback; fires
+        synchronously when the lookahead queue is empty (responsive when not printing)
+        """
+        self._pending_rd = rd
+        if self._rd_cb_scheduled:
+            return
+        self._rd_cb_scheduled = True
+        try:
+            self.mmu.toolhead.register_lookahead_callback(self._apply_pending_rd)
+        except Exception:
+            # Toolhead refused the callback; apply directly to keep model and stepper synced
+            self._rd_cb_scheduled = False
+            target = self._pending_rd
+            self._pending_rd = None
+            if target is not None:
+                self.mmu_unit.calibrator.apply_gear_rd(target)
+
+
+    def _apply_pending_rd(self, print_time):
+        """
+        Lookahead callback that mutates the stepper's rd, sequenced with extruder
+        motion. Consumes the latest coalesced target.
+        """
+        target = self._pending_rd
+        self._pending_rd = None
+        self._rd_cb_scheduled = False
+        if target is None:
+            return
+        # Skip if sync-feedback was turned off since scheduling (unsync restores rd itself)
+        if not (self.mmu.is_enabled and self.active):
+            return
+        self.mmu_unit.calibrator.apply_gear_rd(target)
 
 
     def _handle_sync_feedback(self, eventtime, state):
@@ -415,11 +513,25 @@ class MmuSyncFeedback:
             self.new_autotuned_rd = rd
             self.mmu.log_debug(msg)
 
-        # Always update instaneous gear stepper rotation_distance
+        # Update gear stepper rd, subject to a fractional dead-band against the last
+        # committed rd. Drops sub-0.3% EKF chatter; sustained drift still accumulates
+        # and crosses the band, and the controller's envelope clamp bounds both sides.
         rd_current, rd_prev, rd_tuned = output['rd_current'], output['rd_prev'], output['rd_tuned']
         if rd_current != rd_prev:
-            self.mmu.log_debug("MmuSyncFeedback: Altered rotation distance for gate %d from %.4f to %.4f" % (self.mmu.gate_selected, rd_prev, rd_current))
-            self.mmu_unit.calibrator.apply_gear_rd(rd_current)
+            # Controller model moved; whether it reaches the stepper is gated below
+            self.mmu.log_debug("MmuSyncFeedback: Recalculated rotation distance for gate %d from %.4f to %.4f" % (self.mmu.gate_selected, rd_prev, rd_current))
+            last = self._last_scheduled_rd
+            # First tick after activation/reset (last is None): always schedule
+            if last is None or last == 0.0 or abs(rd_current - last) / abs(last) > self._rd_deadband_frac:
+                # Dead-band fired: log accumulated delta since last commit (what crossed the band)
+                if last is None or last == 0.0:
+                    self.mmu.log_debug("MmuSyncFeedback: Altered rotation distance for gate %d to %.4f (initial)" % (self.mmu.gate_selected, rd_current))
+                else:
+                    delta = rd_current - last
+                    frac_pct = abs(delta) / abs(last) * 100.0
+                    self.mmu.log_debug("MmuSyncFeedback: Altered rotation distance for gate %d from %.4f to %.4f (delta %+.4f, %.2f%%)" % (self.mmu.gate_selected, last, rd_current, delta, frac_pct))
+                self._last_scheduled_rd = rd_current
+                self._schedule_rd_update(rd_current) # Defer to lookahead callback (lands between moves)
 
         # Proportional sensor (with autotune) allows for estimation of flow rate!
         if self.mmu.sensor_manager.has_sensor(SENSOR_PROPORTIONAL):
@@ -445,6 +557,9 @@ class MmuSyncFeedback:
             rd_start = self.mmu_unit.calibrator.get_gear_rd()
         else:
             rd_start = self.ctrl.autotune.get_rec_rd()
+        # Fresh controller state: invalidate so a stale queued lookahead callback
+        # can't apply an out-of-date target after activation
+        self._invalidate_rd_scheduler()
         status = self.ctrl.reset(eventtime, rd_start, starting_state, log_file=self._telemetry_log_path(), hard_reset=hard_reset)
         self._process_status(eventtime, status) # May adjust rotation_distance
 
