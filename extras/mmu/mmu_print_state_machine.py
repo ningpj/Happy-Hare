@@ -199,10 +199,19 @@ class MmuPrintStateMachine:
         """
         if not self.is_in_endstate():
             self.mmu.log_trace("on_print_end(%s)" % state)
+            # If we're leaving a paused state directly into an end-state, the
+            # slicer's PRINT_END has almost certainly been bypassed by pause_resume
+            # and the user's TURN_OFF_HEATERS never ran. Don't silently disarm the
+            # safety timer and leave the hotend (and bed) hot — explicitly turn
+            # heaters off before we tear down state.
+            was_paused = self.is_mmu_paused()
             self.mmu.movequeue_wait()
             self.mmu._clear_saved_toolhead_position()
             self.resume_to_state = "ready"
             self.paused_extruder_temp = None
+            if was_paused and state in ("complete", "cancelled", "error"):
+                self.mmu.log_info("Turning off heaters (slicer PRINT_END was bypassed by MMU pause)")
+                self.mmu.gcode.run_script_from_command("TURN_OFF_HEATERS")
             self.mmu.reactor.update_timer(self.mmu.hotend_off_timer, self.mmu.reactor.NEVER) # Don't automatically turn off extruder heaters
 
             self.mmu.gate_maps.restore_automap_option()
