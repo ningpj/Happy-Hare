@@ -28,14 +28,11 @@ class MmuGateMapCommand(BaseCommand):
     HELP_BRIEF = "Display or define the type and color of filaments on each gate"
     HELP_PARAMS = (
         f"{CMD}: {HELP_BRIEF}\n"
-        + "QUIET        = [0|1]\n"
-        + "RESET        = [0|1]\n"
-        + "GATES        = comma,separated,list OR single GATE\n"
-        + "MAP          = dict string for bulk update (hidden)\n"
-        + "REPLACE      = [0|1] (hidden - bulk replace)\n"
-        + "FROM_SPOOLMAN= [0|1] (hidden)\n"
-        + "GATE         = g\n"
-        + "NEXT_SPOOLID = id\n"
+        + "QUIET        = 1 To minimize console reporting\n"
+        + "RESET        = 1 To reset filament attributes to configured defaults\n"
+        + "GATES        = g,g,g comma separated list of gates (don't mix with GATE)\n"
+        + "GATE         = g Specify a single gate (don't mix with GATES)\n"
+        + "NEXT_SPOOLID = id Specify the spoolman id of the next filament loaded - automatically assigned\n"
         + "NAME         = # Filament name\n"
         + "MATERIAL     = # Material type\n"
         + "COLOR        = # Filament color as w3c name or RRGGBB or RRGGBBaa (without #)\n"
@@ -43,9 +40,15 @@ class MmuGateMapCommand(BaseCommand):
         + "TEMP         = # Default temperature of filament\n"
         + "SPEED        = % Speed override (use <100 for soft TPU types)\n"
         + "AVAILABLE    = [-1|0|1|2] Filament availability: Unknown | Empty | Available | Available from filament buffer\n"
+        + "(no parameters for status report)\n"
     )
     HELP_SUPPLEMENT = (
-        ""  # add examples here if desired
+        "Examples:\n"
+        + f"{CMD} GATES=0,1,2,3 AVAILABLE=1      ...Mark gates 0-3 as having filament available\n"
+        + f"{CMD} GATE=5 COLOR=red MATERIAL=pla  ...Set filament attributes for gate 5\n"
+        + f"{CMD} NEXT_SPOOLID=45                ...Automatically mark the next spool preloaded or loaded with spoolman id 45\n"
+        + f"{CMD} GATE=0 SPEED=50                ...Set load/unload speed of gate 0 to 50% - great for TPU!\n"
+        + f"{CMD} RESET=1                        ...Reset filament attributes to defaults optionally configured in cfg files\n"
     )
 
     def __init__(self, mmu):

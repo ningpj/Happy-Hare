@@ -277,6 +277,19 @@ class BaseCommand:
         )
 
 
+    def get_choice(gcmd, name, choices, default=None):
+        value = gcmd.get(name, default)
+        if value is None:
+            return None
+        try:
+            return choices[value]
+        except KeyError:
+            raise gcmd.error(
+                "%s must be one of [%s]"
+                % (name, ", ".join(sorted(choices)))
+        )
+
+
 # -----------------------------------------------------------------------------------------------------------
 # Common "checker" methods used to guard commands
 # Return:

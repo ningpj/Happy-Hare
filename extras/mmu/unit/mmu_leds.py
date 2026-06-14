@@ -185,7 +185,10 @@ class MmuLeds:
         return self.effects.get(operation, '')
 
     def get_rgb_for_effect(self, effect):
-        return self.effect_rgb[effect]
+        return self.effect_rgb.get(effect)
+
+    def get_effect_names(self):
+        return set(effect for effect in self.effect_rgb if effect)
 
     def get_status(self, eventtime=None):
         status = {segment: len(self.virtual_chains[segment].leds) for segment in self.SEGMENTS}
@@ -203,10 +206,19 @@ class MmuLeds:
     @staticmethod
     def string_to_rgb(rgb_string):
         if not isinstance(rgb_string, tuple):
-            rgb = re.sub(r"[\"'()]", '', rgb_string) # Clean up strings
+            rgb = re.sub(r"[\"'()]", '', rgb_string)
             rgb = tuple(float(x) for x in rgb.split(','))
         else:
-           rgb = rgb_string
+            rgb = rgb_string
+
         if len(rgb) != 3:
-            raise ValueError("%s is not a valid rgb tuple" % str(rgb_string))
+            raise ValueError(f"{rgb_string} is not a valid rgb tuple")
+
+        for value in rgb:
+            if not 0.0 <= value <= 1.0:
+                raise ValueError(
+                    f"{rgb_string} is not a valid rgb tuple. "
+                    f"RGB value {value} is out of range. Values must be between 0.0 and 1.0"
+                )
+
         return rgb

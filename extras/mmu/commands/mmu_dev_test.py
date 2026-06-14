@@ -987,6 +987,30 @@ class MmuTestCommand(BaseCommand):
                 mmu._auto_calibrate(direction, ratio, homing_movement)
 
             if gcmd.get_int('CALC_PURGE', 0, minval=0, maxval=1):
+
+                # Generate purge matrix based on filament colors (copied from mmu_calc_purge_volumes.py)
+                def generate_purge_matrix(tool_colors, purge_min, purge_max, multiplier):
+                    purge_vol_calc = PurgeVolCalculator(purge_min, purge_max, multiplier)
+
+                    # Build purge volume map (x=to_tool, y=from_tool)
+                    should_calc = lambda x,y: x < len(tool_colors) and y < len(tool_colors) and x != y
+                    purge_volumes = [
+                        [
+                            purge_vol_calc.calc_purge_vol_by_hex(tool_colors[y], tool_colors[x]) if should_calc(x,y) else 0
+                            for x in range(self.mmu.num_gates)
+                        ]
+                        for y in range(self.mmu.num_gates)
+                    ]
+                    return purge_volumes
+
+                def format_purge_matrix(purge_volumes):
+                    matrix_str = "\n".join(
+                        f"|{UI_SPACE.join(f'{v:4d}' for v in row)} |"
+                        for row in purge_volumes
+                    )
+                    return matrix_str
+
+
                 have_run_test = True
                 purge_vol_calc = PurgeVolCalculator(0, 800, 1.0)
 
@@ -997,10 +1021,14 @@ class MmuTestCommand(BaseCommand):
                 mmu.log_always("The purge vol from hex color #C0C0C0 to #F72323 is: {}".format(purge_vol))
 
                 tool_colors = ["FFFF00", "80FFFF", "FFFFFF", "FF8000"]
-                purge_volumes = mmu._generate_purge_matrix(tool_colors, 0, 800, 1.0)
+                purge_volumes = generate_purge_matrix(tool_colors, 0, 800, 1.0)
                 mmu.log_always("\ntool_colors={}\npurge_volumes={}".format(tool_colors, purge_volumes))
-                purge_volumes = mmu._generate_purge_matrix(tool_colors, 0, 800, 0.5)
-                mmu.log_always("\ntool_colors={}\npurge_volumes={}".format(tool_colors, purge_volumes))
+                matrix_str = format_purge_matrix(purge_volumes)
+                mmu.log_always(f"\ntool_colors={tool_colors}\npurge_volumes=\n{matrix_str}")
+
+                purge_volumes = generate_purge_matrix(tool_colors, 0, 800, 0.5)
+                matrix_str = format_purge_matrix(purge_volumes)
+                mmu.log_always(f"\ntool_colors={tool_colors}\npurge_volumes=\n{matrix_str}")
 
             runout = gcmd.get_int('RUNOUT', None, minval=0, maxval=1)
             if runout is not None:
