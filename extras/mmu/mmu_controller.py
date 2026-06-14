@@ -851,42 +851,66 @@ class MmuController(MmuFilamentMovement):
         msg_tools = "Tools: "
         msg_avail = "Avail: "
         msg_selct = "Selct: "
-        for unit in range(self.mmu_machine.num_units):
-            unit = self.mmu_machine.get_mmu_unit_by_index(unit)
-            gate_indices = range(unit.first_gate, unit.first_gate + unit.num_gates)
-            last_gate = gate_indices[-1] == self.num_gates - 1
-            sep = ("|" + divider) if not last_gate else "|"
+        bypass_shown = False
+
+        if self.filament_pos < FILAMENT_POS_START_BOWDEN:
+            bypass_fil_swatch = bypass_ext_swatch = UI_SEPARATOR
+        else:
+            bypass_fil_swatch = UI_SOLID_SQUARE
+            bypass_ext_swatch = UI_SOLID_TRIANGLE
+
+        for unit in self.mmu_machine.units:
+            show_bypass = unit is self.mmu_machine.unit_with_bypass
+            gate_indices = list(range(unit.first_gate, unit.first_gate + unit.num_gates))
+
+            if show_bypass:
+                gate_indices.append(TOOL_GATE_BYPASS) # Show on right of unit
+                bypass_shown = True
+
+            is_last = unit is self.mmu_machine.units[-1]
+            sep = ("|" + divider) if not is_last else "|"
             tool_strings = []
             select_strings = []
             fil_swatch = UI_SEPARATOR
             selct_char = "~" if unit.selector.is_homed else "X"
             for g in gate_indices:
-                msg_gates += "".join("|{:^3}".format(g) if g < 10 else "| {:2}".format(g))
 
-                fc = self._get_filament_char(g)
-                fcs = self._get_filament_char(g, show_letter=True, show_swatch=True)
-                msg_avail += "".join("|%s%s%s" % (fc, fcs, fc))
+                if g == TOOL_GATE_BYPASS:
+                    msg_gates += "|ByP"
+                    tool_strings.append(f"| {UI_SEPARATOR} ")
+                    msg_avail += f"| {bypass_fil_swatch} "
 
-                tool_str = "+".join("T%d" % t for t in range(self.num_gates) if self.ttg_map[t] == g)
-                tool_strings.append(("|%s " % (tool_str if tool_str else " {} ".format(UI_SEPARATOR)))[:4])
+                else:
+                    msg_gates += "".join("|{:^3}".format(g) if g < 10 else "| {:2}".format(g))
+
+                    fc = self._get_filament_char(g)
+                    fcs = self._get_filament_char(g, show_letter=True, show_swatch=True)
+                    msg_avail += "".join("|%s%s%s" % (fc, fcs, fc))
+
+                    tool_str = "+".join("T%d" % t for t in range(self.num_gates) if self.ttg_map[t] == g)
+                    tool_strings.append(("|%s " % (tool_str if tool_str else " {} ".format(UI_SEPARATOR)))[:4])
 
                 if g == self.gate_selected:
                     if self.filament_pos < FILAMENT_POS_START_BOWDEN:
-                        fil_swatch = UI_SEPARATOR
+                        ext_swatch = UI_SEPARATOR
                     else:
-                        fil_swatch = self._get_filament_char(g, show_swatch=True, symbol=UI_SOLID_TRIANGLE)
-
-                    select_strings.append("|\*/|")
+                        ext_swatch = self._get_filament_char(g, show_swatch=True, symbol=UI_SOLID_TRIANGLE)
+                    select_strings.append(f"|\{ext_swatch}/|")
                 else:
                     select_strings.append(selct_char * 4)
 
             unit_str = "{0:-^{width}}".format( " " + str(unit.name) + " ", width=len(gate_indices) * 4 + 1)
-            msg_units += unit_str + (divider if not last_gate else "")
+            msg_units += unit_str + (divider if not is_last else "")
             msg_gates += sep
             msg_avail += sep
             msg_tools += "".join(tool_strings) + sep
-            msg_selct += ("".join(select_strings) + selct_char)[:len(gate_indices) * 4 + 1] + (divider if not last_gate else "")
+            msg_selct += ("".join(select_strings) + selct_char)[:len(gate_indices) * 4 + 1] + (divider if not is_last else "")
             msg_selct = msg_selct.replace("*", fil_swatch)
+
+        if self.gate_selected == TOOL_GATE_BYPASS and not bypass_shown:
+            msg_tools += f" {UI_SEPARATOR} |ByP|"
+            msg_avail += f" {UI_SEPARATOR} | {bypass_fil_swatch} |"
+            msg_selct += f" {UI_SEPARATOR} {UI_SEPARATOR}\{bypass_ext_swatch}/{UI_SEPARATOR}"
 
         lines = [msg_units] if len(self.mmu_machine.units) > 1 else []
         lines.extend([msg_gates, msg_tools, msg_avail, msg_selct])

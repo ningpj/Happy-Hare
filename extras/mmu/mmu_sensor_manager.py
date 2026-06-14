@@ -86,15 +86,15 @@ class MmuSensorManager:
 
                 self.gate_sensors.append(gate_sensors)
 
-# PAUL TODO: Is this still needed in v4? Not a good idea because it would complicate filament positon recovery
-# PAUL TODO: ...better to allow for no bowden in filament move logic I think
-#                # Special case for "no bowden" (one unit) designs where mmu_shared_exit is an alias for extruder sensor
-#                if (
-#                    not mmu_unit.require_bowden_move and
-#                    gate_sensors.get(SENSOR_EXTRUDER_ENTRY) and
-#                    SENSOR_SHARED_EXIT not in self.gate_sensors
-#                ):
-#                    self.gate_sensors.update(connect_sensors([(mmu_unit.toolhead_wrapper.extruder_sensor, SENSOR_SHARED_EXIT)]))
+# PAUL TODO: this complicates filament position recovery. Need to address.
+                # Special case for "no bowden" designs where mmu_shared_exit is an alias for extruder sensor.
+                # This allows "gate loading" to use the extruder sensor
+                if (
+                    not mmu_unit.require_bowden_move and
+                    gate_sensors.get(SENSOR_EXTRUDER_ENTRY) and
+                    SENSOR_SHARED_EXIT not in self.gate_sensors
+                ):
+                    self.gate_sensors.update(connect_sensors([(mmu_unit.toolhead_wrapper.extruder_sensor, SENSOR_SHARED_EXIT)]))
 
                 suffixed_gate_sensors = collect_sensors([
                     (mmu_unit.sensors.entry_sensors.get(gate), self.get_gate_sensor_name(SENSOR_ENTRY_PREFIX, gate)),
