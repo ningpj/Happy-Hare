@@ -119,6 +119,7 @@ class MmuSyncFeedbackCommand(BaseCommand):
                 msg += "- FlowGuard: %s" % ("Active" if sf.flowguard_active else "Inactive")
                 if has_proportional:
                     msg += " (Flowrate: %.1f%%)" % sf.flow_rate
+                    msg += "\n- Tangle Prevention: %s" % ("Enabled (BOOSTED)" if sf._tangle_prevention_boosted else "Enabled" if sf.p.tangle_prevention_enabled else "Disabled")
 
                 mmu.log_always(msg)
             else:
