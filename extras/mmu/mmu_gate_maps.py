@@ -79,7 +79,7 @@ class MmuGateMaps:
         self.ttg_map = list(self.p.default_ttg_map)
 
         # Slicer tool map is populated only at start of print
-        self.slicer_tool_map = None             # Set by startup gcode from slicer during print
+        self.slicer_tool_map = None
 
 
 # -----------------------------------------------------------------------------------------------------------
@@ -412,7 +412,10 @@ class MmuGateMaps:
 
         for i in tools:
             gate = self.ttg_map[i]
-            filament_char = self.mmu._get_filament_char(gate, show_swatch=True)
+
+            fc = self.mmu._get_filament_char(gate)
+            fcs = self.mmu._get_filament_char(gate, show_letter=True, show_swatch=True)
+            filament_char = f"{fc}{fcs}{fc}"
             msg += "\n" if i and tool is None else ""
             msg += "T{:<2}-> Gate{:>2}({})".format(i, gate, filament_char)
 
@@ -469,7 +472,9 @@ class MmuGateMaps:
             temperature = self.gate_temperature[g] or "n/a"
 
             gate_fstr = ""
-            filament_char = self.mmu._get_filament_char(g, show_swatch=True)
+            fc = self.mmu._get_filament_char(g)
+            fcs = self.mmu._get_filament_char(g, show_letter=True, show_swatch=True)
+            filament_char = f"{fc}{fcs}{fc}"
             tools = ",".join("T{}".format(t) for t in range(self.num_gates) if self.ttg_map[t] == g)
             tools_fstr = (" [{}]".format(tools) if tools else "")
             gate_fstr = "{}".format(g).ljust(2, UI_SPACE)
