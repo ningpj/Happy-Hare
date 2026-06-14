@@ -152,7 +152,6 @@ class MmuProportionalSensor:
         virtual_tension_sensor = False,
         register=True
     ):
-
         self.printer = config.get_printer()
         self.reactor = self.printer.get_reactor()
         self.name = name
@@ -269,7 +268,7 @@ class MmuProportionalSensor:
 
         prev_state = self._vsensor_state
 
-        # Apply hysteresis before calling trigger and ititilize on first call
+        # Apply hysteresis before calling trigger and initilize on first call
         if self._vsensor_state is None:
             if self.value > self._vsensor_threshold_high:
                 self._vsensor_state = 1
