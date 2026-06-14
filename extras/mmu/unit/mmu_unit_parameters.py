@@ -157,6 +157,11 @@ class MmuUnitParameters(TunableParametersBase):
         ParamSpec('sync_feedback_debug_log',          'int',       0, section="SYNC FEEDBACK BUFFER", limits=dict(minval=0, maxval=1),    guard=_guard_has_buffer, fmt="%d"),
         ParamSpec('sync_feedback_force_twolevel',     'int',       0, section="SYNC FEEDBACK BUFFER", limits=dict(minval=0, maxval=1),    guard=_guard_has_buffer, hidden=True),
 
+        # Tangle prevention - gear current boost on high tension (spool resistance)
+        ParamSpec('tangle_prevention_enabled',        'int',       1, section="SYNC FEEDBACK BUFFER", limits=dict(minval=0, maxval=1),       guard=_guard_has_buffer, hidden=True, fmt="%d"),
+        ParamSpec('tangle_prevention_threshold',      'float',   0.3, section="SYNC FEEDBACK BUFFER", limits=dict(minval=0.2, maxval=0.9),   guard=_guard_has_buffer, hidden=True, fmt="%.2f"),
+        ParamSpec('tangle_prevention_release',        'float',   0.2, section="SYNC FEEDBACK BUFFER", limits=dict(minval=0.15, maxval=0.8),  guard=_guard_has_buffer, hidden=True, fmt="%.2f"),
+
         # FlowGuard
         ParamSpec('flowguard_enabled',                'int',       1, section="FLOWGUARD", limits=dict(minval=0, maxval=1), on_change=_on_flowguard_enabled, fmt="%d"),
         ParamSpec('flowguard_max_relief',             'float',   8.0, section="FLOWGUARD", limits=dict(above=1.0),          guard=_guard_has_buffer, fmt="%.1f"),
