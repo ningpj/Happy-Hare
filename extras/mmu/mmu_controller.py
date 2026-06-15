@@ -877,7 +877,7 @@ class MmuController(MmuFilamentMovement):
 
                 if g == TOOL_GATE_BYPASS:
                     msg_gates += "|Byp"
-                    tool_strings.append(f"|ass")
+                    tool_strings.append(f"| - ")
                     msg_avail += f"| {bypass_fil_swatch} "
 
                 else:
