@@ -876,8 +876,8 @@ class MmuController(MmuFilamentMovement):
             for g in gate_indices:
 
                 if g == TOOL_GATE_BYPASS:
-                    msg_gates += "|ByP"
-                    tool_strings.append(f"| {UI_SEPARATOR} ")
+                    msg_gates += "|Byp"
+                    tool_strings.append(f"|ass")
                     msg_avail += f"| {bypass_fil_swatch} "
 
                 else:
