@@ -40,7 +40,7 @@ class MmuTestGripCommand(BaseCommand):
             help_brief=self.HELP_BRIEF,
             help_params=self.HELP_PARAMS,
             help_supplement=self.HELP_SUPPLEMENT,
-            category=CATEGORY_TESTING
+            category=CATEGORY_TESTING,
         )
 
     def _run(self, gcmd):
@@ -53,5 +53,6 @@ class MmuTestGripCommand(BaseCommand):
             return
 
         # Grip filament then disable gear motor to test grip behavior
-        mmu.selector().filament_drive()
-        mmu.motors_onoff(on=False, motor="gear")
+        mmu_unit = self.get_unit(gcmd, mode="infer")
+        mmu_unit.selector.filament_drive()
+        mmu_unit.motors_onoff(on=False, motor="gear")
