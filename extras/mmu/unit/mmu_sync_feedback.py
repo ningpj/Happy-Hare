@@ -476,14 +476,15 @@ class MmuSyncFeedback:
             return float(self._get_sensor_state())
 
 
-    def _get_sensor_state(self):
+    def _get_sensor_state(self, use_virtual_threshold=False):
         """
         Get current tension state based on current sensor feedback.
+        Arg 'use_virtual_threshold' forces a descrete {-1, 0, 1) output even from proportional sensor
         Returns float in range [-1.0 .. 1.0] for proportional, {-1, 0, 1) for switch
         """
         sm = self.mmu.sensor_manager
         has_proportional   = sm.has_sensor(SENSOR_PROPORTIONAL)
-        if has_proportional:
+        if has_proportional and not use_virtual_threshold:
             sensor = sm.get_sensor_obj(SENSOR_PROPORTIONAL)
             return sensor.get_status(0).get('value', 0.)
 

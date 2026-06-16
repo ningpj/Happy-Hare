@@ -73,6 +73,45 @@ if MMU_HAS_SYNC_FEEDBACK_BUFFER
                ^          ^                  ^                                     ^                       ^^
           compression   tension        compression-only                      tension-only
 
+      choice CHOICE_BUFFER_SPRING_STATE
+        prompt "Buffer resting spring state"
+        default CHOICE_BUFFER_SPRING_STATE_NONE
+        help
+          If the buffer is sprung and reliably rests in one position it can be set here. This aids
+          filament detection logic. If 'none' (default) no assumption will be made about resting position.
+          IMPORTANT NOTE: This is the state the filament
+            - commonly an expanded buffer indicates filament "compression"
+            - while a squeezed buffer indicates filament "tension"
+ 
+
+        config CHOICE_BUFFER_SPRING_STATE_TENSION
+          bool "Tension / squeezed buffer"
+          help
+            Set if buffer spring naturally keeps buffer indicating filament tension
+
+        config CHOICE_BUFFER_SPRING_STATE_NEUTRAL
+          bool "Neutral"
+          help
+            Set if buffer spring naturally keeps buffer centered in neutral position
+
+        config CHOICE_BUFFER_SPRING_STATE_COMPRESSION
+          bool "Compression / expanded buffer"
+          help
+            Set if buffer spring naturally keeps buffer indicating filament compression
+
+        config CHOICE_BUFFER_SPRING_STATE_NONE
+          bool "n/a"
+          help
+            Set for no spring or if buffer doesn't have a relaible resting position
+      endchoice
+
+      config PARAM_BUFFER_SPRING_STATE
+        string
+        default "tension"     if CHOICE_BUFFER_SPRING_STATE_TENSION
+        default "neutral"     if CHOICE_BUFFER_SPRING_STATE_NEUTRAL
+        default "compression" if CHOICE_BUFFER_SPRING_STATE_COMPRESSION
+        default "none"
+
       comment "_"
       comment "Sensors"
 

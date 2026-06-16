@@ -1011,9 +1011,8 @@ class MmuFilamentMovement:
                 and u.p.toolhead_entry_tension_test
                 and synced
                 and not has_toolhead
-                and self.sensor_manager.check_sensor(SENSOR_COMPRESSION) # None if no mmu_buffer
             ):
-                if self.sensor_manager.check_sensor(SENSOR_PROPORTIONAL):
+                if self.sensor_manager.has_sensor(SENSOR_PROPORTIONAL):
                     # Sensorless + proportional sensor: distinct grip-establish + extruder pull validation
                     overshoot = self._validate_extruder_load_proportional(length)
                     length -= overshoot
@@ -1097,7 +1096,9 @@ class MmuFilamentMovement:
     def _validate_extruder_load_proportional(self, length):
         """
         Post-load extruder grip check using only the proportional sensor: feed synced to establish grip then
-        drive the extruder alone until the compression sensor releases. Returns distance consumed (0 if skipped)
+        drive the extruder alone until the compression sensor releases.
+        Returns:
+          distance consumed (0 if skipped)
         """
         u = self.mmu_unit()
         buffer_range  = u.buffer.buffer_maxrange
@@ -1147,6 +1148,7 @@ class MmuFilamentMovement:
             self.movequeue_dwell(0.2)  # Let ADC sensor catch up
             self.movequeue_wait()
 
+# PAUL seems like this should simply be a test of tension relax and not rely on compression sensor
             if not self.sensor_manager.check_sensor(SENSOR_COMPRESSION):
                 self.log_info(
                     f"Proportional post-load validation: compression "
@@ -1155,7 +1157,7 @@ class MmuFilamentMovement:
                 )
                 return moved
 
-        self.set_filament_pos_state(FILAMENT_POS_EXTRUDER_ENTRY)  # But could also still be POS_IN_BOWDEN!
+        self.set_filament_pos_state(FILAMENT_POS_EXTRUDER_ENTRY) # But could also still be POS_IN_BOWDEN!
 
         raise MmuError(
             f"Failed to load filament past the extruder entrance "
@@ -1375,6 +1377,9 @@ class MmuFilamentMovement:
                 if validate and not extruder_only and self.gate_selected != TOOL_GATE_BYPASS:
 
                     if self.sensor_manager.has_sensor(SENSOR_PROPORTIONAL):
+# PAUL: Original logic, but the endstop setting doesn't matter on unload!
+#                    if self.sensor_manager.has_sensor(SENSOR_PROPORTIONAL) and
+#                        u.p.extruder_homing_endstop == SENSOR_COMPRESSION:
                         # Use proportional sync-feedback buffer movement to validate success
                         self._validate_extruder_unload_proportional()
 
@@ -1409,6 +1414,10 @@ class MmuFilamentMovement:
             return synced, overshoot
 
 
+# PAUL: this seems to be problematic ... the extruder could pick up the filament again!
+# PAUL: if probe distance > unload safety then it probably will!
+# PAUL: why not just move extruder in retract direction, if proportional compresses, still trapped
+# PAUL: if no change (or more tension) filament is confirmed out
     def _validate_extruder_unload_proportional(self):
         """
         Use proportional sync-feedback buffer to validate filament is out of the extruder
@@ -2562,7 +2571,7 @@ class MmuFilamentMovement:
         filament_detected = self.sensor_manager.check_any_sensors_in_path()
         looks_loaded = self.sensor_manager.check_all_sensors_in_path()
         if not filament_detected:
-            filament_detected = self.check_filament_in_mmu() # Include encoder detection method
+            filament_detected = self.check_filament_in_mmu() # Checks sensors including buffer and encoder tests
 
         # Definitely loaded
         if ts:
@@ -2570,7 +2579,14 @@ class MmuFilamentMovement:
 
         # Probably loaded: Unless strict we will continue to assume loaded in the absence of sensors to say otherwise
         elif not strict and self.filament_pos == FILAMENT_POS_LOADED and looks_loaded:
-            pass
+            # Gate sensor alone can't tell "in bowden" from "loaded"; use proportional grip check
+            if can_heat and ts is None and es is None and self.sensor_manager.has_sensor(SENSOR_PROPORTIONAL):
+                prop_result = self.check_filament_in_extruder_proportional()
+                if prop_result is True:
+                    self.log_info("Proportional sensor confirms extruder grip - filament loaded")
+                elif prop_result is False:
+                    self.log_info("Proportional sensor indicates no extruder grip - filament may not be fully loaded")
+                    self.set_filament_pos_state(FILAMENT_POS_IN_BOWDEN, silent=silent)
 
         # Somewhere in extruder
         elif filament_detected and can_heat and self.check_filament_in_extruder(): # Encoder based
@@ -2625,14 +2641,32 @@ class MmuFilamentMovement:
         Returns:
             bool or None: True when filament is detected in the MMU path, False when not detected, or None when no test is possible.
         """
+        u = self.mmu_unit()
         self.log_debug("Checking for filament in MMU...")
+
+        # First check sensors in filament path
         detected = self.sensor_manager.check_any_sensors_in_path()
+
+        # Check resting postion of sprung sync-feedback buffer for positive identification of filament
+        if not detected and u.has_buffer():
+            resting_state = u.buffer.buffer_spring_state_num
+            state = u.sync_feedback._get_sensor_state(use_virtual_threshold=True) # Get discrete state
+            if resting_state is not None and state != resting_state:
+                detected = True
+                self.log_debug("Buffer is not in resting position thus filament must be present")
+
+        # Run encoder buzz test
         if not detected and self.has_encoder():
             self.selector().filament_drive() # Prevent accidental encoder movement by griping early
             detected = self.buzz_gear_motor()
-            self.log_debug("Filament %s in encoder after buzzing gear motor" % ("detected" if detected else "not detected"))
+            self.log_debug(
+                f"Filament {'detected' if detected else 'not detected'} "
+                f"in encoder after buzzing gear motor"
+            )
+
         if detected is None:
-            self.log_debug("No sensors configured!")
+            self.log_debug("Unable to check filament in MMU because no sensors available!")
+
         return detected
 
 
