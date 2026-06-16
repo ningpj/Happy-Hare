@@ -143,6 +143,10 @@ class MmuDrive():
         return self._driving_stepper.rail.has_endstop(endstop_name)
 
 
+    def get_endstop(self, endstop_name):
+        return self._driving_stepper.rail.get_homing_endstops(endstop_name)[0]
+
+
     def get_extra_endstop_names(self):
         return self._driving_stepper.rail.get_extra_endstop_names()
 

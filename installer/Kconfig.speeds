@@ -92,6 +92,16 @@ menu "Speeds"
       help
         Individual move distance below which is considered a short move
 
+    config PARAM_VIRTUAL_ENDSTOP_HOMING_SPEED
+      float "Virtual endstop homing speed    "
+      default 15
+      help
+        Special slow speed used for homing to virtual endstops (like
+        filament_compression and filament_tension with a proportional
+        sync-feedback buffer, or using Qidi filament width sensor
+        as a substitute for extruder or toolhead sensor.
+        This applies to all steppers using virtual endstops.
+
   endif
 
 
