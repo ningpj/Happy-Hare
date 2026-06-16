@@ -494,7 +494,8 @@ class MmuCalibrator:
             self.mmu_unit.encoder.set_resolution(new_resolution)
 
         else:
-            self.mmu.log_info(f"Autotune (disabled): {msg}. Ignored")
+            pass # Currently this option is hidden from user so we hide evidence of it
+            #self.mmu.log_info(f"Autotune (disabled): {msg}. Ignored")
 
 
     def note_rd_telemetry(self, gate, new_rd):

@@ -11,7 +11,7 @@
 #   PARAM_SKIP_CAL_ROTATION_DISTANCE
 #   PARAM_AUTOTUNE_ROTATION_DISTANCE
 #   PARAM_SKIP_CAL_ENCODER
-#   PARAM_AUTOTUNE_ENCODER
+#   PARAM_AUTOTUNE_ENCODER (experimental, currently disabled)
 
 menu "Calibration/Autotuning"
   config BOOL_AUTOCAL_BOWDEN_LENGTH
@@ -80,14 +80,15 @@ menu "Calibration/Autotuning"
     default 1 if BOOL_SKIP_CAL_ENCODER
     default 0
 
-  config BOOL_AUTOTUNE_ENCODER
-    bool "Autotune encoder"
-    default n
-    help
-      Automated encoder tuning.
-      Not Implemented Yet!
-  config PARAM_AUTOTUNE_ENCODER
-    int
-    default 1 if BOOL_AUTOTUNE_ENCODER
-    default 0
+# Experiemental: Currently disabled
+#  config BOOL_AUTOTUNE_ENCODER
+#    bool "Autotune encoder"
+#    default n
+#    help
+#      Automated encoder tuning.
+#      Not Implemented Yet!
+#  config PARAM_AUTOTUNE_ENCODER
+#    int
+#    default 1 if BOOL_AUTOTUNE_ENCODER
+#    default 0
 endmenu
