@@ -1744,7 +1744,7 @@ class MmuController(MmuFilamentMovement):
         self.log_trace("Disabling FlowGuard and runout detection")
         self.sensor_manager.disable_runout(self.gate_selected)
         self.mmu_unit().sync_feedback.deactivate_flowguard(eventtime)
-        self.mmu_unit().sync_feedback.deactivate_tangle_prevention()
+        self.mmu_unit().sync_feedback.deactivate_tangle_prevention(eventtime)
         return enabled
 
 
@@ -1756,7 +1756,7 @@ class MmuController(MmuFilamentMovement):
         self.sensor_manager.enable_runout(self.gate_selected)
         self.runout_last_enable_time = eventtime
         self.mmu_unit().sync_feedback.activate_flowguard(eventtime)
-        self.mmu_unit().sync_feedback.activate_tangle_prevention()
+        self.mmu_unit().sync_feedback.activate_tangle_prevention(eventtime)
 
 
     @contextlib.contextmanager
