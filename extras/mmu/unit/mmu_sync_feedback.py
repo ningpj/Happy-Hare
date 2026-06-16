@@ -201,28 +201,28 @@ class MmuSyncFeedback:
     # before a tangle develops. Parallels FlowGuard, armed/disarmed with filament monitoring so
     # it never interferes with load/unload moves
 
-    def activate_tangle_prevention(self):
+    def activate_tangle_prevention(self, eventtime):
         # Arm only with a proportional sensor present (filament monitoring enabled)
         if self.p.tangle_prevention_enabled and self.mmu.sensor_manager.has_sensor(SENSOR_PROPORTIONAL):
             self._tangle_prevention_active = True
             self.mmu.log_debug("Tangle Prevention: Armed")
 
 
-    def deactivate_tangle_prevention(self):
+    def deactivate_tangle_prevention(self, eventtime):
         # Disarm and restore boosted current (filament monitoring disabled)
         if self._tangle_prevention_active:
             self._tangle_prevention_active = False
             self.mmu.log_debug("Tangle Prevention: Disarmed")
-        self._restore_tangle_prevention_current("disarmed")
+        self._restore_tangle_prevention_current(eventtime, "disarmed")
 
 
-    def _reset_tangle_prevention(self):
+    def _reset_tangle_prevention(self, eventtime):
         # Disarm and restore boosted current on unsync
         self._tangle_prevention_active = False
-        self._restore_tangle_prevention_current("reset")
+        self._restore_tangle_prevention_current(eventtime, "reset")
 
 
-    def _restore_tangle_prevention_current(self, reason):
+    def _restore_tangle_prevention_current(self, eventtime, reason):
         if self._tangle_prevention_boosted:
             self._tangle_prevention_boosted = False
             restore_percent = self.p.sync_gear_current
@@ -422,7 +422,7 @@ class MmuSyncFeedback:
         self.active = False
 
         # Reset tangle prevention state and restore current if boosted
-        self._reset_tangle_prevention()
+        self._reset_tangle_prevention(eventtime)
 
         if self.new_autotuned_rd is not None:
             self.mmu_unit.calibrator.note_rd_telemetry(self.mmu.gate_selected, self.new_autotuned_rd)
