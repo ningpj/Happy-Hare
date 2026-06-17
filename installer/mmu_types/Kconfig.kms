@@ -20,6 +20,11 @@ config MMU_TYPE_KMS_1_0
   select DISABLE_NUM_GATES_OPTION
   imply OPTION_KMS_BUFFER
 
+
+# -------------------------------------
+# Buffer option
+# -------------------------------------
+
 if MMU_TYPE_KMS_1_0
   config OPTION_KMS_BUFFER
     bool "KMS buffer"
@@ -44,6 +49,11 @@ if MMU_TYPE_KMS_1_0
 
 endif
 
+
+# -------------------------------------
+# Defaults
+# -------------------------------------
+
 if MMU_TYPE_KMS_1_0
 
   if SHOW_MMU_ADDITIONS_WITH_TYPE
@@ -51,10 +61,6 @@ if MMU_TYPE_KMS_1_0
   endif
 
   source "Kconfig.capabilities"
-
-  ####################
-  ##### Defaults #####
-  ####################
 
   config PARAM_VENDOR
     default "KMS"
@@ -96,5 +102,7 @@ if MMU_TYPE_KMS_1_0
 
   config PARAM_FILAMENT_HEATER
     default "$(UNIT_NAME)_heater"
+
+  comment "_"
 
 endif 

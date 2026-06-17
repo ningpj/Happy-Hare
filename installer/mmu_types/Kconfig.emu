@@ -1,5 +1,5 @@
 config MMU_TYPE_EMU_1_0
-  bool "EMU  - [E]xpandable [M]ulti-material [U]nit"
+  bool "EMU  - Expandable Multi-material Unit"
   help
     EMU is a modular type-B MMU with each spool being contained in it's own
     (optionally heater) enclosure. It had many features and is an incredible
@@ -19,7 +19,12 @@ config MMU_TYPE_EMU_1_0
   select BOOL_ENABLE_SYNC_TO_EXTRUDER
   select BOOL_ENABLE_SYNC_FORM_TIP
   select BOOL_ENABLE_SYNC_PURGE
-  imply OPTION_PSF_BUFFER
+  imply  OPTION_PSF_BUFFER
+
+
+# -------------------------------------
+# Buffer option
+# -------------------------------------
 
 if MMU_TYPE_EMU_1_0
   config OPTION_PSF_BUFFER
@@ -42,7 +47,14 @@ if MMU_TYPE_EMU_1_0
     default 16
 endif
 
+
+# -------------------------------------
+# Defaults
+# -------------------------------------
+
 if MMU_TYPE_EMU_1_0
+
+  source "Kconfig.num_gates"
 
   if SHOW_MMU_ADDITIONS_WITH_TYPE
     source "Kconfig.mmu_additions"
@@ -50,16 +62,14 @@ if MMU_TYPE_EMU_1_0
 
   source "Kconfig.capabilities"
 
-  ####################
-  ##### Defaults #####
-  ####################
-
   config PARAM_VENDOR
     default "EMU"
   config PARAM_VERSION
     default "1.0"  
+
   config PARAM_NUM_GATES
-    default 4
+    default 5
+
   choice BOARD_TYPE
     default BOARD_TYPE_EMU_SLB_1_0
   endchoice
@@ -90,9 +100,11 @@ if MMU_TYPE_EMU_1_0
     default 100
 
   config PARAM_ENVIRONMENT_SENSORS
-    default "$(UNIT_NAME)_environment"
+    generated_default "$(UNIT_NAME)_env%d" "" PARAM_NUM_GATES
 
   config PARAM_FILAMENT_HEATERS
-    default "$(UNIT_NAME)_heater"
+    generated_default "$(UNIT_NAME)_heater%d" "" PARAM_NUM_GATES
+
+  comment "_"
 
 endif 

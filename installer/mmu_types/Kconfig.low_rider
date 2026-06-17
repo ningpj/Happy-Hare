@@ -40,4 +40,6 @@ if MMU_TYPE_LOW_RIDER_1_0
   config PARAM_GATE_HOMING_MAX
     default 1000
 
+  comment "_"
+
 endif 

@@ -3463,6 +3463,35 @@ class Kconfig(object):
 
                 node.item.is_optional = True
 
+            elif t0 is _T_GENERATED_DEFAULT: # Happy Hare: Added
+                if node.item.__class__ is not Symbol:
+                    self._parse_error("generated_default is only valid for symbols")
+
+                template = self._tokens[1]
+                arg_names = self._tokens[2]
+                self._tokens_i = 3
+
+                if template.__class__ is not str:
+                    self._parse_error("expected generated_default template string")
+
+                if arg_names.__class__ is Symbol:
+                    if not arg_names.is_constant:
+                        self._parse_error("expected generated_default argument-name string")
+                    arg_names = arg_names.name
+                elif arg_names.__class__ is not str:
+                    self._parse_error("expected generated_default argument-name string")
+
+                args = [self._lookup_sym(name) for name in arg_names.split()]
+
+                repeat_sym = None
+                if self._tokens[self._tokens_i].__class__ is Symbol:
+                    repeat_sym = self._tokens[self._tokens_i]
+                    self._tokens_i += 1
+
+                node.generated_defaults.append(
+                    (template, args, repeat_sym, self._parse_cond())
+                )
+
             else:
                 # Reuse the tokens for the non-property line later
                 self._reuse_tokens = True
@@ -3679,6 +3708,14 @@ class Kconfig(object):
                 if node.prompt:
                     depend_on(sym, node.prompt[1])
 
+            # Happy Hare: Added
+            for template, args, repeat_sym, cond in sym.generated_defaults:
+                for arg in args:
+                    depend_on(sym, arg)
+                if repeat_sym is not None:
+                    depend_on(sym, repeat_sym)
+                depend_on(sym, cond)
+
             # The default values and their conditions
             for value, cond in sym.defaults:
                 depend_on(sym, value)
@@ -3852,6 +3889,13 @@ class Kconfig(object):
                                       cur.prompt[1],
                                       self._make_and(visible_if, dep)))
 
+                # Happy Hare: Added
+                if cur.generated_defaults:
+                    cur.generated_defaults = [
+                        (template, args, repeat_sym, self._make_and(cond, dep))
+                        for template, args, repeat_sym, cond in cur.generated_defaults
+                    ]
+
                 # Propagate dependencies to defaults
                 if cur.defaults:
                     cur.defaults = [(default, self._make_and(cond, dep))
@@ -3896,6 +3940,7 @@ class Kconfig(object):
         sym.direct_dep = self._make_or(sym.direct_dep, node.dep)
 
         sym.defaults += node.defaults
+        sym.generated_defaults += node.generated_defaults # Happy Hare: Added
         sym.ranges += node.ranges
         sym.selects += node.selects
         sym.implies += node.implies
@@ -4451,6 +4496,7 @@ class Symbol(object):
         "_write_to_conf",
         "choice",
         "defaults",
+        "generated_defaults", # Happy Hare: Added
         "direct_dep",
         "env_var",
         "implies",
@@ -4607,12 +4653,19 @@ class Symbol(object):
                 # If the symbol is visible and has a user value, use that
                 val = self.user_value
             else:
-                # Otherwise, look at defaults
-                for sym, cond in self.defaults:
+                # Happy Hare: Added else block
+                for template, args, repeat_sym, cond in self.generated_defaults:
                     if expr_value(cond):
-                        val = sym.str_value
+                        val = _generated_default_value(template, args, repeat_sym)
                         self._write_to_conf = True
                         break
+                else:
+                    # Otherwise, look at defaults
+                    for sym, cond in self.defaults:
+                        if expr_value(cond):
+                            val = sym.str_value
+                            self._write_to_conf = True
+                            break
 
         elif self.orig_type is FLOAT: # Happy Hare: Added
             if vis and self.user_value is not None:
@@ -5004,6 +5057,7 @@ class Symbol(object):
         self.nodes = []
 
         self.defaults = []
+        self.generated_defaults = [] # Happy Hare: Added
         self.selects = []
         self.implies = []
         self.ranges = []
@@ -5158,6 +5212,11 @@ class Symbol(object):
             return TRI_TO_STR[val]
 
         if self.orig_type:  # STRING/INT/HEX
+            # Happy Hare: Added (favor generated defaults)
+            for template, args, repeat_sym, cond in self.generated_defaults:
+                if expr_value(cond):
+                    return _generated_default_value(template, args, repeat_sym)
+
             for default, cond in self.defaults:
                 if expr_value(cond):
                     return default.str_value
@@ -5840,6 +5899,7 @@ class MenuNode(object):
 
         # Properties
         "defaults",
+        "generated_defaults", # Happy Hare: Added
         "selects",
         "implies",
         "ranges",
@@ -5851,6 +5911,7 @@ class MenuNode(object):
         # only applies to these, in case a symbol is defined in multiple
         # locations.
         self.defaults = []
+        self.generated_defaults = [] # Happy Hare: Added
         self.selects = []
         self.implies = []
         self.ranges = []
@@ -5913,6 +5974,13 @@ class MenuNode(object):
 
         for value, cond in self.defaults:
             res |= expr_items(value)
+            res |= expr_items(cond)
+
+        # Happy Hare: Added
+        for template, args, repeat_sym, cond in self.generated_defaults:
+            res.update(args)
+            if repeat_sym is not None:
+                res.add(repeat_sym)
             res |= expr_items(cond)
 
         for value, cond in self.selects:
@@ -6584,6 +6652,33 @@ def _strcmp(s1, s2):
 
     return (s1 > s2) - (s1 < s2)
 
+# Happy Hare: Added
+def _generated_default_value(template, args, repeat_sym=None):
+    def sym_val(sym):
+        if sym.orig_type in _INT_HEX_FLOAT:
+            try:
+                return int(sym.str_value, 0)
+            except ValueError:
+                return sym.str_value
+        return sym.str_value
+
+    base_args = [sym_val(arg) for arg in args]
+
+    try:
+        if repeat_sym is None:
+            return template % tuple(base_args)
+
+        count = int(repeat_sym.str_value, 0)
+        if count <= 0:
+            return ""
+
+        return ", ".join(
+            template % tuple(base_args + [i])
+            for i in range(count)
+        )
+
+    except Exception:
+        return ""
 
 def _sym_to_num(sym):
     # expr_value() helper for converting a symbol to a number. Raises
@@ -7084,6 +7179,7 @@ except AttributeError:
     _T_COMMENT,
     _T_CONFIG,
     _T_DEFAULT,
+    _T_GENERATED_DEFAULT, # Happy Hare: Added
     _T_DEFCONFIG_LIST,
     _T_DEF_BOOL,
     _T_DEF_HEX,
@@ -7129,7 +7225,7 @@ except AttributeError:
     _T_TRISTATE,
     _T_UNEQUAL,
     _T_VISIBLE,
-) = range(1, 54) # Happy Hare: 51->54
+) = range(1, 55) # Happy Hare: 51->55
 
 # Keyword to token map, with the get() method assigned directly as a small
 # optimization
@@ -7148,6 +7244,7 @@ _get_keyword = {
     "def_string":     _T_DEF_STRING,
     "def_tristate":   _T_DEF_TRISTATE,
     "default":        _T_DEFAULT,
+    "generated_default": _T_GENERATED_DEFAULT, # Happy Hare: Added
     "defconfig_list": _T_DEFCONFIG_LIST,
     "depends":        _T_DEPENDS,
     "endchoice":      _T_ENDCHOICE,
@@ -7273,6 +7370,7 @@ _STRING_LEX = frozenset({
     _T_SOURCE,
     _T_STRING,
     _T_TRISTATE,
+    _T_GENERATED_DEFAULT, # Happy Hare: Added
 })
 
 # Various sets for quick membership tests. Gives a single global lookup and

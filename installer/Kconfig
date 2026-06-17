@@ -15,6 +15,31 @@
 # don't want the abilty to "reset to default" and you want past values to be "sticky" you
 # must use alternative names (or unamed choice)
 #
+# Some Happy Hare augmented features:
+# Kconfig:
+# 1. Dynamic defaults 'generated_default' (simple substitution with optional iterator to create list)
+#    config PARAM_TEST1
+#      string "CSV list"
+#      generated_default "%s_%s_%d" "PARAM_VENDOR PARAM_VERSION" PARAM_NUM_GATES
+#
+#    config PARAM_TEST2
+#      string "Dynamic default"
+#      generated_default "%s_%s_%d" "PARAM_VENDOR PARAM_VERSION PARAM_NUM_GATES"
+#
+# 2. Added float type
+# 3. Option 'force_show'to force display even if dependency isn't met
+# 4. Recording of default value with #~DEFAULT~# magic token
+# 5. default expansion macro (to avoid multiple lines):
+#      @defaults template="neopixel:$(UNIT_NAME)_leds (1-%d)" ifsym=PARAM_NUM_GATES min=1 max=32@
+# 6. help added to menus
+#
+# Menuconfig:
+# 1. 'r' to reset value to default
+# 2. Flexible comment lines and section separated
+# 3. Lots of formatting changes and style options
+# 4. Variable input dialogs with better parsing
+#
+#
 # Capability parmams:
 #   MMU_HAS_BUFFER_MCU
 #   MMU_HAS_EJECT_BUTTONS

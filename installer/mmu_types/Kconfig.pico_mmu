@@ -48,4 +48,6 @@ if MMU_TYPE_PICO_MMU_1_0
   config PARAM_GATE_PARKING_DISTANCE
     default 25
 
+  comment "_"
+
 endif 

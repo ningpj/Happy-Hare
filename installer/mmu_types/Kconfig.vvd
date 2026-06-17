@@ -103,4 +103,6 @@ if MMU_TYPE_VVD_1_0
   config PARAM_HEATER_MAX_TEMP
     default "75"
 
+  comment "_"
+
 endif 
