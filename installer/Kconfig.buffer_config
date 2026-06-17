@@ -115,18 +115,6 @@ if MMU_HAS_SYNC_FEEDBACK_BUFFER
       comment "_"
       comment "Sensors"
 
-      config BOOL_REGISTER_BUFFER_SENSORS
-        bool "Register buffer sensors          "
-        default y
-        help
-          Whether to register the sensors for visibility in klipper UI's
-          and with QUERY_SENSOR command. There is no harm in doing this but
-          it can be disabled to reduce clutter.
-      config PARAM_REGISTER_BUFFER_SENSORS
-        int
-        default 1 if BOOL_REGISTER_BUFFER_SENSORS
-        default 0
-
       config UNSELECT_MMU_HAS_SENSOR_BUFFER_COMPRESSION
           bool
       config MMU_HAS_SENSOR_BUFFER_COMPRESSION
@@ -229,6 +217,18 @@ if MMU_HAS_SYNC_FEEDBACK_BUFFER
             more sensitive at one end of travel verses the other.
 
       endif
+
+      config BOOL_REGISTER_BUFFER_SENSORS
+        bool "Register buffer sensors          "
+        default y
+        help
+          Whether to register the sensors for visibility in klipper UI's
+          and with QUERY_SENSOR command. There is no harm in doing this but
+          it can be disabled to reduce clutter.
+      config PARAM_REGISTER_BUFFER_SENSORS
+        int
+        default 1 if BOOL_REGISTER_BUFFER_SENSORS
+        default 0
 
     endif
   endmenu

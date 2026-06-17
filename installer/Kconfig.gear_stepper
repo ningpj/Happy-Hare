@@ -24,4 +24,8 @@ menu "Gear stepper"
     float "Gear hold current     "
     default 0.1
 
+  config PARAM_GEAR_MICROSTEPS
+    int "Microsteps            "
+    default 16
+
 endmenu

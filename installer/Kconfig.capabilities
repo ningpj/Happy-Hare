@@ -49,6 +49,10 @@ config MMU_HAS_ESPOOLER
 
 config MMU_HAS_FILAMENT_BUFFER
   def_bool n
+config PARAM_HAS_FILAMENT_BUFFER
+    int
+    default 1 if MMU_HAS_FILAMENT_BUFFER
+    default 0
 
 config MMU_HAS_LEDS
   def_bool n

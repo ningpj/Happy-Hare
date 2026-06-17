@@ -42,4 +42,9 @@ choice BOARD_TYPE
     rsource "custom/Kconfig.vvd"
   endif
 
+  # EMU has special recommended mcu
+  if MMU_TYPE_EMU_1_0
+    rsource "custom/Kconfig.emu_slb"
+  endif
+
 endchoice
