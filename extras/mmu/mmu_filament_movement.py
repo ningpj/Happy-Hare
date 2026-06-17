@@ -1148,7 +1148,9 @@ class MmuFilamentMovement:
             self.movequeue_dwell(0.2)  # Let ADC sensor catch up
             self.movequeue_wait()
 
-# PAUL seems like this should simply be a test of tension relax and not rely on compression sensor
+# PAUL: seems like this should simply be a test of tension relax and not rely on compression sensor
+# PAUL: because what if compression is not triggered at the start of the operation?
+# PAUL: seems like it would be more reliable this way
             if not self.sensor_manager.check_sensor(SENSOR_COMPRESSION):
                 self.log_info(
                     f"Proportional post-load validation: compression "
@@ -1415,9 +1417,13 @@ class MmuFilamentMovement:
 
 
 # PAUL: this seems to be problematic ... the extruder could pick up the filament again!
-# PAUL: if probe distance > unload safety then it probably will!
-# PAUL: why not just move extruder in retract direction, if proportional compresses, still trapped
-# PAUL: if no change (or more tension) filament is confirmed out
+# PAUL: if probe distance > unload safety then it probably will and springiness in the filament
+# PAUL: could cause it to catch.
+# PAUL: why not just move extruder in retract direction, if proportional indicates further compression,
+# PAUL: then the filament is still trapped. If no change (or more tension) filament is confirmed out
+# PAUL: That said, why not change unload_extruder() so that the 'toolhead_unload_safety_margin'
+# PAUL: move is done JUST with extruder stepper... that guarantee's removal and doesn't complicate with
+# PAUL: overshoot into bowden?!
     def _validate_extruder_unload_proportional(self):
         """
         Use proportional sync-feedback buffer to validate filament is out of the extruder
@@ -2205,8 +2211,8 @@ class MmuFilamentMovement:
         u = self.mmu_unit()
 
         # Virtual endstops (e.g. proportional-backed compression) trigger via ADC polling
-        # so use special slow speed
-        if homing_move != 0 and virtual_endstop:
+        # so use special slow speed for short movements
+        if homing_move != 0 and virtual_endstop and abs(dist) <= u.p.gear_short_move_threshold:
             speed = speed or u.p.virtual_endstop_homing_speed
 
         if motor in ["gear"]:
