@@ -2305,127 +2305,232 @@ class Kconfig(object):
 #
 #        return True
 
-    # Happy Hare added vvv
+    # Happy Hare added vv
+    # Replacement with support for injecting expanded blocks via a simple macro:
     #
-    # Replacement with support for injecting expanded lines via a simple macro:
-    #
-    #   @defaults template="neopixel:$(UNIT_NAME)_leds (1-%d)" ifsym=PARAM_NUM_GATES min=1 max=32@
+    #   @repeat var=i min=1 max=3@
+    #       default "heater$(i)" if PARAM_NUM_GATES = $(i)
+    #   @endrepeat@
     #
     # Expands into:
-    #   default "neopixel:$(UNIT_NAME)_leds (1-1)" if PARAM_NUM_GATES = 1
-    #   ...
-    #   default "neopixel:$(UNIT_NAME)_leds (1-32)" if PARAM_NUM_GATES = 32
+    #   default "heater1" if PARAM_NUM_GATES = 1
+    #   default "heater2" if PARAM_NUM_GATES = 2
+    #   default "heater3" if PARAM_NUM_GATES = 3
+    #
+    # The placeholder $(i) is replaced with each value in the range [min..max].
+    # Nested @repeat blocks are supported.
+    #
     def _next_line(self):
-            # Fetches and tokenizes the next line from the current Kconfig file.
-            # Returns False at EOF and True otherwise.
-            #
-            # Supports:
-            #   @defaults template="..." ifsym=SYM min=1 max=32@
-            #
-            # Expands into:
-            #   default "..." if SYM = N
-            #   for N in [min..max]
-
-            if self._reuse_tokens:
-                self._reuse_tokens = False
-                return True
-
-            if not hasattr(self, "_line_queue"):
-                self._line_queue = []
-
-            def _to_int(s, name):
-                try:
-                    return int(s, 10)
-                except Exception:
-                    self._parse_error("invalid integer for '%s': %r (in @defaults)" % (name, s))
-
-            def _parse_defaults_macro(raw_line):
-                import shlex
-
-                stripped = raw_line.strip()
-                if not stripped:
-                    return None
-
-                if not (stripped.startswith("@defaults") and stripped.endswith("@")):
-                    return None
-
-                # Extract inner directive text
-                inner = stripped[len("@defaults"):].strip()
-                inner = inner[:-1].strip()  # remove trailing '@'
-
-                lex = shlex.shlex(inner, posix=True)
-                lex.whitespace_split = True
-
-                args = {}
-                for tok in list(lex):
-                    if "=" not in tok:
-                        self._line = raw_line
-                        self._parse_error("bad @defaults token (expected key=value): %r" % tok)
-                    k, v = tok.split("=", 1)
-                    args[k.strip()] = v.strip()
-
-                template = args.get("template")
-                ifsym = args.get("ifsym")
-                mn = args.get("min")
-                mx = args.get("max")
-
-                if template is None or ifsym is None or mn is None or mx is None:
-                    self._line = raw_line
-                    self._parse_error(
-                        "missing required @defaults args (need template=..., ifsym=..., min=..., max=...)"
-                    )
-
-                mn_i = _to_int(mn, "min")
-                mx_i = _to_int(mx, "max")
-
-                if mn_i > mx_i:
-                    self._line = raw_line
-                    self._parse_error("@defaults has min > max (%d > %d)" % (mn_i, mx_i))
-
-                out = []
-                for i in range(mn_i, mx_i + 1):
-                    try:
-                        rendered = template % i
-                    except Exception:
-                        self._line = raw_line
-                        self._parse_error(
-                            "template formatting failed for i=%d. "
-                            "Template must use printf-style formatting like %%d" % i
-                        )
-
-                    out.append('default "%s" if %s = %d\n' % (rendered, ifsym, i))
-
-                return out
-
-            # --- Fetch next line ---
-
-            if self._line_queue:
-                line = self._line_queue.pop(0)
-            else:
-                line = self._readline()
-                if not line:
-                    return False
-                self.linenr += 1
-
-                # Handle line joining
-                while line.endswith("\\\n"):
-                    line = line[:-2] + self._readline()
-                    self.linenr += 1
-
-            # Expand macro (if present)
-            expanded = _parse_defaults_macro(line)
-            if expanded:
-                # Inject generated lines
-                self._line_queue = expanded[1:] + self._line_queue
-                line = expanded[0]
-
-            # IMPORTANT: Set self._line for proper error reporting
-            self._line = line
-
-            self._tokens = self._tokenize(line)
-            self._tokens_i = 1
+        if self._reuse_tokens:
+            self._reuse_tokens = False
             return True
-# Happy Hare added ^^^
+
+        if not hasattr(self, "_line_queue"):
+            self._line_queue = []
+
+        def _to_int(s, name, macro="@repeat"):
+            try:
+                return int(s, 10)
+            except Exception:
+                self._line = getattr(self, "_line", "")
+                self._parse_error(
+                    "invalid integer for '%s': %r (in %s)" % (name, s, macro)
+                )
+
+        def _parse_keyvals(inner, macro_name):
+            import shlex
+
+            lex = shlex.shlex(inner, posix=True)
+            lex.whitespace_split = True
+
+            args = {}
+            for tok in list(lex):
+                if "=" not in tok:
+                    self._parse_error(
+                        "bad %s token (expected key=value): %r" %
+                        (macro_name, tok)
+                    )
+                k, v = tok.split("=", 1)
+                args[k.strip()] = v.strip()
+            return args
+
+        def _parse_if_start(raw_line):
+            stripped = raw_line.strip()
+
+            if stripped.startswith("@if ") and stripped.endswith("@"):
+                return ("if", stripped[4:-1].strip())
+
+            if stripped.startswith("@ifnot ") and stripped.endswith("@"):
+                return ("ifnot", stripped[7:-1].strip())
+
+            return None
+
+        def _parse_repeat_start(raw_line):
+            stripped = raw_line.strip()
+            if not (stripped.startswith("@repeat") and stripped.endswith("@")):
+                return None
+
+            inner = stripped[len("@repeat"):].strip()
+            inner = inner[:-1].strip()
+
+            args = _parse_keyvals(inner, "@repeat")
+
+            var = args.get("var", "i")
+            mn = args.get("min")
+            mx = args.get("max")
+
+            if mn is None or mx is None:
+                self._line = raw_line
+                self._parse_error(
+                    "missing required @repeat args "
+                    "(need min=..., max=..., optional var=...)"
+                )
+
+            if not var:
+                self._line = raw_line
+                self._parse_error("@repeat var cannot be empty")
+
+            mn_i = _to_int(mn, "min", "@repeat")
+            mx_i = _to_int(mx, "max", "@repeat")
+
+            if mn_i > mx_i:
+                self._line = raw_line
+                self._parse_error(
+                    "@repeat has min > max (%d > %d)" % (mn_i, mx_i)
+                )
+
+            return var, mn_i, mx_i
+
+        def _read_physical_line():
+            line = self._readline()
+            if not line:
+                return None
+
+            self.linenr += 1
+
+            while line.endswith("\\\n"):
+                nxt = self._readline()
+                self.linenr += 1
+                if not nxt:
+                    break
+                line = line[:-2] + nxt
+
+            return line
+
+        def _read_macro_body_line():
+            if self._line_queue:
+                return self._line_queue.pop(0)
+            return _read_physical_line()
+
+        def _expand_repeat_macro(start_line):
+            parsed = _parse_repeat_start(start_line)
+            if parsed is None:
+                return None
+
+            var, mn_i, mx_i = parsed
+
+            body = []
+            depth = 1
+
+            while True:
+                line = _read_macro_body_line()
+                if line is None:
+                    self._line = start_line
+                    self._parse_error("@repeat without matching @endrepeat@")
+
+                stripped = line.strip()
+
+                if stripped.startswith("@repeat") and stripped.endswith("@"):
+                    depth += 1
+                    body.append(line)
+                    continue
+
+                if stripped == "@endrepeat@":
+                    depth -= 1
+
+                    if depth == 0:
+                        break
+
+                    body.append(line)
+                    continue
+
+                body.append(line)
+
+            placeholder = "$(%s)" % var
+
+            out = []
+            for i in range(mn_i, mx_i + 1):
+                i_s = str(i)
+                for body_line in body:
+                    out.append(body_line.replace(placeholder, i_s))
+
+            return out
+
+        def _expand_if_macro(start_line):
+            parsed = _parse_if_start(start_line)
+            if parsed is None:
+                return None
+
+            mode, var = parsed
+
+            enabled = os.getenv(var, "").lower() in ("y", "yes", "1", "true")
+
+            if mode == "ifnot":
+                enabled = not enabled
+
+            body = []
+            depth = 1
+
+            while True:
+                line = _read_macro_body_line()
+
+                if line is None:
+                    self._line = start_line
+                    self._parse_error("@if without matching @endif@")
+
+                stripped = line.strip()
+
+                if (stripped.startswith("@if ") and stripped.endswith("@")) or \
+                   (stripped.startswith("@ifnot ") and stripped.endswith("@")):
+                    depth += 1
+                    body.append(line)
+                    continue
+
+                if stripped == "@endif@":
+                    depth -= 1
+
+                    if depth == 0:
+                        break
+
+                    body.append(line)
+                    continue
+
+                body.append(line)
+
+            return body if enabled else []
+
+        if self._line_queue:
+            line = self._line_queue.pop(0)
+        else:
+            line = _read_physical_line()
+            if line is None:
+                return False
+
+        expanded = _expand_if_macro(line)
+        if expanded is not None:
+            self._line_queue = expanded + self._line_queue
+            return self._next_line()
+
+        expanded = _expand_repeat_macro(line)
+        if expanded is not None:
+            self._line_queue = expanded + self._line_queue
+            return self._next_line()
+
+        self._line = line
+        self._tokens = self._tokenize(line)
+        self._tokens_i = 1
+        return True
+    # Happy Hare added ^^^
 
     def _line_after_help(self, line):
         # Tokenizes a line after a help text. This case is special in that the
@@ -2435,11 +2540,17 @@ class Kconfig(object):
         # An earlier version used a _saved_line variable instead that was
         # checked in _next_line(). This special-casing gets rid of it and makes
         # _reuse_tokens alone sufficient to handle unget.
-
-        # Handle line joining
         while line.endswith("\\\n"):
             line = line[:-2] + self._readline()
             self.linenr += 1
+
+        # Happy Hare: allow custom block macros immediately after help text
+        if line.strip().startswith("@repeat"):
+            if not hasattr(self, "_line_queue"):
+                self._line_queue = []
+            self._line_queue.insert(0, line)
+            self._reuse_tokens = False
+            return
 
         self._tokens = self._tokenize(line)
         self._reuse_tokens = True
@@ -6673,7 +6784,7 @@ def _generated_default_value(template, args, repeat_sym=None):
             return ""
 
         return ", ".join(
-            template % tuple(base_args + [i])
+            template % tuple([i] + base_args)
             for i in range(count)
         )
 

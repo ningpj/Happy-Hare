@@ -1,0 +1,614 @@
+# This defines the symbol types, pins menu layout and changes to defaults.
+# The defaults are set in the Kconfig.board_type under the boards directory.
+#
+# Responsible for defining all "PIN_*" parameters
+# Note types must always be defined, the prompts are based on MMU capabilities
+#
+# Assumed that max gates:
+#   for type-A boards is 12 (although currently max is 8)
+#   for type-B boards is 5 (Chameleon X5)
+
+menu "Pins / TMC"
+
+# -------------------------------------
+# Gear TMC chip
+# -------------------------------------
+
+  choice CHOICE_GEAR_TMC
+    prompt "Gear TMC chip"
+    default CHOICE_GEAR_TMC_2209
+    help
+      Select correct TMC chip type for gear stepper.
+      Can be changed by editing .cfg files directly.
+
+    config CHOICE_GEAR_TMC_2209
+      bool "TMC2209"
+    config CHOICE_GEAR_TMC_2130
+      bool "TMC2130"
+    config CHOICE_GEAR_TMC_2208
+      bool "TMC2208"
+    config CHOICE_GEAR_TMC_2660
+      bool "TMC2660"
+    config CHOICE_GEAR_TMC_5160
+      bool "TMC5160"
+    config CHOICE_GEAR_TMC_2240
+      bool "TMC2240"
+  endchoice
+
+  config PARAM_GEAR_TMC
+      string
+      default "tmc2209" if CHOICE_GEAR_TMC_2209
+      default "tmc2130" if CHOICE_GEAR_TMC_2130
+      default "tmc2208" if CHOICE_GEAR_TMC_2208
+      default "tmc2660" if CHOICE_GEAR_TMC_2660
+      default "tmc5160" if CHOICE_GEAR_TMC_5160
+      default "tmc2240" if CHOICE_GEAR_TMC_2240
+
+# -------------------------------------
+# Gear stepper
+# -------------------------------------
+
+  menu "Gear pins"
+    config PIN_GEAR_UART
+      string "Gear UART pin    "
+    config PIN_GEAR_STEP
+      string "Gear step pin    "
+    config PIN_GEAR_DIR
+      string "Gear dir pin     "
+    config PIN_GEAR_ENABLE
+      string "Gear enable pin  "
+    config PIN_GEAR_DIAG
+      string "Gear diag pin    "
+
+  # Additional gears for type-b/c MMU's
+
+    config PIN_GEAR_UART_1
+      string
+    config PIN_GEAR_STEP_1
+      string
+    config PIN_GEAR_DIR_1
+      string
+    config PIN_GEAR_ENABLE_1
+      string
+    config PIN_GEAR_DIAG_1
+      string
+
+    config PIN_GEAR_UART_2
+      string
+    config PIN_GEAR_STEP_2
+      string
+    config PIN_GEAR_DIR_2
+      string
+    config PIN_GEAR_ENABLE_2
+      string
+    config PIN_GEAR_DIAG_2
+      string
+
+    config PIN_GEAR_UART_3
+      string
+    config PIN_GEAR_STEP_3
+      string
+    config PIN_GEAR_DIR_3
+      string
+    config PIN_GEAR_ENABLE_3
+      string
+    config PIN_GEAR_DIAG_3
+      string
+
+    config PIN_GEAR_UART_4
+      string
+    config PIN_GEAR_STEP_4
+      string
+    config PIN_GEAR_DIR_4
+      string
+    config PIN_GEAR_ENABLE_4
+      string
+    config PIN_GEAR_DIAG_4
+      string
+
+    if MULTIGEAR
+
+      if PARAM_NUM_GATES > 1
+        comment "_"
+        config PIN_GEAR_UART_1
+          prompt "Gear 1 UART pin  "
+        config PIN_GEAR_STEP_1
+          prompt "Gear 1 step pin  "
+        config PIN_GEAR_DIR_1
+          prompt "Gear 1 dir pin   "
+        config PIN_GEAR_ENABLE_1
+          prompt "Gear 1 enable pin"
+        config PIN_GEAR_DIAG_1
+          prompt "Gear 1 diag pin  "
+      endif
+
+      if PARAM_NUM_GATES > 2
+        comment "_"
+        config PIN_GEAR_UART_2
+          prompt "Gear 2 UART pin  "
+        config PIN_GEAR_STEP_2
+          prompt "Gear 2 step pin  "
+        config PIN_GEAR_DIR_2
+          prompt "Gear 2 dir pin   "
+        config PIN_GEAR_ENABLE_2
+          prompt "Gear 2 enable pin"
+        config PIN_GEAR_DIAG_2
+          prompt "Gear 2 diag pin  "
+      endif
+
+      if PARAM_NUM_GATES > 3
+        comment "_"
+        config PIN_GEAR_UART_3
+          prompt "Gear 3 UART pin  "
+        config PIN_GEAR_STEP_3
+          prompt "Gear 3 step pin  "
+        config PIN_GEAR_DIR_3
+          prompt "Gear 3 dir pin   "
+        config PIN_GEAR_ENABLE_3
+          prompt "Gear 3 enable pin"
+        config PIN_GEAR_DIAG_3
+          prompt "Gear 3 diag pin  "
+      endif
+
+      if PARAM_NUM_GATES > 4
+        comment "_"
+        config PIN_GEAR_UART_4
+          prompt "Gear 4 UART pin  "
+        config PIN_GEAR_STEP_4
+          prompt "Gear 4 step pin  "
+        config PIN_GEAR_DIR_4
+          prompt "Gear 4 dir pin   "
+        config PIN_GEAR_ENABLE_4
+          prompt "Gear 4 enable pin"
+        config PIN_GEAR_DIAG_4
+          prompt "Gear 4 diag pin  "
+      endif
+
+    endif
+
+  endmenu
+
+
+# -------------------------------------
+# Selector stepper and servo
+# -------------------------------------
+
+  config PIN_SELECTOR_UART
+    string
+  config PIN_SELECTOR_STEP
+    string
+  config PIN_SELECTOR_DIR
+    string
+  config PIN_SELECTOR_ENABLE
+    string
+  config PIN_SELECTOR_DIAG
+    string
+  config PIN_SELECTOR_ENDSTOP
+    string
+  config PIN_SELECTOR_SERVO
+    string
+
+  # Special case for IndexedSelector
+  config PIN_GATE_ENDSTOP_0
+    string
+  config PIN_GATE_ENDSTOP_1
+    string
+  config PIN_GATE_ENDSTOP_2
+    string
+  config PIN_GATE_ENDSTOP_3
+    string
+
+
+# -------------------------------------
+# Selector TMC chip
+# -------------------------------------
+
+  choice CHOICE_SELECTOR_TMC
+    prompt "Selector TMC chip"
+    default CHOICE_SELECTOR_TMC_2209
+    depends on MMU_HAS_SELECTOR_STEPPER
+    help
+      Select correct TMC chip type for gear stepper.
+      Can be changed by editing .cfg files directly.
+
+    config CHOICE_SELECTOR_TMC_2209
+      bool "TMC2209"
+    config CHOICE_SELECTOR_TMC_2130
+      bool "TMC2130"
+    config CHOICE_SELECTOR_TMC_2208
+      bool "TMC2208"
+    config CHOICE_SELECTOR_TMC_2660
+      bool "TMC2660"
+    config CHOICE_SELECTOR_TMC_5160
+      bool "TMC5160"
+    config CHOICE_SELECTOR_TMC_2240
+      bool "TMC2240"
+  endchoice
+
+  config PARAM_SELECTOR_TMC
+      string
+      default "tmc2209" if CHOICE_SELECTOR_TMC_2209
+      default "tmc2130" if CHOICE_SELECTOR_TMC_2130
+      default "tmc2208" if CHOICE_SELECTOR_TMC_2208
+      default "tmc2660" if CHOICE_SELECTOR_TMC_2660
+      default "tmc5160" if CHOICE_SELECTOR_TMC_5160
+      default "tmc2240" if CHOICE_SELECTOR_TMC_2240
+
+  menu "Selector pins"
+    depends on MMU_HAS_SELECTOR_STEPPER || MMU_HAS_SELECTOR_SERVO
+
+    if MMU_HAS_SELECTOR_STEPPER
+      config PIN_SELECTOR_UART
+        prompt "Selector UART pin   "
+      config PIN_SELECTOR_STEP
+        prompt "Selector step pin   "
+      config PIN_SELECTOR_DIR
+        prompt "Selector dir pin    "
+      config PIN_SELECTOR_ENABLE
+        prompt "Selector enable pin "
+      config PIN_SELECTOR_DIAG
+        prompt "Selector diag pin   "
+      config PIN_SELECTOR_ENDSTOP
+        prompt "Selector endstop pin"
+    endif
+
+    if INDEXED_SELECTOR
+      config PIN_GATE_ENDSTOP_0
+        prompt "Gate 0 endstop pin"
+      config PIN_GATE_ENDSTOP_1
+        prompt "Gate 1 endstop pin" if PARAM_NUM_GATES > 1
+      config PIN_GATE_ENDSTOP_2
+        prompt "Gate 2 endstop pin" if PARAM_NUM_GATES > 2
+      config PIN_GATE_ENDSTOP_3
+        prompt "Gate 3 endstop pin" if PARAM_NUM_GATES > 3
+    endif
+
+    config PIN_SELECTOR_SERVO
+      prompt "Servo pin           " if MMU_HAS_SELECTOR_SERVO
+  endmenu
+
+
+# -------------------------------------
+# eSpooler
+# -------------------------------------
+
+  config HAS_ESPOOLER_ENABLE_PIN
+    def_bool n
+
+  config PIN_ESPOOLER_EN_0
+    string
+  config PIN_ESPOOLER_RWD_0
+    string
+  config PIN_ESPOOLER_FWD_0
+    string
+  config PIN_ESPOOLER_TRIG_0
+    string
+
+  config PIN_ESPOOLER_EN_1
+    string
+  config PIN_ESPOOLER_RWD_1
+    string
+  config PIN_ESPOOLER_FWD_1
+    string
+  config PIN_ESPOOLER_TRIG_1
+    string
+
+  config PIN_ESPOOLER_EN_2
+    string
+  config PIN_ESPOOLER_RWD_2
+    string
+  config PIN_ESPOOLER_FWD_2
+    string
+  config PIN_ESPOOLER_TRIG_2
+    string
+
+  config PIN_ESPOOLER_EN_3
+    string
+  config PIN_ESPOOLER_RWD_3
+    string
+  config PIN_ESPOOLER_FWD_3
+    string
+  config PIN_ESPOOLER_TRIG_3
+    string
+
+  config PIN_ESPOOLER_EN_4
+    string
+  config PIN_ESPOOLER_RWD_4
+    string
+  config PIN_ESPOOLER_FWD_4
+    string
+  config PIN_ESPOOLER_TRIG_4
+    string
+
+  menu "eSpooler pins"
+    depends on MMU_HAS_ESPOOLER
+
+    config PIN_ESPOOLER_EN_0
+      prompt "eSpooler enable 0 pin " if HAS_ESPOOLER_ENABLE_PIN
+    config PIN_ESPOOLER_RWD_0
+      prompt "eSpooler rewind 0 pin "
+    config PIN_ESPOOLER_FWD_0
+      prompt "eSpooler forward 0 pin"
+    config PIN_ESPOOLER_TRIG_0
+      prompt "eSpooler trigger 0 pin"
+
+    if PARAM_NUM_GATES > 1
+      comment "_"
+      config PIN_ESPOOLER_EN_1
+        prompt "eSpooler enable 1 pin " if HAS_ESPOOLER_ENABLE_PIN
+      config PIN_ESPOOLER_RWD_1
+        prompt "eSpooler rewind 1 pin "
+      config PIN_ESPOOLER_FWD_1
+        prompt "eSpooler forward 1 pin"
+      config PIN_ESPOOLER_TRIG_1
+        prompt "eSpooler trigger 1 pin"
+    endif
+
+    if PARAM_NUM_GATES > 2
+      comment "_"
+      config PIN_ESPOOLER_EN_2
+        prompt "eSpooler enable 2 pin " if HAS_ESPOOLER_ENABLE_PIN
+      config PIN_ESPOOLER_RWD_2
+        prompt "eSpooler rewind 2 pin "
+      config PIN_ESPOOLER_FWD_2
+        prompt "eSpooler forward 2 pin"
+      config PIN_ESPOOLER_TRIG_2
+        prompt "eSpooler trigger 2 pin"
+    endif
+
+    if PARAM_NUM_GATES > 3
+      comment "_"
+      config PIN_ESPOOLER_EN_3
+        prompt "eSpooler enable 3 pin " if HAS_ESPOOLER_ENABLE_PIN
+      config PIN_ESPOOLER_RWD_3
+        prompt "eSpooler rewind 3 pin "
+      config PIN_ESPOOLER_FWD_3
+        prompt "eSpooler forward 3 pin"
+      config PIN_ESPOOLER_TRIG_3
+        prompt "eSpooler trigger 3 pin"
+    endif
+
+    if PARAM_NUM_GATES > 4
+      comment "_"
+      config PIN_ESPOOLER_EN_4
+        prompt "eSpooler enable 4 pin " if HAS_ESPOOLER_ENABLE_PIN
+      config PIN_ESPOOLER_RWD_4
+        prompt "eSpooler rewind 4 pin "
+      config PIN_ESPOOLER_FWD_4
+        prompt "eSpooler forward 4 pin"
+      config PIN_ESPOOLER_TRIG_4
+        prompt "eSpooler trigger 4 pin"
+    endif
+  endmenu
+
+
+# -------------------------------------
+# Eject buttons
+# -------------------------------------
+
+  config PIN_EJECT_BUTTON_0
+    string
+  config PIN_EJECT_BUTTON_1
+    string
+  config PIN_EJECT_BUTTON_2
+    string
+  config PIN_EJECT_BUTTON_3
+    string
+  config PIN_EJECT_BUTTON_4
+    string
+  config PIN_EJECT_BUTTON_5
+    string
+  config PIN_EJECT_BUTTON_6
+    string
+  config PIN_EJECT_BUTTON_7
+    string
+  config PIN_EJECT_BUTTON_8
+    string
+  config PIN_EJECT_BUTTON_9
+    string
+  config PIN_EJECT_BUTTON_10
+    string
+  config PIN_EJECT_BUTTON_11
+    string
+
+  menu "Mmu eject buttons"
+    depends on MMU_HAS_EJECT_BUTTONS
+
+    config PIN_EJECT_BUTTON_0
+      prompt "Eject button 0 pin " if PARAM_NUM_GATES > 0
+    config PIN_EJECT_BUTTON_1
+      prompt "Eject button 1 pin " if PARAM_NUM_GATES > 1
+    config PIN_EJECT_BUTTON_2
+      prompt "Eject button 2 pin " if PARAM_NUM_GATES > 2
+    config PIN_EJECT_BUTTON_3
+      prompt "Eject button 3 pin " if PARAM_NUM_GATES > 3
+    config PIN_EJECT_BUTTON_4
+      prompt "Eject button 4 pin " if PARAM_NUM_GATES > 4
+    config PIN_EJECT_BUTTON_5
+      prompt "Eject button 5 pin " if PARAM_NUM_GATES > 5
+    config PIN_EJECT_BUTTON_6
+      prompt "Eject button 6 pin " if PARAM_NUM_GATES > 6
+    config PIN_EJECT_BUTTON_7
+      prompt "Eject button 7 pin " if PARAM_NUM_GATES > 7
+    config PIN_EJECT_BUTTON_8
+      prompt "Eject button 8 pin " if PARAM_NUM_GATES > 8
+    config PIN_EJECT_BUTTON_9
+      prompt "Eject button 9 pin " if PARAM_NUM_GATES > 9
+    config PIN_EJECT_BUTTON_10
+      prompt "Eject button 10 pin" if PARAM_NUM_GATES > 10
+    config PIN_EJECT_BUTTON_11
+      prompt "Eject button 11 pin" if PARAM_NUM_GATES > 11
+  endmenu
+
+
+# -------------------------------------
+# Sync-Feedback Buffer
+# -------------------------------------
+
+  config PIN_BUFFER_TENSION
+    string
+  config PIN_BUFFER_COMPRESSION
+    string
+  config PIN_BUFFER_ANALOG
+    string
+
+  menu "Sync-feedback Buffer"
+    depends on MMU_HAS_SYNC_FEEDBACK_BUFFER && !MMU_SHARED_SYNC_FEEDBACK_BUFFER
+
+    config PIN_BUFFER_TENSION
+      prompt "Sync feedback tension pin    " if MMU_HAS_SENSOR_BUFFER_TENSION
+    config PIN_BUFFER_COMPRESSION
+      prompt "Sync feedback compression pin" if MMU_HAS_SENSOR_BUFFER_COMPRESSION
+    config PIN_BUFFER_ANALOG
+      prompt "Proportional (analog) pin    " if MMU_HAS_SENSOR_BUFFER_PROPORTIONAL
+  endmenu
+
+
+
+# -------------------------------------
+# Entry sensor
+# -------------------------------------
+
+  config PIN_ENTRY_SENSOR_0
+    string
+  config PIN_ENTRY_SENSOR_1
+    string
+  config PIN_ENTRY_SENSOR_2
+    string
+  config PIN_ENTRY_SENSOR_3
+    string
+  config PIN_ENTRY_SENSOR_4
+    string
+  config PIN_ENTRY_SENSOR_5
+    string
+  config PIN_ENTRY_SENSOR_6
+    string
+  config PIN_ENTRY_SENSOR_7
+    string
+  config PIN_ENTRY_SENSOR_8
+    string
+  config PIN_ENTRY_SENSOR_9
+    string
+  config PIN_ENTRY_SENSOR_10
+    string
+  config PIN_ENTRY_SENSOR_11
+    string
+
+  menu "Mmu entry sensor pins"
+    depends on MMU_HAS_SENSOR_ENTRY
+
+    config PIN_ENTRY_SENSOR_0
+      prompt "Entry sensor 0 pin "  if PARAM_NUM_GATES > 0
+    config PIN_ENTRY_SENSOR_1
+      prompt "Entry sensor 1 pin "  if PARAM_NUM_GATES > 1
+    config PIN_ENTRY_SENSOR_2
+      prompt "Entry sensor 2 pin "  if PARAM_NUM_GATES > 2
+    config PIN_ENTRY_SENSOR_3
+      prompt "Entry sensor 3 pin "  if PARAM_NUM_GATES > 3
+    config PIN_ENTRY_SENSOR_4
+      prompt "Entry sensor 4 pin "  if PARAM_NUM_GATES > 4
+    config PIN_ENTRY_SENSOR_5
+      prompt "Entry sensor 5 pin "  if PARAM_NUM_GATES > 5
+    config PIN_ENTRY_SENSOR_6
+      prompt "Entry sensor 6 pin "  if PARAM_NUM_GATES > 6
+    config PIN_ENTRY_SENSOR_7
+      prompt "Entry sensor 7 pin "  if PARAM_NUM_GATES > 7
+    config PIN_ENTRY_SENSOR_8
+      prompt "Entry sensor 8 pin "  if PARAM_NUM_GATES > 8
+    config PIN_ENTRY_SENSOR_9
+      prompt "Entry sensor 9 pin "  if PARAM_NUM_GATES > 9
+    config PIN_ENTRY_SENSOR_10
+      prompt "Entry sensor 10 pin" if PARAM_NUM_GATES > 10
+    config PIN_ENTRY_SENSOR_11
+      prompt "Entry sensor 11 pin" if PARAM_NUM_GATES > 11
+  endmenu
+
+
+# -------------------------------------
+# Exit sensor
+# -------------------------------------
+
+  config PIN_EXIT_SENSOR_0
+    string
+  config PIN_EXIT_SENSOR_1
+    string
+  config PIN_EXIT_SENSOR_2
+    string
+  config PIN_EXIT_SENSOR_3
+    string
+  config PIN_EXIT_SENSOR_4
+    string
+  config PIN_EXIT_SENSOR_5
+    string
+  config PIN_EXIT_SENSOR_6
+    string
+  config PIN_EXIT_SENSOR_7
+    string
+  config PIN_EXIT_SENSOR_8
+    string
+  config PIN_EXIT_SENSOR_9
+    string
+  config PIN_EXIT_SENSOR_10
+    string
+  config PIN_EXIT_SENSOR_11
+    string
+
+  menu "Mmu exit sensor pins"
+    depends on MMU_HAS_SENSOR_EXIT
+
+    config PIN_EXIT_SENSOR_0
+      prompt "Exit sensor 0 pin "  if PARAM_NUM_GATES > 0
+    config PIN_EXIT_SENSOR_1
+      prompt "Exit sensor 1 pin "  if PARAM_NUM_GATES > 1
+    config PIN_EXIT_SENSOR_2
+      prompt "Exit sensor 2 pin "  if PARAM_NUM_GATES > 2
+    config PIN_EXIT_SENSOR_3
+      prompt "Exit sensor 3 pin "  if PARAM_NUM_GATES > 3
+    config PIN_EXIT_SENSOR_4
+      prompt "Exit sensor 4 pin "  if PARAM_NUM_GATES > 4
+    config PIN_EXIT_SENSOR_5
+      prompt "Exit sensor 5 pin "  if PARAM_NUM_GATES > 5
+    config PIN_EXIT_SENSOR_6
+      prompt "Exit sensor 6 pin "  if PARAM_NUM_GATES > 6
+    config PIN_EXIT_SENSOR_7
+      prompt "Exit sensor 7 pin "  if PARAM_NUM_GATES > 7
+    config PIN_EXIT_SENSOR_8
+      prompt "Exit sensor 8 pin "  if PARAM_NUM_GATES > 8
+    config PIN_EXIT_SENSOR_9
+      prompt "Exit sensor 9 pin "  if PARAM_NUM_GATES > 9
+    config PIN_EXIT_SENSOR_10
+      prompt "Exit sensor 10 pin" if PARAM_NUM_GATES > 10
+    config PIN_EXIT_SENSOR_11
+      prompt "Exit sensor 11 pin" if PARAM_NUM_GATES > 11
+  endmenu
+
+
+# -------------------------------------
+# Shared Exit sensor
+# -------------------------------------
+
+  config PIN_SHARED_EXIT_SENSOR
+    string
+    prompt "Shared exit sensor pin" if MMU_HAS_SENSOR_SHARED_EXIT
+
+
+# -------------------------------------
+# Misc pins
+# -------------------------------------
+
+  config PIN_ENCODER
+    string
+    prompt "Encoder pin           " if MMU_HAS_ENCODER && !MMU_SHARED_ENCODER
+
+  config PIN_NEOPIXEL
+    string
+    prompt "Neopixel pin          " if MMU_HAS_LEDS
+
+
+# -------------------------------------
+# Per-printer pins
+# -------------------------------------
+
+  source "Kconfig.shared_pins"
+
+endmenu

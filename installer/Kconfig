@@ -17,20 +17,24 @@
 #
 # Some Happy Hare augmented features:
 # Kconfig:
-# 1. Dynamic defaults 'generated_default' (simple substitution with optional iterator to create list)
-#    config PARAM_TEST1
-#      string "CSV list"
-#      generated_default "%s_%s_%d" "PARAM_VENDOR PARAM_VERSION" PARAM_NUM_GATES
-#
-#    config PARAM_TEST2
-#      string "Dynamic default"
-#      generated_default "%s_%s_%d" "PARAM_VENDOR PARAM_VERSION PARAM_NUM_GATES"
+# 1. Dynamic defaults 'generated_default'
+#   Repeated form: The iterator is passed as the FIRST format argument.
+#     config PARAM_TEST1
+#       string "CSV list"
+#       generated_default "%d_%s_%s" "PARAM_VENDOR PARAM_VERSION" PARAM_NUM_GATES
+#   Non-repeated form:
+#     config PARAM_TEST2
+#       string "Dynamic default"
+#       generated_default "%s_%s_%d" "PARAM_VENDOR PARAM_VERSION PARAM_NUM_GATES"
 #
 # 2. Added float type
 # 3. Option 'force_show'to force display even if dependency isn't met
 # 4. Recording of default value with #~DEFAULT~# magic token
-# 5. default expansion macro (to avoid multiple lines):
-#      @defaults template="neopixel:$(UNIT_NAME)_leds (1-%d)" ifsym=PARAM_NUM_GATES min=1 max=32@
+# 5. repeat expansion macro to avoid multiple lines (can be nested):
+#      @repeat var=i min=0 max=3@
+#        config PARAM_MMU_CANBUS_UNIT_$(i)
+#          string "CANbus UUID for MMU unit $(i)"
+#      @endrepeat@
 # 6. help added to menus
 #
 # Menuconfig:
@@ -92,10 +96,12 @@ to_bool = $(shell, $(1) && echo y || echo n)
 # Used to count arguments
 count   = $(shell, set -- $(1); echo $#)
 
-# Used to dynamically get the serial device paths (ls is not expensive to run multiple time)
-serial_device        = $(shell, ls /dev/serial/by-id/* 2>/dev/null | grep 'Klipper_$(2)' | tail -n +$(1) | head -n 1)
-serial_exists        = $(to_bool, [ -e '$(serial_device,$(1),$(2))' ])
+# Used to dynamically get the serial device paths
+all_serial_devices  := $(shell, ls /dev/serial/by-id/* 2>/dev/null || true)
+serial_device        = $(shell, printf '%s\n' $(all_serial_devices) | grep 'Klipper_$(2)' | sed -n '$(1)p')
+serial_exists        = $(to_bool, [ -n '$(serial_device,$(1),$(2))' ])
 mmu_serial_config    = $(shell, basename '$(serial_device,$(1),$(2))' | sed 's/-/_/g' | awk 'BEGIN{out="CHOICE_MMU_SERIAL_DEVICE_NONE" } NF && $$0!="." {out="CHOICE_MMU_SERIAL_DEVICE_" toupper($$0)} END{print out}')
+mmu_serial_config_pg = $(shell, basename '$(serial_device,$(2),$(3))' | sed 's/-/_/g' | awk -v gate=$(1) 'BEGIN{out="CHOICE_MMU_SERIAL_DEVICE_NONE_GATE_" gate } NF && $$0!="." {out="CHOICE_MMU_SERIAL_DEVICE_" toupper($$0) "_GATE_" gate} END{print out}')
 buffer_serial_config = $(shell, basename '$(serial_device,$(1),$(2))' | sed 's/-/_/g' | awk 'BEGIN{out="CHOICE_BUFFER_SERIAL_DEVICE_NONE"} NF && $$0!="." {out="CHOICE_BUFFER_SERIAL_DEVICE_" toupper($$0)} END{print out}')
 
 # Grab the UUIDs that are not in use by klipper as a space-separated list, e.g. "43a8... 25ff... aaba..."
@@ -104,6 +110,7 @@ canbus_uuids        := $(shell, $(canbus_query) 2>/dev/null | sed -n 's/.*canbus
 canbus_uuid_count   := $(count, $(canbus_uuids))
 canbus_uuid          = $(shell, echo $(canbus_uuids) | awk -v n=$(1) '{ print $n }')
 mmu_canbus_config    = $(shell, echo $(canbus_uuid,$(1)) | awk 'BEGIN{out="CHOICE_MMU_CANBUS_UUID_NONE"} NF {out="CHOICE_MMU_CANBUS_UUID_" toupper($$0)} END{print out}')
+mmu_canbus_config_pg = $(shell, echo $(canbus_uuid,$(2)) | awk -v gate=$(1) 'BEGIN{out="CHOICE_MMU_CANBUS_UUID_NONE_GATE_" gate} NF {out="CHOICE_MMU_CANBUS_UUID_" toupper($$0) "_GATE_" gate} END{print out}')
 buffer_canbus_config = $(shell, echo $(canbus_uuid,$(1)) | awk 'BEGIN{out="CHOICE_BUFFER_CANBUS_UUID_NONE"} NF {out="CHOICE_BUFFER_CANBUS_UUID_" toupper($$0)} END{print out}')
 
 # Used for comment padding

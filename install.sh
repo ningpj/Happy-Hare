@@ -53,6 +53,7 @@ usage() {
     # echo "-r specify Repetier-Server <stub> to override printer.cfg and klipper.service names"
     echo "  -a <name> to specify alternative klipper-service-name when installed with Kiauh"
     echo "  -t activate test mode to create test config files in /tmp"
+    echo "  -e Enables multi MCU support (for EMU design)"
     echo "  (-q verbose make --no-print-directory)"
     echo "  (-v verbose builder)"
     echo
@@ -117,7 +118,16 @@ time_elapsed() {
     echo
 }
 
-while getopts "hfiudzsb:nk:c:m:a:tqv" arg; do
+# Convert long options to short options
+for arg in "$@"; do
+    shift
+    case "$arg" in
+        --emu) set -- "$@" -e ;;
+        *)     set -- "$@" "$arg" ;;
+    esac
+done
+
+while getopts "ehfiudzsb:nk:c:m:a:tqv" arg; do
     case $arg in
     f)
         FIX_LINKS=y
@@ -142,6 +152,7 @@ while getopts "hfiudzsb:nk:c:m:a:tqv" arg; do
     t) export TESTDIR=/tmp/mmu_test ;;
     q) export Q= ;;   # Developer: Disable quiet mode in Makefile
     v) export V=-v ;; # Developer: Enable verbose mode in builder and debug in Makefile
+    e) export PER_GATE_MCU=1 ;; # Allows mutliple MCU selection but menuconfig startup time is increased
     h) usage ;;
     *) usage ;;
     esac
@@ -241,6 +252,12 @@ fi
 
 
 
+# Force PER_GATE_MCU if existing config already enables per-gate MCU support.
+# This preserves the expanded menuconfig behavior on later runs without needing -e.
+if [ -r "${KCONFIG_CONFIG}" ] && grep -q '^CONFIG_MMU_HAS_PER_GATE_MCU=y' "${KCONFIG_CONFIG}"; then
+    export PER_GATE_MCU=1
+fi
+
 ################################
 ##### Menuconfig / Refresh #####
 ################################
@@ -294,6 +311,9 @@ if [ -r "${KCONFIG_CONFIG}" ] && [ -n "${F_MENUCONFIG:-}" ]; then
     esac
 
     echo "${C_INFO}Launching menuconfig (${F_CFG_UPGRADE_MODE})...${C_OFF}"
+    if [ -n "${PER_GATE_MCU:-}" ]; then
+        echo "${C_INFO}Per-gate MCU support enabled. Menuconfig startup will be slower.${C_OFF}"
+    fi
     echo
 fi
 
@@ -417,10 +437,6 @@ if [ -n "${F_MENUCONFIG:-}" ]; then
         tmpconfig="$(mktemp -t tmpconfig.XXXXXX)"
         cp -- "${KCONFIG_CONFIG}" "${tmpconfig}"
     fi
-#    if [ -n "${F_MULTI_UNIT:-}" ] && [ -z "${CONFIG_MULTI_UNIT:-}" ]; then
-#        tmpconfig="$(mktemp -t tmpconfig.XXXXXX)"
-#        cp -- "${KCONFIG_CONFIG}" "${tmpconfig}"
-#    fi
 
     run_kconfig_top menuconfig n
 
