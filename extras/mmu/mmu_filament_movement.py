@@ -809,7 +809,6 @@ class MmuFilamentMovement:
                 "Homing filament to extruder endstop",
                 homing_max,
                 motor="gear",
-                speed=speed,
                 homing_move=1,
                 endstop_name=u.p.extruder_homing_endstop,
             )
