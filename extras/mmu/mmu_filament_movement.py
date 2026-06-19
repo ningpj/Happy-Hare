@@ -2595,8 +2595,9 @@ class MmuFilamentMovement:
                     self.set_filament_pos_state(FILAMENT_POS_IN_BOWDEN, silent=silent)
 
         # Somewhere in extruder
-        elif filament_detected and can_heat and self.check_filament_in_extruder(): # Encoder based
+        elif filament_detected and can_heat and self.check_filament_in_extruder():
             self.set_filament_pos_state(FILAMENT_POS_IN_EXTRUDER, silent=silent) # Will start from tip forming on unload
+
         elif ts is False and filament_detected and (self.p.strict_filament_recovery or strict) and can_heat and self.check_filament_in_extruder():
             # This case adds an additional encoder based test to see if filament is still being gripped by extruder
             # even though TS doesn't see it. It's a pedantic option so on turned on by strict flag
@@ -2728,6 +2729,9 @@ class MmuFilamentMovement:
         ts = self.sensor_manager.check_sensor(SENSOR_TOOLHEAD)
         if ts is True:
             return True
+
+        if self.sensor_manager.has_sensor(SENSOR_PROPORTIONAL):
+            return self._check_filament_in_extruder_by_proportional()
 
         # Finally resort to movement test with encoder
         detected, _ = self.test_filament_still_in_extruder_by_retracting()
