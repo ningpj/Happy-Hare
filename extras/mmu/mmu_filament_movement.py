@@ -1142,9 +1142,10 @@ class MmuFilamentMovement:
 
             moved += step_size
 
-            self.movequeue_dwell(0.2)  # Let ADC sensor catch up
+            self.movequeue_dwell(0.2) # Let ADC sensor catch up
             self.movequeue_wait()
 
+# IGIANNAKAS
 # PAUL: seems like this should simply be a test of tension relax and not rely on compression sensor
 # PAUL: because what if compression is not triggered at the start of the operation?
 # PAUL: seems like it would be more reliable this way
@@ -1376,9 +1377,6 @@ class MmuFilamentMovement:
                 if validate and not extruder_only and self.gate_selected != TOOL_GATE_BYPASS:
 
                     if self.sensor_manager.has_sensor(SENSOR_PROPORTIONAL):
-# IGIANNAKAS: Original logic, but the endstop setting doesn't matter on unload!
-#                    if self.sensor_manager.has_sensor(SENSOR_PROPORTIONAL) and
-#                        u.p.extruder_homing_endstop == SENSOR_COMPRESSION:
                         # Use proportional sync-feedback buffer movement to validate success
                         self._validate_extruder_unload_proportional()
 
@@ -2748,31 +2746,53 @@ class MmuFilamentMovement:
         buffer_range = u.buffer.buffer_maxrange
 
         baseline = prop.get_status(0).get('value', 0.)
-        self.log_info("Checking for filament in extruder using proportional sensor (baseline=%.3f)..." % baseline)
+        self.log_info(f"Checking for filament in extruder using proportional sensor (baseline={baseline:.3f})...")
 
         # Phase 1: gear-only centering. Still deep tension => nothing to compress against => free in bowden
         _, success = u.sync_feedback.adjust_filament_tension()
         post_adjust = prop.get_status(0).get('value', 0.)
         if not success and post_adjust <= -0.9:
-            self.log_info("Proportional recovery: sensor still in deep tension (%.3f) after centering - filament free in bowden" % post_adjust)
+            self.log_info(
+                f"Proportional recovery: sensor still in deep tension ({post_adjust:.3f}) "
+                "- filament free in bowden"
+            )
             return False
 
         # Phase 2: extruder-only retract; a shift toward compression confirms grip
         self._ensure_safe_extruder_temperature(wait=True)
         pre_retract = prop.get_status(0).get('value', 0.)
-        self.log_info("Proportional recovery: extruder-only retract test of %.1fmm (sensor=%.3f)..." % (buffer_range, pre_retract))
-        self.move_filament("Proportional recovery: extruder retract test", -buffer_range, speed=self.p.extruder_unload_speed, motor="extruder", wait=True)
+        self.log_info(
+            f"Proportional recovery: extruder-only retract test of {buffer_range:.1f}mm "
+            f"(sensor={pre_retract:.3f})..."
+        )
+        self.move_filament(
+            "Proportional recovery: extruder retract test",
+            -buffer_range,
+            speed=self.p.extruder_unload_speed,
+            motor="extruder",
+            wait=True,
+        )
         self.movequeue_dwell(0.2) # Let ADC sensor catch up
         self.movequeue_wait()
         post_retract = prop.get_status(0).get('value', 0.)
 
-        shift = post_retract - pre_retract # Positive => toward compression
+        shift = post_retract - pre_retract  # Positive => toward compression
         detected = shift > 0.1
-        self.log_info("Proportional recovery: pre=%.3f, post=%.3f, shift=%.3f - filament %s loaded" % (pre_retract, post_retract, shift, "confirmed" if detected else "not"))
+        self.log_info(
+            f"Proportional recovery: pre={pre_retract:.3f}, "
+            f"post={post_retract:.3f}, shift={shift:.3f} - "
+            f"filament {'confirmed' if detected else 'not'} loaded"
+        )
 
         # Restore filament position if gripped
         if detected:
-            self.move_filament("Proportional recovery: re-feed after retract test", buffer_range, speed=self.p.extruder_load_speed, motor="extruder", wait=True)
+            self.move_filament(
+                "Proportional recovery: re-feed after retract test",
+                buffer_range,
+                speed=self.p.extruder_load_speed,
+                motor="extruder",
+                wait=True,
+            )
 
         return detected
 
