@@ -2731,7 +2731,7 @@ class MmuFilamentMovement:
             return True
 
         if self.sensor_manager.has_sensor(SENSOR_PROPORTIONAL):
-            return self._check_filament_in_extruder_by_proportional()
+            return self._check_filament_in_extruder_proportional()
 
         # Finally resort to movement test with encoder
         detected, _ = self.test_filament_still_in_extruder_by_retracting()
