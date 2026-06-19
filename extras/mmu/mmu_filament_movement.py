@@ -2587,7 +2587,7 @@ class MmuFilamentMovement:
         elif not strict and self.filament_pos == FILAMENT_POS_LOADED and looks_loaded:
             # Gate sensor alone can't tell "in bowden" from "loaded"; use proportional grip check
             if can_heat and ts is None and es is None and self.sensor_manager.has_sensor(SENSOR_PROPORTIONAL):
-                prop_result = self.check_filament_in_extruder_proportional()
+                prop_result = self._check_filament_in_extruder_proportional()
                 if prop_result is True:
                     self.log_info("Proportional sensor confirms extruder grip - filament loaded")
                 elif prop_result is False:
