@@ -3594,13 +3594,33 @@ class Kconfig(object):
 
                 args = [self._lookup_sym(name) for name in arg_names.split()]
 
-                repeat_sym = None
-                if self._tokens[self._tokens_i].__class__ is Symbol:
-                    repeat_sym = self._tokens[self._tokens_i]
+                separator = ", "
+                token = self._tokens[self._tokens_i]
+                if token.__class__ is Symbol and token.is_constant:
+                    separator = token.name
                     self._tokens_i += 1
 
+                iter_vals = []
+                while (
+                    len(iter_vals) < 2 and
+                    self._tokens[self._tokens_i] is not None and
+                    self._tokens[self._tokens_i] is not _T_IF
+                ):
+                    iter_vals.append(self._expect_sym())
+
+
+                if len(iter_vals) == 0:
+                    start_sym = None
+                    stop_sym = None
+                elif len(iter_vals) == 1:
+                    start_sym = None
+                    stop_sym = iter_vals[0]
+                else:
+                    start_sym = iter_vals[0]
+                    stop_sym = iter_vals[1]
+
                 node.generated_defaults.append(
-                    (template, args, repeat_sym, self._parse_cond())
+                    (template, args, separator, start_sym, stop_sym, self._parse_cond())
                 )
 
             else:
@@ -3820,11 +3840,13 @@ class Kconfig(object):
                     depend_on(sym, node.prompt[1])
 
             # Happy Hare: Added
-            for template, args, repeat_sym, cond in sym.generated_defaults:
+            for template, args, separator, start_sym, stop_sym, cond in sym.generated_defaults:
                 for arg in args:
                     depend_on(sym, arg)
-                if repeat_sym is not None:
-                    depend_on(sym, repeat_sym)
+                if start_sym is not None:
+                    depend_on(sym, start_sym)
+                if stop_sym is not None:
+                    depend_on(sym, stop_sym)
                 depend_on(sym, cond)
 
             # The default values and their conditions
@@ -4003,8 +4025,8 @@ class Kconfig(object):
                 # Happy Hare: Added
                 if cur.generated_defaults:
                     cur.generated_defaults = [
-                        (template, args, repeat_sym, self._make_and(cond, dep))
-                        for template, args, repeat_sym, cond in cur.generated_defaults
+                        (template, args, separator, start_sym, stop_sym, self._make_and(cond, dep))
+                        for template, args, separator, start_sym, stop_sym, cond in cur.generated_defaults
                     ]
 
                 # Propagate dependencies to defaults
@@ -4765,9 +4787,9 @@ class Symbol(object):
                 val = self.user_value
             else:
                 # Happy Hare: Added else block
-                for template, args, repeat_sym, cond in self.generated_defaults:
+                for template, args, separator, start_sym, stop_sym, cond in self.generated_defaults:
                     if expr_value(cond):
-                        val = _generated_default_value(template, args, repeat_sym)
+                        val = _generated_default_value(template, args, separator, start_sym, stop_sym)
                         self._write_to_conf = True
                         break
                 else:
@@ -5324,9 +5346,9 @@ class Symbol(object):
 
         if self.orig_type:  # STRING/INT/HEX
             # Happy Hare: Added (favor generated defaults)
-            for template, args, repeat_sym, cond in self.generated_defaults:
+            for template, args, separator, start_sym, stop_sym, cond in self.generated_defaults:
                 if expr_value(cond):
-                    return _generated_default_value(template, args, repeat_sym)
+                    return _generated_default_value(template, args, separator, start_sym, stop_sym)
 
             for default, cond in self.defaults:
                 if expr_value(cond):
@@ -6088,10 +6110,12 @@ class MenuNode(object):
             res |= expr_items(cond)
 
         # Happy Hare: Added
-        for template, args, repeat_sym, cond in self.generated_defaults:
+        for template, args, separator, start_sym, stop_sym, cond in self.generated_defaults:
             res.update(args)
-            if repeat_sym is not None:
-                res.add(repeat_sym)
+            if start_sym is not None:
+                res.add(start_sym)
+            if stop_sym is not None:
+                res.add(stop_sym)
             res |= expr_items(cond)
 
         for value, cond in self.selects:
@@ -6764,29 +6788,55 @@ def _strcmp(s1, s2):
     return (s1 > s2) - (s1 < s2)
 
 # Happy Hare: Added
-def _generated_default_value(template, args, repeat_sym=None):
+def _generated_default_value(template, args, separator=", ", start_sym=None, stop_sym=None):
     def sym_val(sym):
-        if sym.orig_type in _INT_HEX_FLOAT:
+        if sym.orig_type is INT:
             try:
-                return int(sym.str_value, 0)
+                return int(sym.str_value, 10)
             except ValueError:
                 return sym.str_value
+
+        if sym.orig_type is HEX:
+            try:
+                return int(sym.str_value, 16)
+            except ValueError:
+                return sym.str_value
+
+        if sym.orig_type is FLOAT:
+            try:
+                return float(sym.str_value)
+            except ValueError:
+                return sym.str_value
+
         return sym.str_value
+
+    def int_val(sym, default=0):
+        if sym is None:
+            return default
+        try:
+            return int(sym.str_value, 0)
+        except ValueError:
+            return default
 
     base_args = [sym_val(arg) for arg in args]
 
     try:
-        if repeat_sym is None:
+        if stop_sym is None:
             return template % tuple(base_args)
 
-        count = int(repeat_sym.str_value, 0)
-        if count <= 0:
+        start = int_val(start_sym, 0)
+        stop = int_val(stop_sym, 0)
+
+        if stop <= start:
             return ""
 
-        return ", ".join(
-            template % tuple([i] + base_args)
-            for i in range(count)
-        )
+        out = []
+        for i in range(start, stop):
+            rendered = template.replace("{iter}", str(i))
+            rendered = rendered % tuple(base_args)
+            out.append(rendered)
+
+        return separator.join(out)
 
     except Exception:
         return ""
