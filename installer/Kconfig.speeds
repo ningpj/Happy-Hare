@@ -92,8 +92,8 @@ menu "Speeds"
       help
         Individual move distance below which is considered a short move
 
-    config PARAM_VIRTUAL_ENDSTOP_HOMING_SPEED
-      float "Virtual endstop homing speed    "
+    config PARAM_VIRTUAL_SENSOR_HOMING_SPEED
+      float "Virtual sensor homing speed     "
       default 15
       help
         Special slow speed used for homing to virtual endstops (like

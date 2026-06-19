@@ -5,7 +5,7 @@ config MMU_TYPE_EMU_1_0
     (optionally heater) enclosure. It had many features and is an incredible
     choose for new builds. Highly recommended to use with a analog proportional
     sync-feedback buffer like PSF.
-  select MMU_HAS_PER_GATE_MCU # Install must also be run with "-e" for PER_GATE_MCU support
+  imply  MMU_HAS_PER_GATE_MCU # Install must also be run with "-e" for PER_GATE_MCU support
   select VIRTUAL_SELECTOR
   select MMU_HAS_ENVIRONMENT_SENSOR
   select MMU_HAS_PER_GATE_ENV_SENSORS
