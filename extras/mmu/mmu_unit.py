@@ -772,7 +772,7 @@ class MmuUnit:
                 msg = "Homing to %s sensor" % endstop_name
                 actual, homed = home_gear_motor(msg, self.p.gate_preload_homing_max, homing_move=1, endstop_name=endstop_name)
                 if homed:
-                    self.move_gear_motor("Final parking", self.p.gate_preload_parking_distance)
+                    self._move_gear_motor("Final parking", self.p.gate_preload_parking_distance)
                     mmu.gate_maps.set_gate_status(gate, GATE_AVAILABLE)
                     mmu._check_pending_spool_id(gate) # Have spool_id ready?
                     mmu.log_always("Filament detected and loaded in gate %d" % gate)

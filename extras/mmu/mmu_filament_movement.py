@@ -790,9 +790,7 @@ class MmuFilamentMovement:
 
         elif u.p.extruder_homing_endstop == SENSOR_EXTRUDER_ENCODER:
             if self.has_encoder():
-                homing_movement, homed, measured, _ = (
-                    self._home_to_extruder_collision_detection(homing_max)
-                )
+                homing_movement, homed, measured, _ = self._home_to_extruder_collision_detection(homing_max)
             else:
                 raise MmuError(
                     "Cannot home to extruder using 'collision' method because "

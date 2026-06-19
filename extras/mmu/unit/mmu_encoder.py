@@ -5,18 +5,13 @@
 #
 # Goal: Driver for encoder that supports movement measurement, runout/clog detection and flow rate calc
 #
-# Based on:
-# Original Enraged Rabbit Carrot Feeder Project  Copyright (C) 2021  Ette
-# Generic Filament Sensor Module                 Copyright (C) 2019  Eric Callahan <arksine.code@gmail.com>
-# Filament Motion Sensor Module                  Copyright (C) 2021  Joshua Wherrett <thejoshw.code@gmail.com>
-#
 # (\_/)
 # ( *,*)
 # (")_(") Happy Hare Ready
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 #
-import logging, time
+import logging
 
 # Klipper imports
 from ... import pulse_counter
@@ -37,6 +32,8 @@ class MmuEncoder:
         self.reactor = self.printer.get_reactor()
         self.gcode = self.printer.lookup_object('gcode')
 
+        self.active_mmu_unit = None
+        self.extruder = None
         self.connected_units = [mmu_unit]       # mmu_unit is just the first to load, not necessarily all
         encoder_pin = config.get('encoder_pin')
 
@@ -45,7 +42,7 @@ class MmuEncoder:
         poll_time = config.getfloat('poll_time', 0.001, above=0.)
         encoder_resolution = config.getfloat('encoder_resolution', 1., above=0.) # Expect to be calibrated by user in Happy Hare
         self.set_resolution(encoder_resolution)
-        self._last_time = None                 # Last time counts were recieved from MCU
+        self._last_time = None                 # Last time counts were received from MCU
         self._counts = self._last_count = 0
         counter = pulse_counter.MCU_counter(self.printer, encoder_pin, sample_time, poll_time)
         counter.setup_callback(self._counter_callback)
@@ -102,12 +99,12 @@ class MmuEncoder:
         cal_res = self.mmu_machine.var_manager.get(VARS_MMU_ENCODER_RESOLUTION, None, namespace=self.name)
         if cal_res:
             self.set_resolution(cal_res)
-            self.mmu.log_debug("Loaded saved resolution for encoder %s: %.4f" % (self.name, cal_res))
+            self.mmu.log_debug(f"Loaded saved resolution for encoder {self.name}: {cal_res:.4f}")
 
             for unit in self.connected_units:
                 unit.calibrator.mark_calibrated(CALIBRATED_ENCODER)
         else:
-            self.mmu.log_warning("Warning: Encoder resolution for %s was not found in mmu_vars.cfg. Probably not calibrated" % self.name)
+            self.mmu.log_warning(f"Warning: Encoder resolution for {self.name} was not found in mmu_vars.cfg. Probably not calibrated")
 
         self.min_event_systime = self.reactor.monotonic() + 2. # Don't process events too early
         self._extruder_pos_update_timer = self.reactor.register_timer(self._extruder_pos_update_event)
@@ -137,7 +134,10 @@ class MmuEncoder:
 
 
     def enable_flowguard(self, mmu_unit):
-        if mmu_unit not in self.connected_units: return
+        if mmu_unit not in self.connected_units:
+            return
+
+        self.active_mmu_unit = mmu_unit
 
         # Make sure we are watching the correct extruder
         self.extruder = self.printer.lookup_object(mmu_unit.extruder_name())
@@ -151,7 +151,7 @@ class MmuEncoder:
         if mode == ENCODER_RUNOUT_AUTOMATIC:
             cal_cdl = mmu_unit.calibrator.get_clog_detection_length()
             if cal_cdl is not None:
-               cdl = cal_cdl
+                cdl = cal_cdl
         self.detection_length = max(cdl, 2.)
 
         self._reset_filament_runout_params()
@@ -197,13 +197,20 @@ class MmuEncoder:
                 self._update_detection_length()
             self.next_calibration_point = extruder_pos + self.calibration_length
 
-        if self.filament_runout_pos - extruder_pos < self.min_headroom:
-            self.min_headroom = max(0, self.filament_runout_pos - extruder_pos)
+        headroom = max(0, self.filament_runout_pos - extruder_pos)
+        if headroom < self.min_headroom:
+            self.min_headroom = headroom
             if self.min_headroom < self.desired_headroom:
                 if self.detection_mode == ENCODER_RUNOUT_AUTOMATIC:
-                    self.mmu.log_debug("Automatic clog detection: new min_headroom (< %.1fmm desired): %.1fmm" % (self.desired_headroom, self.min_headroom))
+                    self.mmu.log_debug(
+                        f"Automatic clog detection: new min_headroom "
+                        f"(< {self.desired_headroom:.1f}mm desired): "
+                        f"{self.min_headroom:.1f}mm"
+                    )
                 elif self.detection_mode == ENCODER_RUNOUT_STATIC:
-                    self.mmu.log_debug("Warning: Only %.1fmm of headroom to clog/runout" % self.min_headroom)
+                    self.mmu.log_debug(
+                        f"Warning: Only {self.min_headroom:.1f}mm of headroom to clog/runout"
+                    )
 
         self._handle_filament_event(extruder_pos < self.filament_runout_pos)
 
@@ -219,6 +226,10 @@ class MmuEncoder:
         return eventtime + CHECK_MOVEMENT_TIMEOUT
 
 
+    def _reset_min_headroom(self):
+        self.min_headroom = self.detection_length
+
+
     def _reset_filament_runout_params(self, eventtime=None):
         if eventtime is None:
             eventtime = self.reactor.monotonic()
@@ -229,32 +240,45 @@ class MmuEncoder:
         self.samples = []
         self.filament_runout_pos = self.last_extruder_pos + self.detection_length + self.desired_headroom # Add some headroom to decrease sensitivity on startup
         self.next_calibration_point = self.last_extruder_pos + self.calibration_length
-        self.min_headroom = self.detection_length
+        self._reset_min_headroom()
 
 
-    # Called periodically to tune the clog detection length
+    # Called periodically to tune the automatic clog detection length
     def _update_detection_length(self, increase_only=False):
         if self.detection_mode != ENCODER_RUNOUT_AUTOMATIC:
             return
-        cdl = self.detection_length
-        if self.min_headroom < self.desired_headroom:
+
+        old_detection_length = self.detection_length
+        headroom_error = self.desired_headroom - self.min_headroom
+
+        if headroom_error > 0:
             # Maintain headroom
-            extra_length = min((self.desired_headroom - self.min_headroom), self.desired_headroom)
+            extra_length = min(headroom_error, self.desired_headroom)
             self.detection_length += extra_length
-            self.mmu.log_debug("Automatic clog detection: maintaining headroom by adding %.1fmm to detection_length" % extra_length)
-        elif not increase_only:
+            self.mmu.log_debug(f"Automatic clog detection: maintaining headroom by adding {extra_length:.1f}mm to detection_length")
+
+        elif headroom_error < 0 and not increase_only:
             # Average down
-            sample = self.detection_length - (self.min_headroom - self.desired_headroom)
-            self.detection_length = ((self.average_samples * self.detection_length) + self.desired_headroom - self.min_headroom) / self.average_samples
-            self.mmu.log_debug("Automatic clog detection: averaging down detection_length with new %.1fmm measurement" % sample)
+            sample = self.detection_length + headroom_error
+            self.detection_length = (((self.average_samples - 1) * self.detection_length) + sample) / self.average_samples
+            self.detection_length = max(self.detection_length, 2.)
+            self.mmu.log_debug(f"Automatic clog detection: averaging down detection_length with new {sample:.1f}mm measurement")
+
         else:
             return
 
-        self.min_headroom = self.detection_length
+        self._reset_min_headroom()
         self.filament_runout_pos = self.last_extruder_pos + self.detection_length
-        if round(self.detection_length, 1) != round(cdl, 1): # Persist if significant
-            self.mmu.log_debug("Automatic clog detection: reset detection_length to %.1fmm" % self.min_headroom)
-            self.set_clog_detection_length(self.detection_length)
+
+        if round(self.detection_length, 1) != round(old_detection_length, 1): # Persist if significant
+            self.mmu.log_debug(
+                f"Automatic clog detection: reset detection_length to "
+                f"{self.detection_length:.1f}mm"
+            )
+
+            # Tell the calibrator for this unit of the change
+            if self.active_mmu_unit:
+                self.active_mmu_unit.calibrator.update_clog_detection_length(self.detection_length)
 
 
     # Called to see if state update requires callback notification
@@ -267,17 +291,19 @@ class MmuEncoder:
         if eventtime < self.min_event_systime or self.detection_mode == ENCODER_RUNOUT_DISABLED or not self._flowguard_enabled:
             return
         is_printing = self.printer.lookup_object("idle_timeout").get_status(eventtime)["state"] == "Printing"
+
         if filament_detected:
             if not is_printing and self.insert_gcode is not None:
                 # Insert detected
                 self.min_event_systime = self.reactor.NEVER
-                self.mmu.log_info("MMU: Encoder Sensor %s: insert event detected, Time %.2f" % (self.name, eventtime))
+                self.mmu.log_info(f"MMU: Encoder Sensor {self.name}: insert event detected, Time {eventtime:.2f}")
                 self.reactor.register_callback(self._insert_event_handler)
+
         else:
             if is_printing and self.runout_gcode is not None:
                 # Runout detected
                 self.min_event_systime = self.reactor.NEVER
-                self.mmu.log_info("MMU: Encoder Sensor %s: runout event detected, Time %.2f" % (self.name, eventtime))
+                self.mmu.log_info(f"MMU: Encoder Sensor {self.name}: runout event detected, Time {eventtime:.2f}")
                 self.reactor.register_callback(self._runout_event_handler)
 
 
@@ -298,7 +324,7 @@ class MmuEncoder:
         try:
             self.gcode.run_script(command)
         except Exception:
-            self.mmu.log_error("MMU: Error running mmu encoder handler: `%s`" % command)
+            self.mmu.log_error(f"MMU: Error running mmu encoder handler: `{command}`")
         self.min_event_systime = self.reactor.monotonic() + self.event_delay
 
 
@@ -325,7 +351,7 @@ class MmuEncoder:
 
 
     # The threshold (mm) that determines real encoder movement
-    # (set to 1.5 pulses of encoder. i.e. to allow one rougue pulse)
+    # (set to 1.5 pulses of encoder. i.e. to allow one rogue pulse)
     def movement_min(self):
         return 1.5 * self.resolution
 
