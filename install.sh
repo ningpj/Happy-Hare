@@ -152,7 +152,7 @@ while getopts "ehfiudzsb:nk:c:m:a:tqv" arg; do
     t) export TESTDIR=/tmp/mmu_test ;;
     q) export Q= ;;   # Developer: Disable quiet mode in Makefile
     v) export V=-v ;; # Developer: Enable verbose mode in builder and debug in Makefile
-    e) export PER_GATE_MCU=1 ;; # Allows mutliple MCU selection but menuconfig startup time is increased
+    e) export F_PER_GATE_MCU=y ;; # Allows mutliple MCU selection but menuconfig startup time is increased
     h) usage ;;
     *) usage ;;
     esac
@@ -252,10 +252,10 @@ fi
 
 
 
-# Force PER_GATE_MCU if existing config already enables per-gate MCU support.
+# Force F_PER_GATE_MCU if existing config already enables per-gate MCU support.
 # This preserves the expanded menuconfig behavior on later runs without needing -e.
 if [ -r "${KCONFIG_CONFIG}" ] && grep -q '^CONFIG_MMU_HAS_PER_GATE_MCU=y' "${KCONFIG_CONFIG}"; then
-    export PER_GATE_MCU=1
+    export F_PER_GATE_MCU=y
 fi
 
 ################################
@@ -311,7 +311,7 @@ if [ -r "${KCONFIG_CONFIG}" ] && [ -n "${F_MENUCONFIG:-}" ]; then
     esac
 
     echo "${C_INFO}Launching menuconfig (${F_CFG_UPGRADE_MODE})...${C_OFF}"
-    if [ -n "${PER_GATE_MCU:-}" ]; then
+    if [ -n "${F_PER_GATE_MCU:-}" ]; then
         echo "${C_INFO}Per-gate MCU support enabled. Menuconfig startup will be slower.${C_OFF}"
     fi
     echo

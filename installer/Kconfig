@@ -61,6 +61,7 @@
 #   MMU_HAS_LEDS
 #   MMU_HAS_PER_GATE_ENV_SENSORS
 #   MMU_HAS_PER_GATE_HEATERS
+#   MMU_HAS_PER_GATE_MCU (currently only EMU design)
 #   MMU_HAS_SELECTOR
 #   MMU_HAS_SELECTOR_SERVO
 #   MMU_HAS_SELECTOR_STEPPER
@@ -145,6 +146,10 @@ config MULTI_UNIT_ENTRY_POINT
   bool
   default "$(F_MULTI_UNIT_ENTRY_POINT)"
 
+config PER_GATE_MCU
+  bool
+  default "$(F_PER_GATE_MCU)"
+
 if MULTI_UNIT_ENTRY_POINT || !MULTI_UNIT
   config MMU_UNITS
     string
@@ -194,6 +199,11 @@ config SHOW_MMU_ADDITIONS_WITH_TYPE
 # (like mmu_toolhead, encoder, sync-feedback, ...)
 osource "/tmp/.Kconfig.generated"
 
+
+# -------------------------------------
+# Initial menuconfig for multi-unit
+# -------------------------------------
+
 if MULTI_UNIT_ENTRY_POINT
   config MMU_UNITS
     prompt "MMU unit names"
@@ -205,6 +215,7 @@ if MULTI_UNIT_ENTRY_POINT
 
       A separate configurator will be run for each MMU after this initial screen is closed
 
+  comment "_"
   comment "_Shared System Options"
   source "toolheads/Kconfig"        # Toolhead Selection menu
   source "Kconfig.toolhead"         # Toolhead Sensors/Settings
@@ -212,7 +223,7 @@ if MULTI_UNIT_ENTRY_POINT
   source "Kconfig.tip_shaping"
   source "Kconfig.purging"
   source "Kconfig.speeds"           # Access to extruder speeds
-  source "macro_vars/Kconfig"     # Variables for all macros
+  source "macro_vars/Kconfig"       # Variables for all macros
 
   # Thesee are duplicated settings that are excluded from units when MULTI_UNIT
   menu "Pins"
@@ -226,6 +237,11 @@ if MULTI_UNIT_ENTRY_POINT
   source "Kconfig.paths_services"   # Advanced install options
 endif
 
+
+# -------------------------------------
+# Per unit config
+# -------------------------------------
+
 if !MULTI_UNIT_ENTRY_POINT
   source "mmu_types/Kconfig"        # Base MMU type menu
   source "boards/Kconfig"           # MCU Selection menu
@@ -233,9 +249,10 @@ if !MULTI_UNIT_ENTRY_POINT
     source "Kconfig.mmu_additions"  # MMU Additions/Customization menu (if not inlined with mmu type)
   endif
   comment "_"
-  source "Kconfig.pins"             # Raw pin editing
   source "connection/Kconfig"       # MCU Connection
   if !MULTI_UNIT
+    source "Kconfig.pins"           # Raw pin editing
+    comment "_"
     source "toolheads/Kconfig"      # Toolhead Selection menu
     source "Kconfig.toolhead"       # Toolhead Sensors/Settings
     source "Kconfig.options"        # Main software options
@@ -245,6 +262,7 @@ if !MULTI_UNIT_ENTRY_POINT
   endif
   source "Kconfig.raw"              # Raw access to appropriate parameters
   if !MULTI_UNIT
+    comment "_"
     source "Kconfig.paths_services" # Advanced install options
   endif
 

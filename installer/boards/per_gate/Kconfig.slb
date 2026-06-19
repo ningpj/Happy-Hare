@@ -12,13 +12,6 @@ if BOARD_TYPE_SLB_1_0
     default $(mmu_serial_config,1,stm32)
   endchoice
 
-  choice CHOICE_BUFFER_CONNECTION_TYPE
-    default CHOICE_BUFFER_CONNECTION_TYPE_SERIAL
-  endchoice
-  choice CHOICE_BUFFER_SERIAL_CONNECTION
-    default $(buffer_serial_config,1,stm32)
-  endchoice
-
 
 # -------------------------------------
 # Regular use
