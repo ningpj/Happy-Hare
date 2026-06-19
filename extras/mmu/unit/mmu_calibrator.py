@@ -482,11 +482,11 @@ class MmuCalibrator:
             initial_resolution = self.mmu_unit.encoder.encoder_resolution
 
             if not self.is_gear_rd_calibrated(gate):
-                self.mmu_log_info(f"Autotune: {msg}.\nIgnored because rotation distance not yet calibrated for gate")
+                self.mmu.log_info(f"Autotune: {msg}.\nIgnored because rotation distance not yet calibrated for gate")
                 return
 
             if abs(sampled_resolution - initial_resolution) > 0.2 * initial_resolution:
-                self.mmu_log_info(f"Autotune: {msg}.\nIgnored because not within 20% of h/w configured initial resolution and therefore likely erroneous")
+                self.mmu.log_info(f"Autotune: {msg}.\nIgnored because not within 20% of h/w configured initial resolution and therefore likely erroneous")
                 return
 
             new_resolution = self._ema_update(current_resolution, sampled_resolution, AUTOTUNE_ENCODER_WINDOW_LENGTH)
@@ -563,11 +563,11 @@ class MmuCalibrator:
         if self.mmu_unit.p.autotune_bowden_length:
 
             if not self.is_gear_rd_calibrated(gate):
-                self.mmu_log_info(f"Autotune: {msg}.\nIgnored because rotation distance not yet calibrated for gate")
+                self.mmu.log_info(f"Autotune: {msg}.\nIgnored because rotation distance not yet calibrated for gate")
                 return
 
             if abs(bowden_travel - bowden_length) > 0.2 * bowden_length:
-                self.mmu_log_info(f"Autotune: {msg}.\nIgnored because not within 20% of previous value and therefore likely erroneous")
+                self.mmu.log_info(f"Autotune: {msg}.\nIgnored because not within 20% of previous value and therefore likely erroneous")
                 return
 
             new_bowden_length = self._ema_update(bowden_length, bowden_travel, AUTOTUNE_BOWDEN_WINDOW_LENGTH)
