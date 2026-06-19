@@ -2213,7 +2213,7 @@ class MmuFilamentMovement:
         # Virtual endstops (e.g. proportional-backed compression) trigger via ADC polling
         # so use special slow speed for short movements
         if homing_move != 0 and virtual_endstop and abs(dist) <= u.p.gear_short_move_threshold:
-            speed = speed or u.p.virtual_endstop_homing_speed
+            speed = speed or u.p.virtual_sensor_homing_speed
 
         if motor in ["gear"]:
             if homing_move != 0:

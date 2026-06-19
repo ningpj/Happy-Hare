@@ -20,6 +20,7 @@ config MMU_TYPE_EMU_1_0
   select BOOL_ENABLE_SYNC_TO_EXTRUDER
   select BOOL_ENABLE_SYNC_FORM_TIP
   select BOOL_ENABLE_SYNC_PURGE
+  imply  MMU_HAS_SYNC_FEEDBACK_BUFFER
   imply  OPTION_PSF_BUFFER
 
 
@@ -37,15 +38,25 @@ if MMU_TYPE_EMU_1_0
     select MMU_HAS_SYNC_FEEDBACK_BUFFER
     select MMU_HAS_SENSOR_BUFFER_PROPORTIONAL
 
-  choice CHOICE_BUFFER_SPRING_STATE
-    default CHOICE_BUFFER_SPRING_STATE_TENSION
-  endchoice
+  if OPTION_PSF_BUFFER
+    choice CHOICE_BUFFER_SPRING_STATE
+      default CHOICE_BUFFER_SPRING_STATE_TENSION
+    endchoice
 
-  config PARAM_BUFFER_RANGE
-    default 16
+    config PARAM_BUFFER_RANGE
+      default 16
 
-  config PARAM_BUFFER_MAXRANGE
-    default 16
+    config PARAM_BUFFER_MAXRANGE
+      default 16
+  endif
+
+  if !OPTION_PSF_BUFFER
+    config MMU_HAS_SENSOR_BUFFER_COMPRESSION
+      default y
+    config MMU_HAS_SENSOR_BUFFER_TENSION
+      default y
+  endif
+
 endif
 
 
@@ -72,7 +83,7 @@ if MMU_TYPE_EMU_1_0
     default 5
 
   choice BOARD_TYPE
-    default BOARD_TYPE_EMU_SLB_1_0
+    default BOARD_TYPE_SLB_1_0
   endchoice
 
   config PARAM_GEAR_GEAR_RATIO
@@ -88,12 +99,21 @@ if MMU_TYPE_EMU_1_0
   config PARAM_COLOR_ORDER
     default "GRBW"
 
-  config PARAM_ENTRY_LEDS
-    generated_default "neopixel:$(UNIT_NAME)_gate{iter}_leds (5)" "" "; " PARAM_NUM_GATES
+  if BOARD_TYPE_SLB_1_0
+    config PARAM_ENTRY_LEDS
+      generated_default "neopixel:$(UNIT_NAME)_gate{iter}_leds (5)" "" "; " PARAM_NUM_GATES
 
-  config PARAM_EXIT_LEDS
-    generated_default "neopixel:$(UNIT_NAME)_gate{iter}_leds (1,2,3,4)" "" "; " PARAM_NUM_GATES
+    config PARAM_EXIT_LEDS
+      generated_default "neopixel:$(UNIT_NAME)_gate{iter}_leds (1,2,3,4)" "" "; " PARAM_NUM_GATES
+  endif
 
+  if BOARD_TYPE_EBB_1_0
+    config PARAM_ENTRY_LEDS
+      generated_default "neopixel:$(UNIT_NAME)_gate{iter}_leds (5)" "" "; " PARAM_NUM_GATES
+
+    config PARAM_EXIT_LEDS
+      generated_default "neopixel:$(UNIT_NAME)_gate{iter}_leds (1,2,3,4)" "" "; " PARAM_NUM_GATES
+  endif
 
   # "Gates" config
   config PARAM_GATE_HOMING_MAX

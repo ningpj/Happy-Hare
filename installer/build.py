@@ -529,7 +529,6 @@ def install_includes(dest_file, kconfig):
     # Optional macros
     check_include(builder, "INSTALL_12864_MENU", "mmu/optional/mmu_menu.cfg")
     check_include(builder, "INSTALL_CLIENT_MACROS", "mmu/optional/client_macros.cfg")
-    check_include(builder, "INSTALL_EREC_CUTTER", "mmu/optional/mmu_erec_cutter.cfg")
 
     if not builder.has_section("include mmu/macros/*.cfg"):
         logging.debug(" > Adding include [include mmu/macros/*.cfg]")

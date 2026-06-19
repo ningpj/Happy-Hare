@@ -1,9 +1,9 @@
-config BOARD_TYPE_EMU_SLB_1_0
-  bool "EMU SLB MCU"
+config BOARD_TYPE_EBB_1_0
+  bool "EBB MCU"
 
-if BOARD_TYPE_EMU_SLB_1_0
+if BOARD_TYPE_EBB_1_0
   config PARAM_BOARD_TYPE
-    default "EMU SLB v1"
+    default "EBB v1"
 
   choice CHOICE_MMU_CONNECTION_TYPE
     default CHOICE_MMU_CONNECTION_TYPE_SERIAL
