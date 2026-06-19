@@ -494,8 +494,8 @@ class MmuFilamentMovement:
               - Ratio of encoder measured load movement to commanded movement, used for calibration and telemetry (None for invalid or no encoder)
               - The distance not yet moved and reserved for homing buffer in later stages.
         """
-        self.log_warning(f"PAUL: _load_bowden(length={length}, start_pos={start_pos})")
-        self.log_warning(f"PAUL: S_BOWDEN filament_pos={self.drive().get_filament_position():.1f}mm, encoder={self.get_encoder_distance(dwell=None):.1f}mm")
+#        self.log_warning(f"PAUL: _load_bowden(length={length}, start_pos={start_pos})")
+#        self.log_warning(f"PAUL: S_BOWDEN filament_pos={self.drive().get_filament_position():.1f}mm, encoder={self.get_encoder_distance(dwell=None):.1f}mm")
         u = self.mmu_unit()
 
         full = (length is None)
@@ -616,8 +616,8 @@ class MmuFilamentMovement:
                 self.set_filament_pos_state(FILAMENT_POS_IN_BOWDEN)
                 ratio = None
 
-            self.log_warning(f"PAUL: E_BOWDEN filament_pos={self.drive().get_filament_position():.1f}mm, encoder={self.get_encoder_distance(dwell=None):.1f}mm")
-            self.log_warning(f"PAUL: _load_bowden() => (ratio={ratio}, extruder_homing_buffer={extruder_homing_buffer})")
+#            self.log_warning(f"PAUL: E_BOWDEN filament_pos={self.drive().get_filament_position():.1f}mm, encoder={self.get_encoder_distance(dwell=None):.1f}mm")
+#            self.log_warning(f"PAUL: _load_bowden() => (ratio={ratio}, extruder_homing_buffer={extruder_homing_buffer})")
             return ratio, extruder_homing_buffer
 
         finally:
@@ -641,8 +641,8 @@ class MmuFilamentMovement:
               - Ratio of measured unload movement to commanded movement, used for calibration and telemetry (None for invalid)
               - The distance not yet moved and reserved for homing buffer in later stages.
         """
-        self.log_warning(f"PAUL: ----------\n_unload_bowden(length={length}, start_pos={start_pos})")
-        self.log_warning(f"PAUL: S_BOWDEN filament_pos={self.drive().get_filament_position():.1f}mm, encoder={self.get_encoder_distance(dwell=None):.1f}mm")
+#        self.log_warning(f"PAUL: ----------\n_unload_bowden(length={length}, start_pos={start_pos})")
+#        self.log_warning(f"PAUL: S_BOWDEN filament_pos={self.drive().get_filament_position():.1f}mm, encoder={self.get_encoder_distance(dwell=None):.1f}mm")
         u = self.mmu_unit()
 
         full = (length is None)
@@ -737,8 +737,8 @@ class MmuFilamentMovement:
                 self.set_filament_pos_state(FILAMENT_POS_IN_BOWDEN)
                 ratio = None
 
-            self.log_warning(f"PAUL: E_BOWDEN filament_pos={self.drive().get_filament_position():.1f}mm, encoder={self.get_encoder_distance(dwell=None):.1f}mm")
-            self.log_warning(f"PAUL: _load_bowden() => (ratio={ratio}, gate_homing_buffer={gate_homing_buffer})")
+#            self.log_warning(f"PAUL: E_BOWDEN filament_pos={self.drive().get_filament_position():.1f}mm, encoder={self.get_encoder_distance(dwell=None):.1f}mm")
+#            self.log_warning(f"PAUL: _load_bowden() => (ratio={ratio}, gate_homing_buffer={gate_homing_buffer})")
             return ratio, gate_homing_buffer
 
         finally:
@@ -776,7 +776,7 @@ class MmuFilamentMovement:
             [float or None]
               - Actual homing movement, if applicable required to reach the extruder gear else None
         """
-        self.log_warning(f"PAUL: _home_to_extruder(extra_homing={extra_homing})")
+#        self.log_warning(f"PAUL: _home_to_extruder(extra_homing={extra_homing})")
         u = self.mmu_unit()
 
         self.set_filament_direction(DIRECTION_LOAD)
@@ -848,7 +848,7 @@ class MmuFilamentMovement:
 
         self.set_filament_pos_state(FILAMENT_POS_HOMED_EXTRUDER)
 
-        self.log_warning(f"PAUL: _home_to_extruder() -> homing_movement={homing_movement}")
+#        self.log_warning(f"PAUL: _home_to_extruder() -> homing_movement={homing_movement}")
         return homing_movement
 
 
@@ -1379,7 +1379,7 @@ class MmuFilamentMovement:
                 if validate and not extruder_only and self.gate_selected != TOOL_GATE_BYPASS:
 
                     if self.sensor_manager.has_sensor(SENSOR_PROPORTIONAL):
-# PAUL: Original logic, but the endstop setting doesn't matter on unload!
+# IGIANNAKAS: Original logic, but the endstop setting doesn't matter on unload!
 #                    if self.sensor_manager.has_sensor(SENSOR_PROPORTIONAL) and
 #                        u.p.extruder_homing_endstop == SENSOR_COMPRESSION:
                         # Use proportional sync-feedback buffer movement to validate success
@@ -1412,18 +1412,18 @@ class MmuFilamentMovement:
             self.movequeue_wait()
             self.log_debug("Filament should be out of extruder")
 
-            self.log_warning(f"PAUL: _unload_extruder() => synced={synced}, overshoot={overshoot}")
+#            self.log_warning(f"PAUL: _unload_extruder() => synced={synced}, overshoot={overshoot}")
             return synced, overshoot
 
 
-# PAUL: this seems to be problematic ... the extruder could pick up the filament again!
-# PAUL: if probe distance > unload safety then it probably will and springiness in the filament
-# PAUL: could cause it to catch.
-# PAUL: why not just move extruder in retract direction, if proportional indicates further compression,
-# PAUL: then the filament is still trapped. If no change (or more tension) filament is confirmed out
-# PAUL: That said, why not change unload_extruder() so that the 'toolhead_unload_safety_margin'
-# PAUL: move is done JUST with extruder stepper... that guarantee's removal and doesn't complicate with
-# PAUL: overshoot into bowden?!
+# IGIANNAKAS: this seems to be problematic ... the extruder could pick up the filament again!
+# IGIANNAKAS: if probe distance > unload safety then it probably will and springiness in the filament
+# IGIANNAKAS: could cause it to catch.
+# IGIANNAKAS: why not just move extruder in retract direction, if proportional indicates further compression,
+# IGIANNAKAS: then the filament is still trapped. If no change (or more tension) filament is confirmed out
+# IGIANNAKAS: That said, why not change unload_extruder() so that the 'toolhead_unload_safety_margin'
+# IGIANNAKAS: move is done JUST with extruder stepper... that guarantee's removal and doesn't complicate with
+# IGIANNAKAS: overshoot into bowden?!
     def _validate_extruder_unload_proportional(self):
         """
         Use proportional sync-feedback buffer to validate filament is out of the extruder
