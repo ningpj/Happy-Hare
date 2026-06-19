@@ -45,4 +45,6 @@ if MMU_TYPE_MMX_1_0
   config PARAM_SELECTOR_GATE_ANGLES
     default "60,0,180,120"
 
+  comment "_"
+
 endif 

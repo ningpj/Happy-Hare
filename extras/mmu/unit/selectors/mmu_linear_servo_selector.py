@@ -293,7 +293,6 @@ class LinearSelectorServo:
         return self.servo_state
 
     def disable_motors(self):
-        self.servo_move()
         self.servo_off()
         self._reinit() # Reset state
 

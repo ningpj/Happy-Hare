@@ -11,7 +11,13 @@ config MMU_TYPE_TRADRACK_1_0
   select UNSELECT_VARIABLE_BOWDEN_LENGTHS
   select UNSELECT_VARIABLE_ROTATION_DISTANCES
 
+
+# -------------------------------------
+# Defaults
+# -------------------------------------
+
 if MMU_TYPE_TRADRACK_1_0
+
   source "Kconfig.num_gates"
   source "servos/Kconfig"
 
@@ -31,10 +37,6 @@ if MMU_TYPE_TRADRACK_1_0
   endif
 
   source "Kconfig.capabilities"
-
-  ####################
-  ##### Defaults #####
-  ####################
 
   # Identify
   config PARAM_VENDOR
@@ -87,4 +89,7 @@ if MMU_TYPE_TRADRACK_1_0
   choice CHOICE_ENCODER_TYPE
     default CHOICE_ENCODER_TYPE_BINKY_12 if MOD_BINKY
   endchoice
+
+  comment "_"
+
 endif

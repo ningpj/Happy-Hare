@@ -49,6 +49,10 @@ config MMU_HAS_ESPOOLER
 
 config MMU_HAS_FILAMENT_BUFFER
   def_bool n
+config PARAM_HAS_FILAMENT_BUFFER
+    int
+    default 1 if MMU_HAS_FILAMENT_BUFFER
+    default 0
 
 config MMU_HAS_LEDS
   def_bool n
@@ -70,6 +74,10 @@ config MMU_HAS_EJECT_BUTTONS
 
 # Some new designs have mcu integrated in sync-feedback buffer mcu
 config MMU_HAS_BUFFER_MCU
+  def_bool n
+
+# EMU design has a per-gate MCU and this controls the connection logic
+config MMU_HAS_PER_GATE_MCU
   def_bool n
 
 # Some custom designs have some pre-packaged hwardware configuration

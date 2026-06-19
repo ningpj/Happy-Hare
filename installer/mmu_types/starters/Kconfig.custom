@@ -27,4 +27,6 @@ if MMU_CUSTOM
   config PARAM_NUM_GATES
     default 4
 
+  comment "_"
+
 endif 

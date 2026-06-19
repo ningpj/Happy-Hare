@@ -29,6 +29,13 @@ from ..mmu_sensor_utils import (
 )
 
 
+SPRING_STATES = {
+    'none': None,
+    'tension': -1,
+    'neutral': 0,
+    'compression': 1
+}
+
 class MmuBuffer:
 
     def __init__(self, config, mmu_unit, params):
@@ -47,6 +54,8 @@ class MmuBuffer:
 
         self.buffer_range = config.getfloat('buffer_range', 10.0, minval=0.)
         self.buffer_maxrange = config.getfloat('buffer_maxrange', 10.0, minval=0.)
+        self.buffer_spring_state = config.getchoice('buffer_spring_state', {o: o for o in SPRING_STATES}, 'none')
+        self.buffer_spring_state_num = SPRING_STATES.get(self.buffer_spring_state)
 
         # Setup motor syncing feedback compression sensor for unit...
         switch_pin = config.get('compression_pin', None)

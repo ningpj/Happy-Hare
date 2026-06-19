@@ -494,6 +494,7 @@ class MmuStepper(ExtruderStepper):
         self.homing_accel = config.getfloat('homing_accel', self.accel, minval=0.)
         self.next_cmd_time = 0.
         self.commanded_pos = 0.
+        self._mode_pos_offset = 0. # Re-anchors mode_position while in extruder mode
         self.pos_min = config.getfloat('position_min', None)
         self.pos_max = config.getfloat('position_max', None)
 
@@ -556,7 +557,7 @@ class MmuStepper(ExtruderStepper):
                 if source is not None and isinstance(source, MmuStepper):
                     return source.commanded_pos
             return self.commanded_pos
-        return self.stepper.get_commanded_position()
+        return self.stepper.get_commanded_position() - self._mode_pos_offset # Extruder pos with re-anchor offset
 
 
     # ----------------------------------------------------------------------
@@ -812,6 +813,12 @@ class MmuStepper(ExtruderStepper):
             for follower in self._manual_followers:
                 follower.commanded_pos = setpos
                 follower.rail.set_position([setpos, 0., 0.])
+
+        elif self.motion_mode == self.MODE_EXTRUDER:
+            self.commanded_pos = setpos
+            # Can't rebase the slaved extruder rail, so track offset to re-anchor position
+            self._mode_pos_offset = self.stepper.get_commanded_position() - setpos
+
         else:
             self.commanded_pos = setpos
 
@@ -1184,8 +1191,14 @@ class MmuStepper(ExtruderStepper):
         cmd_pos = self.stepper.get_commanded_position()
 
         lines = [
-            f"Stepper: {self.full_name}: mode_pos={self.get_mode_position():.4f}, cmd_pos={self.commanded_pos}, stepper.cmd_pos={cmd_pos:.4f}, stepper.mcu_pos={mcu_pos:.1f}",
-            f"Motion mode: {self.motion_mode}"
+            (
+                f"Stepper: {self.full_name}: "
+                f"mode_pos={self.get_mode_position():.4f}, "
+                f"commanded_pos={self.commanded_pos}, "
+                f"stepper.commanded_position()={cmd_pos:.4f}, "
+                f"stepper.mcu_position()={mcu_pos:.1f}"
+            ),
+            f"Motion mode: {self.motion_mode}",
         ]
         if self.motion_mode == self.MODE_EXTRUDER:
             lines.extend([

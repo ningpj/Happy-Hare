@@ -150,6 +150,7 @@ if MMU_FAMILY_ERCF
 
 
   if MMU_TYPE_ERCF_1_1
+
     config PARAM_VERSION
       default "1.1sbt" if MOD_SPRINGY && MOD_BINKY && MOD_TRIPLE_DECKY
       default "1.1sb"  if MOD_SPRINGY && MOD_BINKY
@@ -195,9 +196,14 @@ if MMU_FAMILY_ERCF
       default CHOICE_ENCODER_TYPE_BINKY_8  if MOD_BINKY
       default CHOICE_ENCODER_TYPE_TCRT5000 if !MOD_BINKY
     endchoice
+
+    comment "_"
+
   endif
 
+
   if MMU_TYPE_ERCF_2_0
+
     config PARAM_VERSION
       default "2.0"
 
@@ -234,9 +240,14 @@ if MMU_FAMILY_ERCF
     choice CHOICE_ENCODER_TYPE
       default CHOICE_ENCODER_TYPE_BINKY_8
     endchoice
+
+    comment "_"
+
   endif
 
+
   if MMU_TYPE_ERCF_3_0
+
     config PARAM_VERSION
       default "3.0"
 
@@ -272,5 +283,8 @@ if MMU_FAMILY_ERCF
     choice CHOICE_ENCODER_TYPE
       default CHOICE_ENCODER_TYPE_BINKY_12
     endchoice
+
+    comment "_"
+
   endif
 endif

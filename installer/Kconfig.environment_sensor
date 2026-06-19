@@ -35,7 +35,7 @@ if MMU_HAS_ENVIRONMENT_SENSOR
 
         E.g. If you have a section like this: [temperature_sensor MMU_enclosure], then enter
              without the square brackets:
-          "temperature_sensor MMU_enclosure"
+          "temperature_sensor MMU_enclosure" or just "MMU_enclosure"
 
     config PARAM_ENVIRONMENT_SENSORS
       string "List of environment sensors"
@@ -47,7 +47,7 @@ if MMU_HAS_ENVIRONMENT_SENSOR
       
         E.g. If you have a section like this: [temperature_sensor MMU_enclosure], then enter
              without the square brackets:
-          "temperature_sensor MMU_enclosure, ..."
+          "temperature_sensor MMU_enclosure, ..." or just "MMU_enclosure, MMU_enclosure2, ..."
       
   endmenu
 

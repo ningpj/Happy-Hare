@@ -73,20 +73,47 @@ if MMU_HAS_SYNC_FEEDBACK_BUFFER
                ^          ^                  ^                                     ^                       ^^
           compression   tension        compression-only                      tension-only
 
+      choice CHOICE_BUFFER_SPRING_STATE
+        prompt "Buffer resting spring state"
+        default CHOICE_BUFFER_SPRING_STATE_NONE
+        help
+          If the buffer is sprung and reliably rests in one position it can be set here. This aids
+          filament detection logic. If 'none' (default) no assumption will be made about resting position.
+          IMPORTANT NOTE: This is the state the filament
+            - commonly an expanded buffer indicates filament "compression"
+            - while a squeezed buffer indicates filament "tension"
+ 
+
+        config CHOICE_BUFFER_SPRING_STATE_TENSION
+          bool "Tension / squeezed buffer"
+          help
+            Set if buffer spring naturally keeps buffer indicating filament tension
+
+        config CHOICE_BUFFER_SPRING_STATE_NEUTRAL
+          bool "Neutral"
+          help
+            Set if buffer spring naturally keeps buffer centered in neutral position
+
+        config CHOICE_BUFFER_SPRING_STATE_COMPRESSION
+          bool "Compression / expanded buffer"
+          help
+            Set if buffer spring naturally keeps buffer indicating filament compression
+
+        config CHOICE_BUFFER_SPRING_STATE_NONE
+          bool "n/a"
+          help
+            Set for no spring or if buffer doesn't have a relaible resting position
+      endchoice
+
+      config PARAM_BUFFER_SPRING_STATE
+        string
+        default "tension"     if CHOICE_BUFFER_SPRING_STATE_TENSION
+        default "neutral"     if CHOICE_BUFFER_SPRING_STATE_NEUTRAL
+        default "compression" if CHOICE_BUFFER_SPRING_STATE_COMPRESSION
+        default "none"
+
       comment "_"
       comment "Sensors"
-
-      config BOOL_REGISTER_BUFFER_SENSORS
-        bool "Register buffer sensors          "
-        default y
-        help
-          Whether to register the sensors for visibility in klipper UI's
-          and with QUERY_SENSOR command. There is no harm in doing this but
-          it can be disabled to reduce clutter.
-      config PARAM_REGISTER_BUFFER_SENSORS
-        int
-        default 1 if BOOL_REGISTER_BUFFER_SENSORS
-        default 0
 
       config UNSELECT_MMU_HAS_SENSOR_BUFFER_COMPRESSION
           bool
@@ -190,6 +217,18 @@ if MMU_HAS_SYNC_FEEDBACK_BUFFER
             more sensitive at one end of travel verses the other.
 
       endif
+
+      config BOOL_REGISTER_BUFFER_SENSORS
+        bool "Register buffer sensors          "
+        default y
+        help
+          Whether to register the sensors for visibility in klipper UI's
+          and with QUERY_SENSOR command. There is no harm in doing this but
+          it can be disabled to reduce clutter.
+      config PARAM_REGISTER_BUFFER_SENSORS
+        int
+        default 1 if BOOL_REGISTER_BUFFER_SENSORS
+        default 0
 
     endif
   endmenu

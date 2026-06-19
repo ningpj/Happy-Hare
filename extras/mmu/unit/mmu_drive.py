@@ -55,6 +55,7 @@ class MmuDrive():
 
         self.mmu.log_stepper(f"sync_mode({DRIVE_MODE_NAMES[mode]}) for {self.name}")
 
+        # Before resetting the driving stepper, capture it's position
         current_pos = self._driving_stepper.get_mode_position()
 
         # ------------------------------------------------------------------
@@ -90,6 +91,7 @@ class MmuDrive():
         # ------------------------------------------------------------------
         elif mode == DRIVE_GEAR_SYNCED_TO_EXTRUDER:
             self.mmu_extruder_stepper.switch_to_extruder_mode()
+            self.mmu_extruder_stepper.do_set_position(current_pos) # To allow rebasing mode_pos
             self.mmu_gear_stepper.switch_to_extruder_mode()
             self.mmu_gear_stepper.sync_to_extruder(self.mmu_extruder_stepper.get_name())
             self._driving_stepper = self.mmu_extruder_stepper
@@ -141,6 +143,10 @@ class MmuDrive():
 
     def has_endstop(self, endstop_name):
         return self._driving_stepper.rail.has_endstop(endstop_name)
+
+
+    def get_endstop(self, endstop_name):
+        return self._driving_stepper.rail.get_homing_endstops(endstop_name)[0]
 
 
     def get_extra_endstop_names(self):

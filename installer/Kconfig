@@ -15,6 +15,41 @@
 # don't want the abilty to "reset to default" and you want past values to be "sticky" you
 # must use alternative names (or unamed choice)
 #
+# Some Happy Hare augmented features:
+# Kconfig:
+# 1. Dynamic defaults 'generated_default'
+#
+#   Syntax:
+#     generated_default "<template>" "<args>"
+#     generated_default "<template>" "<args>" <stop>
+#     generated_default "<template>" "<args>" <start> <stop>
+#
+#   <args> is a space-separated list of Kconfig symbols used for %-formatting.
+#   {iter} is replaced by the iterator value when repeating.
+#
+# Examples:
+#   generated_default "%s_%d" "PARAM_ONE PARAM_TWO"
+#   generated_default "{iter}_%s" "PARAM_ONE" PARAM_STOP
+#   generated_default "%s_{iter}" "PARAM_VENDOR PARAM_VERSION" PARAM_START PARAM_STOP
+#   generated_default "neopixel:$(UNIT_NAME)_gate{iter}_leds (1-%d)" "PARAM_NUM_GATES" PARAM_NUM_GATES
+#
+# 2. Added float type
+# 3. Option 'force_show'to force display even if dependency isn't met
+# 4. Recording of default value with #~DEFAULT~# magic token
+# 5. repeat expansion macro to avoid multiple lines (can be nested):
+#      @repeat var=i min=0 max=3@
+#        config PARAM_MMU_CANBUS_UNIT_$(i)
+#          string "CANbus UUID for MMU unit $(i)"
+#      @endrepeat@
+# 6. help added to menus
+#
+# Menuconfig:
+# 1. 'r' to reset value to default
+# 2. Flexible comment lines and section separated
+# 3. Lots of formatting changes and style options
+# 4. Variable input dialogs with better parsing
+#
+#
 # Capability parmams:
 #   MMU_HAS_BUFFER_MCU
 #   MMU_HAS_EJECT_BUTTONS
@@ -67,10 +102,12 @@ to_bool = $(shell, $(1) && echo y || echo n)
 # Used to count arguments
 count   = $(shell, set -- $(1); echo $#)
 
-# Used to dynamically get the serial device paths (ls is not expensive to run multiple time)
-serial_device        = $(shell, ls /dev/serial/by-id/* 2>/dev/null | grep 'Klipper_$(2)' | tail -n +$(1) | head -n 1)
-serial_exists        = $(to_bool, [ -e '$(serial_device,$(1),$(2))' ])
+# Used to dynamically get the serial device paths
+all_serial_devices  := $(shell, ls /dev/serial/by-id/* 2>/dev/null || true)
+serial_device        = $(shell, printf '%s\n' $(all_serial_devices) | grep 'Klipper_$(2)' | sed -n '$(1)p')
+serial_exists        = $(to_bool, [ -n '$(serial_device,$(1),$(2))' ])
 mmu_serial_config    = $(shell, basename '$(serial_device,$(1),$(2))' | sed 's/-/_/g' | awk 'BEGIN{out="CHOICE_MMU_SERIAL_DEVICE_NONE" } NF && $$0!="." {out="CHOICE_MMU_SERIAL_DEVICE_" toupper($$0)} END{print out}')
+mmu_serial_config_pg = $(shell, basename '$(serial_device,$(2),$(3))' | sed 's/-/_/g' | awk -v gate=$(1) 'BEGIN{out="CHOICE_MMU_SERIAL_DEVICE_NONE_GATE_" gate } NF && $$0!="." {out="CHOICE_MMU_SERIAL_DEVICE_" toupper($$0) "_GATE_" gate} END{print out}')
 buffer_serial_config = $(shell, basename '$(serial_device,$(1),$(2))' | sed 's/-/_/g' | awk 'BEGIN{out="CHOICE_BUFFER_SERIAL_DEVICE_NONE"} NF && $$0!="." {out="CHOICE_BUFFER_SERIAL_DEVICE_" toupper($$0)} END{print out}')
 
 # Grab the UUIDs that are not in use by klipper as a space-separated list, e.g. "43a8... 25ff... aaba..."
@@ -79,6 +116,7 @@ canbus_uuids        := $(shell, $(canbus_query) 2>/dev/null | sed -n 's/.*canbus
 canbus_uuid_count   := $(count, $(canbus_uuids))
 canbus_uuid          = $(shell, echo $(canbus_uuids) | awk -v n=$(1) '{ print $n }')
 mmu_canbus_config    = $(shell, echo $(canbus_uuid,$(1)) | awk 'BEGIN{out="CHOICE_MMU_CANBUS_UUID_NONE"} NF {out="CHOICE_MMU_CANBUS_UUID_" toupper($$0)} END{print out}')
+mmu_canbus_config_pg = $(shell, echo $(canbus_uuid,$(2)) | awk -v gate=$(1) 'BEGIN{out="CHOICE_MMU_CANBUS_UUID_NONE_GATE_" gate} NF {out="CHOICE_MMU_CANBUS_UUID_" toupper($$0) "_GATE_" gate} END{print out}')
 buffer_canbus_config = $(shell, echo $(canbus_uuid,$(1)) | awk 'BEGIN{out="CHOICE_BUFFER_CANBUS_UUID_NONE"} NF {out="CHOICE_BUFFER_CANBUS_UUID_" toupper($$0)} END{print out}')
 
 # Used for comment padding
@@ -194,6 +232,7 @@ if !MULTI_UNIT_ENTRY_POINT
   if !SHOW_MMU_ADDITIONS_WITH_TYPE
     source "Kconfig.mmu_additions"  # MMU Additions/Customization menu (if not inlined with mmu type)
   endif
+  comment "_"
   source "Kconfig.pins"             # Raw pin editing
   source "connection/Kconfig"       # MCU Connection
   if !MULTI_UNIT

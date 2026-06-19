@@ -24,7 +24,6 @@ config MMU_HAS_LEDS
   help
     Select if your MMU has LEDs.
 
-
 if MMU_HAS_LEDS
   menu "Led config"
 
@@ -51,31 +50,35 @@ if MMU_HAS_LEDS
       default "False"
 
     config PARAM_CHAIN_COUNT
-      int "Chain count"
+      int "Chain count     "
       default PARAM_NUM_GATES
 
     config PARAM_COLOR_ORDER
-      string "Color order"
+      string "Color order     "
       default "GRBW"
 
     config PARAM_EXIT_LEDS
-      string "Exit leds  "
-      @defaults template="neopixel:$(UNIT_NAME)_leds (1-%d)" ifsym=PARAM_NUM_GATES min=1 max=24@
+      string
+
+    config PARAM_EXIT_LEDS
+      string "Exit leds       "
+      generated_default "neopixel:$(UNIT_NAME)_gate{iter}_leds (1-%d)" "PARAM_NUM_GATES" "; " 0 PARAM_NUM_GATES if MMU_HAS_PER_GATE_MCU
+      generated_default "neopixel:$(UNIT_NAME)_leds (1-%d)" "PARAM_NUM_GATES"
 
     config PARAM_ENTRY_LEDS
-      string "Entry leds "
+      string "Entry leds      "
       default ""
 
     config PARAM_STATUS_LEDS
-      string "Status leds"
+      string "Status leds     "
       default ""
 
     config PARAM_LOGO_LEDS
-      string "Logo leds  "
+      string "Logo leds       "
       default ""
 
     config PIN_NEOPIXEL
-      prompt "Led Neopixel pin  "
+      prompt "Led Neopixel pin"
   endmenu
 endif
 

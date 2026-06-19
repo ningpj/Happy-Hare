@@ -41,4 +41,6 @@ if MMU_TYPE_3MS_1_0
   config PARAM_GATE_PARKING_DISTANCE
     default -250
 
+  comment "_"
+
 endif 

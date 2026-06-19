@@ -2305,127 +2305,232 @@ class Kconfig(object):
 #
 #        return True
 
-    # Happy Hare added vvv
+    # Happy Hare added vv
+    # Replacement with support for injecting expanded blocks via a simple macro:
     #
-    # Replacement with support for injecting expanded lines via a simple macro:
-    #
-    #   @defaults template="neopixel:$(UNIT_NAME)_leds (1-%d)" ifsym=PARAM_NUM_GATES min=1 max=32@
+    #   @repeat var=i min=1 max=3@
+    #       default "heater$(i)" if PARAM_NUM_GATES = $(i)
+    #   @endrepeat@
     #
     # Expands into:
-    #   default "neopixel:$(UNIT_NAME)_leds (1-1)" if PARAM_NUM_GATES = 1
-    #   ...
-    #   default "neopixel:$(UNIT_NAME)_leds (1-32)" if PARAM_NUM_GATES = 32
+    #   default "heater1" if PARAM_NUM_GATES = 1
+    #   default "heater2" if PARAM_NUM_GATES = 2
+    #   default "heater3" if PARAM_NUM_GATES = 3
+    #
+    # The placeholder $(i) is replaced with each value in the range [min..max].
+    # Nested @repeat blocks are supported.
+    #
     def _next_line(self):
-            # Fetches and tokenizes the next line from the current Kconfig file.
-            # Returns False at EOF and True otherwise.
-            #
-            # Supports:
-            #   @defaults template="..." ifsym=SYM min=1 max=32@
-            #
-            # Expands into:
-            #   default "..." if SYM = N
-            #   for N in [min..max]
-
-            if self._reuse_tokens:
-                self._reuse_tokens = False
-                return True
-
-            if not hasattr(self, "_line_queue"):
-                self._line_queue = []
-
-            def _to_int(s, name):
-                try:
-                    return int(s, 10)
-                except Exception:
-                    self._parse_error("invalid integer for '%s': %r (in @defaults)" % (name, s))
-
-            def _parse_defaults_macro(raw_line):
-                import shlex
-
-                stripped = raw_line.strip()
-                if not stripped:
-                    return None
-
-                if not (stripped.startswith("@defaults") and stripped.endswith("@")):
-                    return None
-
-                # Extract inner directive text
-                inner = stripped[len("@defaults"):].strip()
-                inner = inner[:-1].strip()  # remove trailing '@'
-
-                lex = shlex.shlex(inner, posix=True)
-                lex.whitespace_split = True
-
-                args = {}
-                for tok in list(lex):
-                    if "=" not in tok:
-                        self._line = raw_line
-                        self._parse_error("bad @defaults token (expected key=value): %r" % tok)
-                    k, v = tok.split("=", 1)
-                    args[k.strip()] = v.strip()
-
-                template = args.get("template")
-                ifsym = args.get("ifsym")
-                mn = args.get("min")
-                mx = args.get("max")
-
-                if template is None or ifsym is None or mn is None or mx is None:
-                    self._line = raw_line
-                    self._parse_error(
-                        "missing required @defaults args (need template=..., ifsym=..., min=..., max=...)"
-                    )
-
-                mn_i = _to_int(mn, "min")
-                mx_i = _to_int(mx, "max")
-
-                if mn_i > mx_i:
-                    self._line = raw_line
-                    self._parse_error("@defaults has min > max (%d > %d)" % (mn_i, mx_i))
-
-                out = []
-                for i in range(mn_i, mx_i + 1):
-                    try:
-                        rendered = template % i
-                    except Exception:
-                        self._line = raw_line
-                        self._parse_error(
-                            "template formatting failed for i=%d. "
-                            "Template must use printf-style formatting like %%d" % i
-                        )
-
-                    out.append('default "%s" if %s = %d\n' % (rendered, ifsym, i))
-
-                return out
-
-            # --- Fetch next line ---
-
-            if self._line_queue:
-                line = self._line_queue.pop(0)
-            else:
-                line = self._readline()
-                if not line:
-                    return False
-                self.linenr += 1
-
-                # Handle line joining
-                while line.endswith("\\\n"):
-                    line = line[:-2] + self._readline()
-                    self.linenr += 1
-
-            # Expand macro (if present)
-            expanded = _parse_defaults_macro(line)
-            if expanded:
-                # Inject generated lines
-                self._line_queue = expanded[1:] + self._line_queue
-                line = expanded[0]
-
-            # IMPORTANT: Set self._line for proper error reporting
-            self._line = line
-
-            self._tokens = self._tokenize(line)
-            self._tokens_i = 1
+        if self._reuse_tokens:
+            self._reuse_tokens = False
             return True
-# Happy Hare added ^^^
+
+        if not hasattr(self, "_line_queue"):
+            self._line_queue = []
+
+        def _to_int(s, name, macro="@repeat"):
+            try:
+                return int(s, 10)
+            except Exception:
+                self._line = getattr(self, "_line", "")
+                self._parse_error(
+                    "invalid integer for '%s': %r (in %s)" % (name, s, macro)
+                )
+
+        def _parse_keyvals(inner, macro_name):
+            import shlex
+
+            lex = shlex.shlex(inner, posix=True)
+            lex.whitespace_split = True
+
+            args = {}
+            for tok in list(lex):
+                if "=" not in tok:
+                    self._parse_error(
+                        "bad %s token (expected key=value): %r" %
+                        (macro_name, tok)
+                    )
+                k, v = tok.split("=", 1)
+                args[k.strip()] = v.strip()
+            return args
+
+        def _parse_if_start(raw_line):
+            stripped = raw_line.strip()
+
+            if stripped.startswith("@if ") and stripped.endswith("@"):
+                return ("if", stripped[4:-1].strip())
+
+            if stripped.startswith("@ifnot ") and stripped.endswith("@"):
+                return ("ifnot", stripped[7:-1].strip())
+
+            return None
+
+        def _parse_repeat_start(raw_line):
+            stripped = raw_line.strip()
+            if not (stripped.startswith("@repeat") and stripped.endswith("@")):
+                return None
+
+            inner = stripped[len("@repeat"):].strip()
+            inner = inner[:-1].strip()
+
+            args = _parse_keyvals(inner, "@repeat")
+
+            var = args.get("var", "i")
+            mn = args.get("min")
+            mx = args.get("max")
+
+            if mn is None or mx is None:
+                self._line = raw_line
+                self._parse_error(
+                    "missing required @repeat args "
+                    "(need min=..., max=..., optional var=...)"
+                )
+
+            if not var:
+                self._line = raw_line
+                self._parse_error("@repeat var cannot be empty")
+
+            mn_i = _to_int(mn, "min", "@repeat")
+            mx_i = _to_int(mx, "max", "@repeat")
+
+            if mn_i > mx_i:
+                self._line = raw_line
+                self._parse_error(
+                    "@repeat has min > max (%d > %d)" % (mn_i, mx_i)
+                )
+
+            return var, mn_i, mx_i
+
+        def _read_physical_line():
+            line = self._readline()
+            if not line:
+                return None
+
+            self.linenr += 1
+
+            while line.endswith("\\\n"):
+                nxt = self._readline()
+                self.linenr += 1
+                if not nxt:
+                    break
+                line = line[:-2] + nxt
+
+            return line
+
+        def _read_macro_body_line():
+            if self._line_queue:
+                return self._line_queue.pop(0)
+            return _read_physical_line()
+
+        def _expand_repeat_macro(start_line):
+            parsed = _parse_repeat_start(start_line)
+            if parsed is None:
+                return None
+
+            var, mn_i, mx_i = parsed
+
+            body = []
+            depth = 1
+
+            while True:
+                line = _read_macro_body_line()
+                if line is None:
+                    self._line = start_line
+                    self._parse_error("@repeat without matching @endrepeat@")
+
+                stripped = line.strip()
+
+                if stripped.startswith("@repeat") and stripped.endswith("@"):
+                    depth += 1
+                    body.append(line)
+                    continue
+
+                if stripped == "@endrepeat@":
+                    depth -= 1
+
+                    if depth == 0:
+                        break
+
+                    body.append(line)
+                    continue
+
+                body.append(line)
+
+            placeholder = "$(%s)" % var
+
+            out = []
+            for i in range(mn_i, mx_i + 1):
+                i_s = str(i)
+                for body_line in body:
+                    out.append(body_line.replace(placeholder, i_s))
+
+            return out
+
+        def _expand_if_macro(start_line):
+            parsed = _parse_if_start(start_line)
+            if parsed is None:
+                return None
+
+            mode, var = parsed
+
+            enabled = os.getenv(var, "").lower() in ("y", "yes", "1", "true")
+
+            if mode == "ifnot":
+                enabled = not enabled
+
+            body = []
+            depth = 1
+
+            while True:
+                line = _read_macro_body_line()
+
+                if line is None:
+                    self._line = start_line
+                    self._parse_error("@if without matching @endif@")
+
+                stripped = line.strip()
+
+                if (stripped.startswith("@if ") and stripped.endswith("@")) or \
+                   (stripped.startswith("@ifnot ") and stripped.endswith("@")):
+                    depth += 1
+                    body.append(line)
+                    continue
+
+                if stripped == "@endif@":
+                    depth -= 1
+
+                    if depth == 0:
+                        break
+
+                    body.append(line)
+                    continue
+
+                body.append(line)
+
+            return body if enabled else []
+
+        if self._line_queue:
+            line = self._line_queue.pop(0)
+        else:
+            line = _read_physical_line()
+            if line is None:
+                return False
+
+        expanded = _expand_if_macro(line)
+        if expanded is not None:
+            self._line_queue = expanded + self._line_queue
+            return self._next_line()
+
+        expanded = _expand_repeat_macro(line)
+        if expanded is not None:
+            self._line_queue = expanded + self._line_queue
+            return self._next_line()
+
+        self._line = line
+        self._tokens = self._tokenize(line)
+        self._tokens_i = 1
+        return True
+    # Happy Hare added ^^^
 
     def _line_after_help(self, line):
         # Tokenizes a line after a help text. This case is special in that the
@@ -2435,11 +2540,17 @@ class Kconfig(object):
         # An earlier version used a _saved_line variable instead that was
         # checked in _next_line(). This special-casing gets rid of it and makes
         # _reuse_tokens alone sufficient to handle unget.
-
-        # Handle line joining
         while line.endswith("\\\n"):
             line = line[:-2] + self._readline()
             self.linenr += 1
+
+        # Happy Hare: allow custom block macros immediately after help text
+        if line.strip().startswith("@repeat"):
+            if not hasattr(self, "_line_queue"):
+                self._line_queue = []
+            self._line_queue.insert(0, line)
+            self._reuse_tokens = False
+            return
 
         self._tokens = self._tokenize(line)
         self._reuse_tokens = True
@@ -3463,6 +3574,55 @@ class Kconfig(object):
 
                 node.item.is_optional = True
 
+            elif t0 is _T_GENERATED_DEFAULT: # Happy Hare: Added
+                if node.item.__class__ is not Symbol:
+                    self._parse_error("generated_default is only valid for symbols")
+
+                template = self._tokens[1]
+                arg_names = self._tokens[2]
+                self._tokens_i = 3
+
+                if template.__class__ is not str:
+                    self._parse_error("expected generated_default template string")
+
+                if arg_names.__class__ is Symbol:
+                    if not arg_names.is_constant:
+                        self._parse_error("expected generated_default argument-name string")
+                    arg_names = arg_names.name
+                elif arg_names.__class__ is not str:
+                    self._parse_error("expected generated_default argument-name string")
+
+                args = [self._lookup_sym(name) for name in arg_names.split()]
+
+                separator = ", "
+                token = self._tokens[self._tokens_i]
+                if token.__class__ is Symbol and token.is_constant:
+                    separator = token.name
+                    self._tokens_i += 1
+
+                iter_vals = []
+                while (
+                    len(iter_vals) < 2 and
+                    self._tokens[self._tokens_i] is not None and
+                    self._tokens[self._tokens_i] is not _T_IF
+                ):
+                    iter_vals.append(self._expect_sym())
+
+
+                if len(iter_vals) == 0:
+                    start_sym = None
+                    stop_sym = None
+                elif len(iter_vals) == 1:
+                    start_sym = None
+                    stop_sym = iter_vals[0]
+                else:
+                    start_sym = iter_vals[0]
+                    stop_sym = iter_vals[1]
+
+                node.generated_defaults.append(
+                    (template, args, separator, start_sym, stop_sym, self._parse_cond())
+                )
+
             else:
                 # Reuse the tokens for the non-property line later
                 self._reuse_tokens = True
@@ -3679,6 +3839,16 @@ class Kconfig(object):
                 if node.prompt:
                     depend_on(sym, node.prompt[1])
 
+            # Happy Hare: Added
+            for template, args, separator, start_sym, stop_sym, cond in sym.generated_defaults:
+                for arg in args:
+                    depend_on(sym, arg)
+                if start_sym is not None:
+                    depend_on(sym, start_sym)
+                if stop_sym is not None:
+                    depend_on(sym, stop_sym)
+                depend_on(sym, cond)
+
             # The default values and their conditions
             for value, cond in sym.defaults:
                 depend_on(sym, value)
@@ -3852,6 +4022,13 @@ class Kconfig(object):
                                       cur.prompt[1],
                                       self._make_and(visible_if, dep)))
 
+                # Happy Hare: Added
+                if cur.generated_defaults:
+                    cur.generated_defaults = [
+                        (template, args, separator, start_sym, stop_sym, self._make_and(cond, dep))
+                        for template, args, separator, start_sym, stop_sym, cond in cur.generated_defaults
+                    ]
+
                 # Propagate dependencies to defaults
                 if cur.defaults:
                     cur.defaults = [(default, self._make_and(cond, dep))
@@ -3896,6 +4073,7 @@ class Kconfig(object):
         sym.direct_dep = self._make_or(sym.direct_dep, node.dep)
 
         sym.defaults += node.defaults
+        sym.generated_defaults += node.generated_defaults # Happy Hare: Added
         sym.ranges += node.ranges
         sym.selects += node.selects
         sym.implies += node.implies
@@ -4451,6 +4629,7 @@ class Symbol(object):
         "_write_to_conf",
         "choice",
         "defaults",
+        "generated_defaults", # Happy Hare: Added
         "direct_dep",
         "env_var",
         "implies",
@@ -4607,12 +4786,19 @@ class Symbol(object):
                 # If the symbol is visible and has a user value, use that
                 val = self.user_value
             else:
-                # Otherwise, look at defaults
-                for sym, cond in self.defaults:
+                # Happy Hare: Added else block
+                for template, args, separator, start_sym, stop_sym, cond in self.generated_defaults:
                     if expr_value(cond):
-                        val = sym.str_value
+                        val = _generated_default_value(template, args, separator, start_sym, stop_sym)
                         self._write_to_conf = True
                         break
+                else:
+                    # Otherwise, look at defaults
+                    for sym, cond in self.defaults:
+                        if expr_value(cond):
+                            val = sym.str_value
+                            self._write_to_conf = True
+                            break
 
         elif self.orig_type is FLOAT: # Happy Hare: Added
             if vis and self.user_value is not None:
@@ -5004,6 +5190,7 @@ class Symbol(object):
         self.nodes = []
 
         self.defaults = []
+        self.generated_defaults = [] # Happy Hare: Added
         self.selects = []
         self.implies = []
         self.ranges = []
@@ -5158,6 +5345,11 @@ class Symbol(object):
             return TRI_TO_STR[val]
 
         if self.orig_type:  # STRING/INT/HEX
+            # Happy Hare: Added (favor generated defaults)
+            for template, args, separator, start_sym, stop_sym, cond in self.generated_defaults:
+                if expr_value(cond):
+                    return _generated_default_value(template, args, separator, start_sym, stop_sym)
+
             for default, cond in self.defaults:
                 if expr_value(cond):
                     return default.str_value
@@ -5840,6 +6032,7 @@ class MenuNode(object):
 
         # Properties
         "defaults",
+        "generated_defaults", # Happy Hare: Added
         "selects",
         "implies",
         "ranges",
@@ -5851,6 +6044,7 @@ class MenuNode(object):
         # only applies to these, in case a symbol is defined in multiple
         # locations.
         self.defaults = []
+        self.generated_defaults = [] # Happy Hare: Added
         self.selects = []
         self.implies = []
         self.ranges = []
@@ -5913,6 +6107,15 @@ class MenuNode(object):
 
         for value, cond in self.defaults:
             res |= expr_items(value)
+            res |= expr_items(cond)
+
+        # Happy Hare: Added
+        for template, args, separator, start_sym, stop_sym, cond in self.generated_defaults:
+            res.update(args)
+            if start_sym is not None:
+                res.add(start_sym)
+            if stop_sym is not None:
+                res.add(stop_sym)
             res |= expr_items(cond)
 
         for value, cond in self.selects:
@@ -6584,6 +6787,59 @@ def _strcmp(s1, s2):
 
     return (s1 > s2) - (s1 < s2)
 
+# Happy Hare: Added
+def _generated_default_value(template, args, separator=", ", start_sym=None, stop_sym=None):
+    def sym_val(sym):
+        if sym.orig_type is INT:
+            try:
+                return int(sym.str_value, 10)
+            except ValueError:
+                return sym.str_value
+
+        if sym.orig_type is HEX:
+            try:
+                return int(sym.str_value, 16)
+            except ValueError:
+                return sym.str_value
+
+        if sym.orig_type is FLOAT:
+            try:
+                return float(sym.str_value)
+            except ValueError:
+                return sym.str_value
+
+        return sym.str_value
+
+    def int_val(sym, default=0):
+        if sym is None:
+            return default
+        try:
+            return int(sym.str_value, 0)
+        except ValueError:
+            return default
+
+    base_args = [sym_val(arg) for arg in args]
+
+    try:
+        if stop_sym is None:
+            return template % tuple(base_args)
+
+        start = int_val(start_sym, 0)
+        stop = int_val(stop_sym, 0)
+
+        if stop <= start:
+            return ""
+
+        out = []
+        for i in range(start, stop):
+            rendered = template.replace("{iter}", str(i))
+            rendered = rendered % tuple(base_args)
+            out.append(rendered)
+
+        return separator.join(out)
+
+    except Exception:
+        return ""
 
 def _sym_to_num(sym):
     # expr_value() helper for converting a symbol to a number. Raises
@@ -7084,6 +7340,7 @@ except AttributeError:
     _T_COMMENT,
     _T_CONFIG,
     _T_DEFAULT,
+    _T_GENERATED_DEFAULT, # Happy Hare: Added
     _T_DEFCONFIG_LIST,
     _T_DEF_BOOL,
     _T_DEF_HEX,
@@ -7129,7 +7386,7 @@ except AttributeError:
     _T_TRISTATE,
     _T_UNEQUAL,
     _T_VISIBLE,
-) = range(1, 54) # Happy Hare: 51->54
+) = range(1, 55) # Happy Hare: 51->55
 
 # Keyword to token map, with the get() method assigned directly as a small
 # optimization
@@ -7148,6 +7405,7 @@ _get_keyword = {
     "def_string":     _T_DEF_STRING,
     "def_tristate":   _T_DEF_TRISTATE,
     "default":        _T_DEFAULT,
+    "generated_default": _T_GENERATED_DEFAULT, # Happy Hare: Added
     "defconfig_list": _T_DEFCONFIG_LIST,
     "depends":        _T_DEPENDS,
     "endchoice":      _T_ENDCHOICE,
@@ -7273,6 +7531,7 @@ _STRING_LEX = frozenset({
     _T_SOURCE,
     _T_STRING,
     _T_TRISTATE,
+    _T_GENERATED_DEFAULT, # Happy Hare: Added
 })
 
 # Various sets for quick membership tests. Gives a single global lookup and
