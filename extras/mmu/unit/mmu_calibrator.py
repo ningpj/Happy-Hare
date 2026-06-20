@@ -689,7 +689,7 @@ class MmuCalibrator:
 
         # Encoder ----------------------------------------------------
 
-        if should_check(CALIBRATED_ENCODER, u.p.skip_cal_encoder, u.p.autotune_encoder):
+        if u.has_encoder() and should_check(CALIBRATED_ENCODER, u.p.skip_cal_encoder, u.p.autotune_encoder):
             info = "\n- Use MMU_CALIBRATE_ENCODER (with first gate of unit selected)"
             add_msg(info, u.p.skip_cal_encoder)
 

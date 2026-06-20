@@ -388,6 +388,7 @@ class MmuUnit:
                 self.encoder.add_unit(self)
         else:
             logging.info("MMU: - No mmu_encoder specified")
+            self.calibrator.mark_calibrated(CALIBRATED_ENCODER)
 
         # Load optional sync-feedback mmu_buffer (can be a shared buffer so check for existance first)
         self.buffer = None
