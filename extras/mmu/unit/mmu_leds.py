@@ -123,6 +123,7 @@ class MmuLeds:
         self.white_light = MmuLeds.string_to_rgb(config.get('white_light', '(1,1,1)'))
         self.black_light = MmuLeds.string_to_rgb(config.get('black_light', '(0.01,0,0.02)'))
         self.empty_light = MmuLeds.string_to_rgb(config.get('empty_light', '(0,0,0)'))
+        self.filament_color_intensity = config.getfloat('filament_color_intensity', 0.5, minval=0.0, maxval=1.0)
 
         # Read operation to effect mappings
         self.effects = {}
@@ -222,3 +223,7 @@ class MmuLeds:
                 )
 
         return rgb
+
+    @staticmethod
+    def apply_intensity(rgb, intensity):
+        return tuple(min(1.0, value * intensity) for value in rgb)

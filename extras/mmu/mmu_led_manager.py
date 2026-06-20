@@ -556,6 +556,8 @@ class MmuLedManager:
                         rgb = self.mmu.gate_color_rgb[self.mmu.gate_selected]
                         if rgb == (0,0,0):
                             rgb = mmu_unit.leds.black_light
+                        elif effect == "filament_color":
+                            rgb = MmuLeds.apply_intensity(rgb, mmu_unit.leds.filament_color_intensity)
                 else:
                     rgb = mmu_unit.leds.black_light
                 set_gate_rgb(rgb, unit, segment, None)
@@ -565,6 +567,7 @@ class MmuLedManager:
                 rgb = (0,0,0)
                 if self.mmu.gate_selected >= 0 and self.mmu.filament_pos > FILAMENT_POS_UNLOADED:
                     rgb = self.mmu.slicer_color_rgb[self.mmu.gate_selected]
+                    rgb = MmuLeds.apply_intensity(rgb, mmu_unit.leds.filament_color_intensity)
                 set_gate_rgb(rgb, unit, segment, None)
     
             elif isinstance(effect, tuple) or (isinstance(effect, str) and ',' in effect): # RGB color
