@@ -6,7 +6,7 @@ if BOARD_TYPE_EBB_1_0
     default "EBB v1"
 
   choice CHOICE_MMU_CONNECTION_TYPE
-    default CHOICE_MMU_CONNECTION_TYPE_SERIAL
+    default CHOICE_MMU_CONNECTION_TYPE_CANBUS
   endchoice
   choice CHOICE_MMU_SERIAL_CONNECTION
     default $(mmu_serial_config,1,stm32)
