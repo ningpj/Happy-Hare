@@ -36,8 +36,8 @@ class MmuTestMoveCommand(MoveMixin, BaseCommand):
         + "ACCEL        = mm/s^2 Optionally override the default accelarateion\n"
         + "MOTOR        = [gear|extruder|gear+extruder|synced] Select motor to operation on (default: gear)\n"
         + "GRIP         = 1      To retain grip on filament after move for type-A testing\n"
-        + "WAIT         = [0|1]  Wait for move to complete (make move synchronous)\n"
-        + "DEBUG        = [0|1]  Turn on developer stepper movement debugging\n"
+        + "WAIT         = 0      Don't wait for move to complete (default 1 makes move synchronous)\n"
+        + "DEBUG        = 1      Turn on developer stepper movement debugging\n"
     )
     HELP_SUPPLEMENT = (
         "Examples:\n"

@@ -170,6 +170,20 @@ class MmuLogger:
         if self.mmu.p.log_level > 2:
             self.mmu.gcode.respond_info(msg)
 
+    def log_trace_entry(self, msg):
+        self.log_trace(
+            f"ENTRY {msg} | "
+            f"filament_pos={self.mmu.drive().get_filament_position():.1f}mm | "
+            f"encoder={self.mmu.get_encoder_distance(dwell=None):.1f}mm"
+        )
+
+    def log_trace_exit(self, msg):
+        self.log_trace(
+            f"EXIT {msg} | "
+            f"filament_pos={self.mmu.drive().get_filament_position():.1f}mm | "
+            f"encoder={self.mmu.get_encoder_distance(dwell=None):.1f}mm"
+        )
+
     def log_stepper(self, msg):
         msg = "%s %s %s STEPPER: %s" % (UI_SEPARATOR, UI_SEPARATOR, UI_SEPARATOR, msg)
         if self.mmu.p.log_file_level > 3:

@@ -90,9 +90,9 @@ class MmuSensorManager:
                 # Special case for "no bowden" designs where mmu_shared_exit is an alias for extruder sensor.
                 # This allows "gate loading" to use the extruder sensor
                 if (
-                    not mmu_unit.require_bowden_move and
-                    gate_sensors.get(SENSOR_EXTRUDER_ENTRY) and
-                    SENSOR_SHARED_EXIT not in self.gate_sensors
+                    not mmu_unit.require_bowden_move
+                    and gate_sensors.get(SENSOR_EXTRUDER_ENTRY)
+                    and SENSOR_SHARED_EXIT not in self.gate_sensors
                 ):
                     self.gate_sensors.update(connect_sensors([(mmu_unit.toolhead_wrapper.extruder_sensor, SENSOR_SHARED_EXIT)]))
 
@@ -321,7 +321,9 @@ class MmuSensorManager:
 
     def get_generic_endstop_name(self, endstop_name):
         """
-        Convert fully qualified sensor name back to generic form
+        Convert fully qualified sensor name back to generic form.
+        Note that fully qualified names never have both unit prefix
+        and gate suffix - gate indexes are global
         """
 
         # Handle "<name>:genericName"
@@ -334,7 +336,7 @@ class MmuSensorManager:
                     return generic
 
             # Buffer-based sensors
-            if generic in [SENSOR_SHARED_EXIT, SENSOR_COMPRESSION, SENSOR_TENSION]:
+            if generic in [SENSOR_COMPRESSION, SENSOR_TENSION]:
                 if prefix == self.mmu.mmu_unit().buffer.name:
                     return generic
 
@@ -524,7 +526,7 @@ class MmuSensorManager:
         return self._get_sensors(pos, gate, lambda p, pc: pc is not None and ((loading and p < pc) or (not loading and p <= pc)))
 
 
-    def get_all_sensors_for_gate(self,  gate):
+    def get_all_sensors_for_gate(self, gate):
         return self._get_sensors(-1, gate, lambda p, pc: pc is not None)
 
 

@@ -1444,6 +1444,12 @@ class MmuController(MmuFilamentMovement):
     def log_trace(self, msg):
         self.logger.log_trace(msg)
 
+    def log_trace_entry(self, msg):
+        self.logger.log_trace_entry(msg)
+
+    def log_trace_exit(self, msg):
+        self.logger.log_trace_exit(msg)
+
     def log_stepper(self, msg):
         self.logger.log_stepper(msg)
 
