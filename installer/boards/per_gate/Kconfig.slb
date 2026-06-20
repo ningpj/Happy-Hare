@@ -40,6 +40,10 @@ if BOARD_TYPE_SLB_1_0
       default "^$(MCU_NAME):PB2"
 
     config PIN_NEOPIXEL
+      default "$(MCU_NAME):PA4" 
+
+    config PIN_NEOPIXEL_BOX
+      string
       default "$(MCU_NAME):PA2" 
 
     config PIN_BUFFER_TENSION
@@ -101,6 +105,10 @@ if BOARD_TYPE_SLB_1_0
         default "^$(MCU_NAME)_gate$(gate):PB2"
 
       config PIN_NEOPIXEL_$(gate)
+        default "$(MCU_NAME)_gate$(gate):PA4" 
+
+      config PIN_NEOPIXEL_BOX_$(gate)
+        string
         default "$(MCU_NAME)_gate$(gate):PA2" 
 
     endif
