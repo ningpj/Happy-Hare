@@ -222,6 +222,7 @@ if MULTI_UNIT_ENTRY_POINT
   source "Kconfig.options"          # Main software options
   source "Kconfig.tip_shaping"
   source "Kconfig.purging"
+  source "Kconfig.fans"             # Fan configuration
   source "Kconfig.speeds"           # Access to extruder speeds
   source "macro_vars/Kconfig"       # Variables for all macros
 
@@ -258,6 +259,7 @@ if !MULTI_UNIT_ENTRY_POINT
     source "Kconfig.options"        # Main software options
     source "Kconfig.tip_shaping"
     source "Kconfig.purging"
+    source "Kconfig.fans"           # Fan configuration
     source "macro_vars/Kconfig"     # Variables for all macros
   endif
   source "Kconfig.raw"              # Raw access to appropriate parameters

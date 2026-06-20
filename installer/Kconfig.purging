@@ -147,6 +147,11 @@ menu "Purging"
           are optionally caught by a collection bucket.
     endif
 
+    config CHOICE_PURGE_MACRO_SLICER
+      bool "Slicer managed"
+      help
+        Purging is controlled and managed by the slicer rather than Happy-Hare.
+
     config CHOICE_PURGE_MACRO_OTHER
       bool "Other / manually entered"
       help
@@ -163,6 +168,7 @@ menu "Purging"
     string
     default "_MMU_PURGE"      if CHOICE_PURGE_MACRO_PURGE
     default "BLOBIFIER"       if CHOICE_PURGE_MACRO_BLOBIFIER
+    default ""                if CHOICE_PURGE_MACRO_SLICER
     default PURGE_MACRO_OTHER if CHOICE_PURGE_MACRO_OTHER
     default ""
 
@@ -173,6 +179,7 @@ menu "Purging"
 
   config BOOL_FORCE_PURGE_STANDALONE
     bool "Happy Hare controlled in-print purge"
+    def_bool n if CHOICE_PURGE_MACRO_SLICER
     def_bool y
     help
       You can choose whether you want the slicer or Happy Hare (recommended) to control filament purging.
