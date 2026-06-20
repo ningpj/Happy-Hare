@@ -9,7 +9,6 @@ config MMU_TYPE_EMU_1_0
   select VIRTUAL_SELECTOR
   select MMU_HAS_ENVIRONMENT_SENSOR
   select MMU_HAS_PER_GATE_ENV_SENSORS
-  select MMU_HAS_PER_GATE_HEATERS
   select MMU_HAS_LEDS
   select MMU_HAS_EJECT_BUTTONS
   select MMU_HAS_SENSOR_ENTRY
@@ -21,8 +20,7 @@ config MMU_TYPE_EMU_1_0
   select BOOL_ENABLE_SYNC_TO_EXTRUDER
   select BOOL_ENABLE_SYNC_FORM_TIP
   select BOOL_ENABLE_SYNC_PURGE
-  imply  MMU_HAS_SYNC_FEEDBACK_BUFFER
-  imply  OPTION_PSF_BUFFER
+  select MMU_HAS_PER_GATE_HEATERS
 
 
 # -------------------------------------
@@ -97,7 +95,7 @@ if MMU_TYPE_EMU_1_0
 
   config PARAM_COLOR_ORDER
     default "GRBW"
-
+  
   if BOARD_TYPE_SLB_1_0
     config PARAM_ENTRY_LEDS
       generated_default "neopixel:$(UNIT_NAME)_gate{iter}_leds (5)" "" "; " PARAM_NUM_GATES
