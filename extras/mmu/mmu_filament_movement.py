@@ -1610,7 +1610,7 @@ class MmuFilamentMovement:
 
 #                    self.log_warning(f"PAUL: filament_pos={self.drive().get_filament_position():.1f}mm, encoder={self.get_encoder_distance(dwell=None):.1f}mm")
                     # Notify calibration manager
-                    u.calibrator.update_bowden_calibration(calibrated_bowden_length)
+                    u.calibrator.update_bowden_length(calibrated_bowden_length)
 
                 else:
 
