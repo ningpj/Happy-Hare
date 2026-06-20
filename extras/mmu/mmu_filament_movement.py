@@ -1619,7 +1619,7 @@ class MmuFilamentMovement:
                         self._load_extruder()
 
                     # Notify calibration manager
-                    u.calibrator.update_bowden_calibration(calibrated_bowden_length)
+                    u.calibrator.update_bowden_length(calibrated_bowden_length)
 
                 else:
 
