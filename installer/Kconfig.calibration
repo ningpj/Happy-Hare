@@ -16,14 +16,15 @@
 menu "Calibration/Autotuning"
   config BOOL_AUTOCAL_BOWDEN_LENGTH
     bool "Auto calibrate bowden length"
-    default y if MMU_HAS_SYNC_FEEDBACK_BUFFER && MMU_HAS_SENSOR_BUFFER_COMPRESSION
+    default y
+    #default y if MMU_HAS_SYNC_FEEDBACK_BUFFER && MMU_HAS_SENSOR_BUFFER_COMPRESSION && MMU_HAS_SENSOR_BUFFER_PROPORTIONAL
     help
       Automated bowden length calibration.
       The calibrated bowden length will be established on first load. It can also be set
       manually or reset with MMU_CALIBRATE_BOWDEN. Best results require the use of
       sync-feedback-compression or extruder sensor but gear-touch or encoder will also work.
       Note that 'extruder_homing_endstop' cannot be 'none'
-  config PARAM_AUTOCAL_BOWDEN_LENGTH
+  config PARAM_AUTOCAL_BOWDEN_LENGTH 
     int
     default 1 if BOOL_AUTOCAL_BOWDEN_LENGTH
     default 0
@@ -55,10 +56,11 @@ menu "Calibration/Autotuning"
 
   config BOOL_AUTOTUNE_ROTATION_DISTANCE
     bool "Autotune rotation distance"
-    default y if MMU_HAS_SYNC_FEEDBACK_BUFFER && \
-        ((MMU_HAS_SENSOR_BUFFER_COMPRESSION && \
-          MMU_HAS_SENSOR_BUFFER_TENSION) || \
-         MMU_HAS_SENSOR_BUFFER_PROPORTIONAL)
+    default n
+    #default y if MMU_HAS_SYNC_FEEDBACK_BUFFER && \
+    #    ((MMU_HAS_SENSOR_BUFFER_COMPRESSION && \
+    #      MMU_HAS_SENSOR_BUFFER_TENSION) || \
+    #     MMU_HAS_SENSOR_BUFFER_PROPORTIONAL)
     help
       Automated gate calibration/tuning.
       Requires sync-feedback sensor (aka "buffer") with both compression and tension switches
