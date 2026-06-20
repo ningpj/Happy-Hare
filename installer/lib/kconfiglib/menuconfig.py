@@ -1776,10 +1776,16 @@ def _change_node(node):
         s = sc.str_value
 
         while True:
-            s = _input_dialog(
-                "{} ({})".format(node.prompt[0], TYPE_TO_STR[sc.orig_type]),
-                s, _range_info(sc),
-                sc.orig_type) # Happy Hare: Added passing of orig_type
+            # Happy Hare: Use multi-line editor for semicolon-separated strings
+            if sc.orig_type == STRING and "; " in s:
+                s = _multiline_input_dialog(
+                    "{} ({})".format(node.prompt[0], TYPE_TO_STR[sc.orig_type]),
+                    s)
+            else:
+                s = _input_dialog(
+                    "{} ({})".format(node.prompt[0], TYPE_TO_STR[sc.orig_type]),
+                    s, _range_info(sc),
+                    sc.orig_type) # Happy Hare: Added passing of orig_type
 
             if s is None:
                 break
@@ -1999,6 +2005,161 @@ def _draw_input_dialog(win, title, info_lines, s, i, hscroll):
     _draw_frame(win, title)
 
     _safe_move(win, 2, 2 + i - hscroll)
+
+    win.noutrefresh()
+
+
+# Happy Hare: Added multi-line editor for semicolon-separated STRING values
+def _multiline_input_dialog(title, initial_text):
+    # Pops up a dialog that edits a semicolon-separated string as multiple lines
+
+    win = _styled_win("body")
+    win.keypad(True)
+
+    help_lines = [
+        "[Ctrl-D] Save     [ESC] Cancel",
+        "[Enter] New line  [Backspace/Delete] Remove"
+    ]
+
+    # Happy Hare: Split semicolon-separated strings into editor lines
+    lines = [line.strip() for line in initial_text.split("; ")] or [""]
+
+    row = 0
+    col = len(lines[row])
+    scroll = 0
+
+    _resize_multiline_input_dialog(win, title, help_lines)
+
+    _safe_curs_set(2)
+
+    while True:
+        _draw_main()
+        _draw_multiline_input_dialog(win, title, help_lines, lines,
+                                     row, col, scroll)
+        curses.doupdate()
+
+
+        c = _getch_compat(win)
+
+        edit_height = max(_height(win) - len(help_lines) - 4, 1)
+
+        if c == curses.KEY_RESIZE:
+            _resize_main()
+            _resize_multiline_input_dialog(win, title, help_lines)
+
+        elif c == "\x04":  # Ctrl-D
+            _safe_curs_set(0)
+            # Happy Hare: Rejoin edited lines as the original semicolon-separated format
+            return "; ".join(line.strip() for line in lines if line.strip())
+
+        elif c == "\x1B":  # \x1B = ESC
+            _safe_curs_set(0)
+            return None
+
+        elif c == "\n":
+            line = lines[row]
+            lines[row] = line[:col]
+            lines.insert(row + 1, line[col:])
+            row += 1
+            col = 0
+
+        elif c == curses.KEY_UP:
+            if row > 0:
+                row -= 1
+                col = min(col, len(lines[row]))
+
+        elif c == curses.KEY_DOWN:
+            if row < len(lines) - 1:
+                row += 1
+                col = min(col, len(lines[row]))
+
+        elif c == curses.KEY_LEFT:
+            if col > 0:
+                col -= 1
+            elif row > 0:
+                row -= 1
+                col = len(lines[row])
+
+        elif c == curses.KEY_RIGHT:
+            if col < len(lines[row]):
+                col += 1
+            elif row < len(lines) - 1:
+                row += 1
+                col = 0
+
+        elif c in (curses.KEY_HOME, "\x01"):  # \x01 = CTRL-A
+            col = 0
+
+        elif c in (curses.KEY_END, "\x05"):  # \x05 = CTRL-E
+            col = len(lines[row])
+
+        elif c in (curses.KEY_BACKSPACE, _ERASE_CHAR):
+            if col > 0:
+                lines[row] = lines[row][:col-1] + lines[row][col:]
+                col -= 1
+            elif row > 0:
+                col = len(lines[row - 1])
+                lines[row - 1] += lines[row]
+                del lines[row]
+                row -= 1
+
+        elif c == curses.KEY_DC:
+            if col < len(lines[row]):
+                lines[row] = lines[row][:col] + lines[row][col+1:]
+            elif row < len(lines) - 1:
+                lines[row] += lines[row + 1]
+                del lines[row + 1]
+
+        elif isinstance(c, str):
+            lines[row] = lines[row][:col] + c + lines[row][col:]
+            col += 1
+
+        # Happy Hare: Keep cursor row visible in multi-line editor
+        if row < scroll:
+            scroll = row
+        elif row >= scroll + edit_height:
+            scroll = row - edit_height + 1
+
+
+# Happy Hare: Added resize helper for multi-line STRING editor
+def _resize_multiline_input_dialog(win, title, help_lines):
+    screen_height, screen_width = _stdscr.getmaxyx()
+
+    win_height = min(max(12, len(help_lines) + 6), screen_height)
+    win_width = min(max(_INPUT_DIALOG_MIN_WIDTH, len(title) + 4), screen_width)
+
+    win.resize(win_height, win_width)
+    win.mvwin((screen_height - win_height)//2,
+              (screen_width - win_width)//2)
+
+
+# Happy Hare: Added draw helper for multi-line STRING editor
+def _draw_multiline_input_dialog(win, title, help_lines, lines,
+                                 row, col, scroll):
+    edit_height = max(_height(win) - len(help_lines) - 4, 1)
+    edit_width = _width(win) - 4
+
+    win.erase()
+
+    for y in range(edit_height):
+        line_i = scroll + y
+        if line_i < len(lines):
+            s = lines[line_i]
+        else:
+            s = ""
+
+        visible_s = s[:edit_width]
+        _safe_addstr(win, 2 + y, 2,
+                     visible_s + " "*(edit_width - len(visible_s)),
+                     _style["edit"])
+
+    for linenr, line in enumerate(help_lines):
+        _safe_addstr(win, 3 + edit_height + linenr, 2, line)
+
+    # Draw the frame last so that it overwrites the body text for small windows
+    _draw_frame(win, title)
+
+    _safe_move(win, 2 + row - scroll, 2 + min(col, edit_width - 1))
 
     win.noutrefresh()
 

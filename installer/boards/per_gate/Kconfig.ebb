@@ -19,19 +19,19 @@ if BOARD_TYPE_EBB_1_0
 
   if !MMU_HAS_PER_GATE_MCU
 
-    config PIN_GEAR_UART 
+    config PIN_GEAR_UART
       default "$(MCU_NAME):PA15"
     config PIN_GEAR_STEP
-      default "$(MCU_NAME):PD0" 
+      default "$(MCU_NAME):PD0"
     config PIN_GEAR_DIR
-      default "$(MCU_NAME):PD1" 
+      default "$(MCU_NAME):PD1"
     config PIN_GEAR_ENABLE
-      default "!$(MCU_NAME):PD2" 
+      default "!$(MCU_NAME):PD2"
     config PIN_GEAR_DIAG
       default ""
 
     config PIN_ENTRY_SENSOR_0
-      default "^(MCU_NAME):PB7" 
+      default "^(MCU_NAME):PB7"
 
     config PIN_EXIT_SENSOR_0
       default "^(MCU_NAME):PB5"
@@ -40,7 +40,7 @@ if BOARD_TYPE_EBB_1_0
       default "^$(MCU_NAME):PB6"
 
     config PIN_NEOPIXEL
-      default "$(MCU_NAME):PD3" 
+      default "$(MCU_NAME):PD3"
 
     config PIN_BUFFER_TENSION
       default "^$(MCU_NAME):PB8"
@@ -60,14 +60,14 @@ if BOARD_TYPE_EBB_1_0
 
   if MMU_HAS_PER_GATE_MCU
 
-    config PIN_GEAR_UART 
+    config PIN_GEAR_UART
       default "$(MCU_NAME)_gate0:PA15"
     config PIN_GEAR_STEP
-      default "$(MCU_NAME)_gate0:PD0" 
+      default "$(MCU_NAME)_gate0:PD0"
     config PIN_GEAR_DIR
-      default "$(MCU_NAME)_gate0:PD1" 
+      default "$(MCU_NAME)_gate0:PD1"
     config PIN_GEAR_ENABLE
-      default "!$(MCU_NAME)_gate0:PD2" 
+      default "!$(MCU_NAME)_gate0:PD2"
     config PIN_GEAR_DIAG
       default ""
 
@@ -77,11 +77,11 @@ if BOARD_TYPE_EBB_1_0
       config PIN_GEAR_UART_$(gate)
         default "$(MCU_NAME)_gate$(gate):PA15"
       config PIN_GEAR_STEP_$(gate)
-        default "$(MCU_NAME)_gate$(gate):PD0" 
+        default "$(MCU_NAME)_gate$(gate):PD0"
       config PIN_GEAR_DIR_$(gate)
-        default "$(MCU_NAME)_gate$(gate):PD1" 
+        default "$(MCU_NAME)_gate$(gate):PD1"
       config PIN_GEAR_ENABLE_$(gate)
-        default "!$(MCU_NAME)_gate$(gate):PD2" 
+        default "!$(MCU_NAME)_gate$(gate):PD2"
       config PIN_GEAR_DIAG_$(gate)
         default ""
 
@@ -101,7 +101,7 @@ if BOARD_TYPE_EBB_1_0
         default "^$(MCU_NAME)_gate$(gate):PB6"
 
       config PIN_NEOPIXEL_$(gate)
-        default "$(MCU_NAME)_gate$(gate):PD3" 
+        default "$(MCU_NAME)_gate$(gate):PD3"
 
     endif
     @endrepeat@

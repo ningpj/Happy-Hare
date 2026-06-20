@@ -19,19 +19,19 @@ if BOARD_TYPE_SLB_1_0
 
   if !MMU_HAS_PER_GATE_MCU
 
-    config PIN_GEAR_UART 
+    config PIN_GEAR_UART
       default "$(MCU_NAME):PB6"
     config PIN_GEAR_STEP
-      default "$(MCU_NAME):PB5" 
+      default "$(MCU_NAME):PB5"
     config PIN_GEAR_DIR
-      default "$(MCU_NAME):PB4" 
+      default "$(MCU_NAME):PB4"
     config PIN_GEAR_ENABLE
-      default "!$(MCU_NAME):PB7" 
+      default "!$(MCU_NAME):PB7"
     config PIN_GEAR_DIAG
       default ""
 
     config PIN_ENTRY_SENSOR_0
-      default "^(MCU_NAME):PA1" 
+      default "^(MCU_NAME):PA1"
 
     config PIN_EXIT_SENSOR_0
       default "^(MCU_NAME):PA0"
@@ -40,11 +40,12 @@ if BOARD_TYPE_SLB_1_0
       default "^$(MCU_NAME):PB2"
 
     config PIN_NEOPIXEL
-      default "$(MCU_NAME):PA4" 
+      default "$(MCU_NAME):PA4"
 
+# PAUL special for EMU
     config PIN_NEOPIXEL_BOX
       string
-      default "$(MCU_NAME):PA2" 
+      default "$(MCU_NAME):PA2"
 
     config PIN_BUFFER_TENSION
       default "^$(MCU_NAME):PB1"
@@ -64,14 +65,14 @@ if BOARD_TYPE_SLB_1_0
 
   if MMU_HAS_PER_GATE_MCU
 
-    config PIN_GEAR_UART 
+    config PIN_GEAR_UART
       default "$(MCU_NAME)_gate0:PB6"
     config PIN_GEAR_STEP
-      default "$(MCU_NAME)_gate0:PB5" 
+      default "$(MCU_NAME)_gate0:PB5"
     config PIN_GEAR_DIR
-      default "$(MCU_NAME)_gate0:PB4" 
+      default "$(MCU_NAME)_gate0:PB4"
     config PIN_GEAR_ENABLE
-      default "!$(MCU_NAME)_gate0:PB7" 
+      default "!$(MCU_NAME)_gate0:PB7"
     config PIN_GEAR_DIAG
       default ""
 
@@ -81,11 +82,11 @@ if BOARD_TYPE_SLB_1_0
       config PIN_GEAR_UART_$(gate)
         default "$(MCU_NAME)_gate$(gate):PB6"
       config PIN_GEAR_STEP_$(gate)
-        default "$(MCU_NAME)_gate$(gate):PB5" 
+        default "$(MCU_NAME)_gate$(gate):PB5"
       config PIN_GEAR_DIR_$(gate)
-        default "$(MCU_NAME)_gate$(gate):PB4" 
+        default "$(MCU_NAME)_gate$(gate):PB4"
       config PIN_GEAR_ENABLE_$(gate)
-        default "!$(MCU_NAME)_gate$(gate):PB7" 
+        default "!$(MCU_NAME)_gate$(gate):PB7"
       config PIN_GEAR_DIAG_$(gate)
         default ""
 
@@ -105,11 +106,12 @@ if BOARD_TYPE_SLB_1_0
         default "^$(MCU_NAME)_gate$(gate):PB2"
 
       config PIN_NEOPIXEL_$(gate)
-        default "$(MCU_NAME)_gate$(gate):PA4" 
+        default "$(MCU_NAME)_gate$(gate):PA4"
 
+# PAUL special for EMU
       config PIN_NEOPIXEL_BOX_$(gate)
         string
-        default "$(MCU_NAME)_gate$(gate):PA2" 
+        default "$(MCU_NAME)_gate$(gate):PA2"
 
     endif
     @endrepeat@

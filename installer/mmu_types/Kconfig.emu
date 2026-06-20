@@ -3,12 +3,13 @@ config MMU_TYPE_EMU_1_0
   help
     EMU is a modular type-B MMU with each spool being contained in it's own
     (optionally heater) enclosure. It had many features and is an incredible
-    choice for new builds. Highly recommended to use with a analog proportional
+    choice for new builds. Highly recommended to use with an analog proportional
     sync-feedback buffer like PSF.
   imply  MMU_HAS_PER_GATE_MCU # Install must also be run with "-e" for PER_GATE_MCU support
   select VIRTUAL_SELECTOR
   select MMU_HAS_ENVIRONMENT_SENSOR
   select MMU_HAS_PER_GATE_ENV_SENSORS
+  select MMU_HAS_PER_GATE_HEATERS
   select MMU_HAS_LEDS
   select MMU_HAS_EJECT_BUTTONS
   select MMU_HAS_SENSOR_ENTRY
@@ -20,7 +21,8 @@ config MMU_TYPE_EMU_1_0
   select BOOL_ENABLE_SYNC_TO_EXTRUDER
   select BOOL_ENABLE_SYNC_FORM_TIP
   select BOOL_ENABLE_SYNC_PURGE
-  select MMU_HAS_PER_GATE_HEATERS
+  imply  MMU_HAS_SYNC_FEEDBACK_BUFFER
+  imply  OPTION_PSF_BUFFER
 
 
 # -------------------------------------
@@ -36,6 +38,8 @@ if MMU_TYPE_EMU_1_0
       under MMU additions)
     select MMU_HAS_SYNC_FEEDBACK_BUFFER
     select MMU_HAS_SENSOR_BUFFER_PROPORTIONAL
+    select UNSELECT_MMU_HAS_SENSOR_BUFFER_COMPRESSION
+    select UNSELECT_MMU_HAS_SENSOR_BUFFER_TENSION
 
   if OPTION_PSF_BUFFER
     choice CHOICE_BUFFER_SPRING_STATE
@@ -93,6 +97,9 @@ if MMU_TYPE_EMU_1_0
   config PARAM_GEAR_MICROSTEPS
     default 4
 
+  config PARAM_SYNC_GEAR_CURRENT
+    default 52
+
   config PARAM_COLOR_ORDER
     default "GRBW"
   
@@ -123,9 +130,6 @@ if MMU_TYPE_EMU_1_0
     default -1
   config PARAM_GATE_FINAL_EJECT_DISTANCE
     default 100
-
-  config PARAM_SYNC_GEAR_CURRENT
-    default 52
 
   config PARAM_ENVIRONMENT_SENSORS
     generated_default "$(UNIT_NAME)_env{iter}" "" PARAM_NUM_GATES
