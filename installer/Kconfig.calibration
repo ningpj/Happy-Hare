@@ -17,7 +17,7 @@ menu "Calibration/Autotuning"
   config BOOL_AUTOCAL_BOWDEN_LENGTH
     bool "Auto calibrate bowden length"
     default y
-    #default y if MMU_HAS_SYNC_FEEDBACK_BUFFER && MMU_HAS_SENSOR_BUFFER_COMPRESSION && MMU_HAS_SENSOR_BUFFER_PROPORTIONAL
+    #default y if MMU_HAS_SYNC_FEEDBACK_BUFFER && (MMU_HAS_SENSOR_BUFFER_COMPRESSION || MMU_HAS_SENSOR_BUFFER_PROPORTIONAL)
     help
       Automated bowden length calibration.
       The calibrated bowden length will be established on first load. It can also be set
