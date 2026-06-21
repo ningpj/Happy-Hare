@@ -1,8 +1,9 @@
-# LED parameter token types and defaults. Must be used within
-# a "if MMU_HAS_LEDS" is cfg templates
+# LED parameter token types and defaults.
 #
 # Responsible for setting:
 #   MMU_HAS_LEDS
+#
+# Led parameter tokens which must be inside if MMU_HAS_LEDS clause in cfg templates:
 #   PARAM_ENABLED
 #   PARAM_ANIMATION
 #   PARAM_CHAIN_COUNT
@@ -11,8 +12,10 @@
 #   PARAM_ENTRY_LEDS
 #   PARAM_STATUS_LEDS
 #   PARAM_LOGO_LEDS
-#
 #   PIN_NEOPIXEL (duplicate with pins)
+#
+# Can be disabled and forced off with:
+#   select UNSELECT_MMU_HAS_LEDS
 
 config UNSELECT_MMU_HAS_LEDS
   def_bool n
@@ -23,6 +26,11 @@ config MMU_HAS_LEDS
   default n
   help
     Select if your MMU has LEDs.
+
+
+# -------------------------------------
+# LED config
+# -------------------------------------
 
 if MMU_HAS_LEDS
   menu "Led config"
@@ -77,14 +85,10 @@ if MMU_HAS_LEDS
       string "Logo leds       "
       default ""
 
-    #config PIN_NEOPIXEL
-    #  prompt "Led Neopixel pin"
-
     config PIN_NEOPIXEL
-      string
       prompt "Neopixel pin          " if MMU_HAS_LEDS && !MMU_HAS_PER_GATE_MCU
 
-    menu "Neopixel per-gate pins    " 
+    menu "Neopixel per-gate pins" 
       depends on MMU_HAS_LEDS && MMU_HAS_PER_GATE_MCU
 
       @repeat var=i min=0 max=11@
@@ -94,7 +98,7 @@ if MMU_HAS_LEDS
       @endrepeat@
     endmenu
 
-    menu "Neopixel box pins         " 
+    menu "Neopixel per-gate box pins" 
       depends on MMU_HAS_LEDS && MMU_HAS_PER_GATE_MCU
 
       @repeat var=i min=0 max=11@

@@ -5,9 +5,6 @@ if BOARD_TYPE_SLB_1_0
   config PARAM_BOARD_TYPE
     default "SLB v1"
 
-  config MMU_SUPPORTS_FANS
-    default y
-
   choice CHOICE_MMU_CONNECTION_TYPE
     default CHOICE_MMU_CONNECTION_TYPE_CANBUS
   endchoice
@@ -45,13 +42,11 @@ if BOARD_TYPE_SLB_1_0
     config PIN_NEOPIXEL
       default "$(MCU_NAME):PA4"
 
-# PAUL special for EMU
     config PIN_NEOPIXEL_BOX
       string
       default "$(MCU_NAME):PA2"
 
     config PIN_FAN
-      string
       default "$(MCU_NAME):PA15"
 
     config PIN_BUFFER_TENSION
@@ -115,7 +110,6 @@ if BOARD_TYPE_SLB_1_0
       config PIN_NEOPIXEL_$(gate)
         default "$(MCU_NAME)_gate$(gate):PA4"
 
-# PAUL special for EMU
       config PIN_NEOPIXEL_BOX_$(gate)
         string
         default "$(MCU_NAME)_gate$(gate):PA2"

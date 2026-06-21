@@ -1,5 +1,12 @@
 # Responsible for setting:
 #   MMU_HAS_EJECT_BUTTONS
+#
+# Eject button parameter tokens which must be inside if MMU_HAS_EJECT_BUTTONS clause in cfg templates:
+#   PIN_EJECT_BUTTON_<gate>
+#
+# Can be disabled and forced off with:
+#   select UNSELECT_MMU_HAS_ENCODER
+
 
 config UNSELECT_MMU_HAS_EJECT_BUTTONS
   def_bool n
@@ -12,6 +19,18 @@ config MMU_HAS_EJECT_BUTTONS
     Some MMU designs have dedicated eject buttons. Select this
     option to allow pin editing and inclusion in config template
 
+
+# -------------------------------------
+# Eject buttons config
+# -------------------------------------
+
 if MMU_HAS_EJECT_BUTTONS
-  comment 'Pins must be set under "Pins" section'
+
+  menu "Mmu eject buttons"
+    @repeat var=i min=0 max=11@
+      config PIN_EJECT_BUTTON_$(i)
+        prompt "Eject button $(i) pin " if PARAM_NUM_GATES > $(i)
+    @endrepeat@
+  endmenu
+
 endif

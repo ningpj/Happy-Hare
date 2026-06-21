@@ -1,8 +1,18 @@
 # Responsible for setting:
 #   MMU_HAS_ESPOOLER
+#
+# Espooler parameter tokens which must be inside if MMU_HAS_ESPOOLER clause in cfg templates:
+# PIN_ESPOOLER_EN_<gate> (depends on HAS_ESPOOLER_ENABLE_PIN)
+# PIN_ESPOOLER_RWD_<gate>
+# PIN_ESPOOLER_FWD_<gate>
+# PIN_ESPOOLER_TRIG_<gate>
+#
+# Can be disabled and forced off with:
+#   select UNSELECT_MMU_HAS_ESPOOLER
+
 
 config UNSELECT_MMU_HAS_ESPOOLER
-  bool
+  def_bool n
 config MMU_HAS_ESPOOLER
   prompt "Has eSpooler?"
   depends on !UNSELECT_MMU_HAS_ESPOOLER
@@ -14,8 +24,33 @@ config MMU_HAS_ESPOOLER
     assist in print. Select if you have added a DC motor controlled
     eSpooler.
 
+
+# -------------------------------------
+# Espooler config
+# -------------------------------------
+
 if MMU_HAS_ESPOOLER
+
+  # Can't also have filament catchment buffer
   config UNSELECT_MMU_HAS_FILAMENT_BUFFER
     default y
-  comment 'Pins must be set under "Pins" section'
+
+  menu "eSpooler pins"
+    @repeat var=i min=0 max=11@
+      if PARAM_NUM_GATES > $(i)
+        if $(i) > 0
+          comment "_"
+        endif
+        config PIN_ESPOOLER_EN_$(i)
+          prompt "eSpooler enable $(i) pin " if HAS_ESPOOLER_ENABLE_PIN
+        config PIN_ESPOOLER_RWD_$(i)
+          prompt "eSpooler rewind $(i) pin "
+        config PIN_ESPOOLER_FWD_$(i)
+          prompt "eSpooler forward $(i) pin"
+        config PIN_ESPOOLER_TRIG_$(i)
+          prompt "eSpooler trigger $(i) pin"
+      endif
+    @endrepeat@
+  endmenu
+
 endif

@@ -299,8 +299,7 @@ menu "Pins / TMC"
 # -------------------------------------
 
   config PIN_SHARED_EXIT_SENSOR
-    string
-    prompt "Shared exit sensor pin" if MMU_HAS_SENSOR_SHARED_EXIT
+    string "Shared exit sensor pin" if MMU_HAS_SENSOR_SHARED_EXIT
 
 # -------------------------------------
 # Misc pins
@@ -308,29 +307,45 @@ menu "Pins / TMC"
 
   config PIN_ENCODER
     string
+  config PIN_NEOPIXEL
+    string
+  config PIN_FAN
+    string
+
+  config PIN_ENCODER
     prompt "Encoder pin           " if MMU_HAS_ENCODER && !MMU_SHARED_ENCODER
 
   config PIN_NEOPIXEL
-    string
     prompt "Neopixel pin          " if MMU_HAS_LEDS && !MMU_HAS_PER_GATE_MCU
 
-  menu "Neopixel per-gate pins    " 
+  menu "Neopixel per-gate pins" 
+    depends on MMU_HAS_LEDS && MMU_HAS_PER_GATE_MCU
+
+    @repeat var=i min=0 max=11@
+      config PIN_NEOPIXEL_$(i)
+        string "Neopixel gate $(i) pin" if PARAM_NUM_GATES > $(i)
+    @endrepeat@
+  endmenu
+
+  menu "Neopixel box pins" 
+    depends on MMU_HAS_LEDS && MMU_HAS_PER_GATE_MCU
+
+    @repeat var=i min=0 max=11@
+      config PIN_NEOPIXEL_BOX_$(i)
+        string "Neopixel box gate $(i) pin" if PARAM_NUM_GATES > $(i)
+    @endrepeat@
+  endmenu
+
+  config PIN_FAN
+    prompt "Cooling fan           " if MMU_HAS_FANS && !MMU_HAS_PER_GATE_MCU
+
+  menu "Fan per-gate pins" 
     depends on MMU_HAS_LEDS && MMU_HAS_PER_GATE_MCU
 
     @repeat var=i min=0 max=11@
       config PIN_NEOPIXEL_$(i)
         string
-        prompt "Neopixel gate $(i) pin" if PARAM_NUM_GATES > $(i)
-    @endrepeat@
-  endmenu
-
-  menu "Neopixel box pins         " 
-    depends on MMU_HAS_LEDS && MMU_HAS_PER_GATE_MCU
-
-    @repeat var=i min=0 max=11@
-      config PIN_NEOPIXEL_BOX_$(i)
-        string
-        prompt "Neopixel box gate $(i) pin" if PARAM_NUM_GATES > $(i)
+        prompt "Cooling fan gate $(i) pin" if PARAM_NUM_GATES > $(i)
     @endrepeat@
   endmenu
 

@@ -1,5 +1,5 @@
 # This aggregates configuration for MMU additions
-# (this duplicates what is available in the "Raw" section)
+# (this overlaps with some of Kconfig.pins and Kconfig.raw)
 
 menu "MMU Features/Additions"
   help
@@ -10,6 +10,7 @@ menu "MMU Features/Additions"
     the best possible starter configuration.
 
   source "Kconfig.leds"
+  source "Kconfig.fans"
   source "Kconfig.espooler"
   source "Kconfig.sync_feedback_buffer"
   source "Kconfig.environment_sensor"
@@ -17,7 +18,6 @@ menu "MMU Features/Additions"
   source "Kconfig.eject_buttons"
   source "Kconfig.encoder"
   source "Kconfig.filament_buffer"
-  source "Kconfig.fans"
   comment "_"
   source "sensors/Kconfig"
 endmenu

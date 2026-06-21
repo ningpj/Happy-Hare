@@ -1,31 +1,37 @@
-# Defines fan configuration for MMU units
-#
-# Responsible for defining/setting:
+# Responsible for defining/setting cooling fan configuration:
 #   MMU_HAS_FANS
-#   PIN_FAN (single MCU)
-#   PIN_FAN_X (per-gate MCU)
+#
+# Fan parameter tokens which must be inside if MMU_HAS_FANS clause in cfg templates:
 #   PARAM_FAN_MAX_POWER
 #   PARAM_FAN_KICK_START_TIME
+#   PIN_FAN   (single MCU)
+#   PIN_FAN_X (per-gate MCU)
+#
+# Can be disabled and forced off with:
+#   select UNSELECT_MMU_HAS_FANS
 
-# Hidden feature : set in boards to enable
-config MMU_SUPPORTS_FANS
-  bool
-  default n
-  help
-    Set by board-specific configurations when fans are available
 
+config UNSELECT_MMU_HAS_FANS
+  def_bool n
 config MMU_HAS_FANS
   bool "Has MMU cooling fans?"
-  depends on MMU_SUPPORTS_FANS
+  depends on !UNSELECT_MMU_HAS_FANS
+  forceshow
   default n
   help
     Enable this if you have cooling fans installed in your MMU unit(s).
     Fans will be defined as hidden [fan_generic] sections in the generated config.
 
+
+# -------------------------------------
+# Fan config
+# -------------------------------------
+
 if MMU_HAS_FANS
-  menu "Fan configuration"
+  menu "Fan config"
+
     config PARAM_FAN_MAX_POWER
-      float "Fan maximum power"
+      float "Fan maximum power  "
       default 1.0
       range 0.1 1.0
       help
@@ -38,31 +44,26 @@ if MMU_HAS_FANS
       range 0 3.0
       help
         Time in seconds to run fan at full power before resetting to target speed.
-  endmenu
 
-  if !MMU_HAS_PER_GATE_MCU
-    menu "Fan pin"
+    if !MMU_HAS_PER_GATE_MCU
       config PIN_FAN
-        string
-        prompt "Fan pin"
+        prompt "Fan pin            "
         help
           Pin for cooling fan.
           Leave blank if you don't have a fan installed.
           Empty pins will be ignored in the generated configuration.
-    endmenu
+    endif
 
-  endif
+    menu "Fan pins" 
+      depends on MMU_HAS_LEDS && MMU_HAS_PER_GATE_MCU
 
-  if MMU_HAS_PER_GATE_MCU
-    menu "Fan pins"
       @repeat var=i min=0 max=11@
         config PIN_FAN_$(i)
-          string
-          prompt "Fan $(i) pin" if PARAM_NUM_GATES > $(i)
-          # ningpj kconfig doesn't like help in this block for some reason !!!
-          # help 
-          #   Leave blank if this gate does not have a fan installed.         
+          string "Fan $(i) pin" if PARAM_NUM_GATES > $(i)
+          help 
+            Leave blank if this gate does not have a fan installed.
       @endrepeat@
     endmenu
-  endif
+
+  endmenu
 endif

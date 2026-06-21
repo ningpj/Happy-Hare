@@ -5,9 +5,6 @@ if BOARD_TYPE_EBB_1_0
   config PARAM_BOARD_TYPE
     default "EBB v1"
 
-  config MMU_SUPPORTS_FANS
-    default y
-
   choice CHOICE_MMU_CONNECTION_TYPE
     default CHOICE_MMU_CONNECTION_TYPE_CANBUS
   endchoice
@@ -107,7 +104,6 @@ if BOARD_TYPE_EBB_1_0
         default "$(MCU_NAME)_gate$(gate):PD3"
 
       config PIN_FAN_$(gate)
-        string
         default "$(MCU_NAME)_gate$(gate):PA0"
 
     endif

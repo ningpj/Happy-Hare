@@ -2272,40 +2272,41 @@ class Kconfig(object):
         self._readline.__self__.close()  # __self__ fetches the 'file' object
         self._include_path, self._readline = self._filestack.pop()
 
-# Happy Hare replaced this original method
-#    def _next_line(self):
-#        # Fetches and tokenizes the next line from the current Kconfig file.
-#        # Returns False at EOF and True otherwise.
-#
-#        # We might already have tokens from parsing a line and discovering that
-#        # it's part of a different construct
-#        if self._reuse_tokens:
-#            self._reuse_tokens = False
-#            # self._tokens_i is known to be 1 here, because _parse_props()
-#            # leaves it like that when it can't recognize a line (or parses a
-#            # help text)
-#            return True
-#
-#        # readline() returns '' over and over at EOF, which we rely on for help
-#        # texts at the end of files (see _line_after_help())
-#        line = self._readline()
-#        if not line:
-#            return False
-#        self.linenr += 1
-#
-#        # Handle line joining
-#        while line.endswith("\\\n"):
-#            line = line[:-2] + self._readline()
-#            self.linenr += 1
-#
-#        self._tokens = self._tokenize(line)
-#        # Initialize to 1 instead of 0 to factor out code from _parse_block()
-#        # and _parse_props(). They immediately fetch self._tokens[0].
-#        self._tokens_i = 1
-#
-#        return True
+    # Happy Hare: Added
+    def _queue_line(self, line, linenr=None):
+        if not hasattr(self, "_line_queue"):
+            self._line_queue = []
+        self._line_queue.insert(0, (line, self.linenr if linenr is None else linenr))
 
-    # Happy Hare added vv
+
+    # Happy Hare: Added
+    def _read_physical_line(self):
+        line = self._readline()
+        if not line:
+            return None, None
+
+        self.linenr += 1
+        linenr = self.linenr
+
+        while line.endswith("\\\n"):
+            nxt = self._readline()
+            if not nxt:
+                break
+            self.linenr += 1
+            line = line[:-2] + nxt
+
+        return line, linenr
+
+    # Happy Hare: Added
+    def _read_macro_line(self):
+        if hasattr(self, "_line_queue") and self._line_queue:
+            line, linenr = self._line_queue.pop(0)
+            self.linenr = linenr
+            return line, linenr
+
+        return self._read_physical_line()
+
+    # Happy Hare
     # Replacement with support for injecting expanded blocks via a simple macro:
     #
     #   @repeat var=i min=1 max=3@
@@ -2404,22 +2405,26 @@ class Kconfig(object):
         def _read_physical_line():
             line = self._readline()
             if not line:
-                return None
+                return None, None
 
             self.linenr += 1
+            linenr = self.linenr
 
             while line.endswith("\\\n"):
                 nxt = self._readline()
-                self.linenr += 1
                 if not nxt:
                     break
+                self.linenr += 1
                 line = line[:-2] + nxt
 
-            return line
+            return line, linenr
 
-        def _read_macro_body_line():
+        def _read_macro_line():
             if self._line_queue:
-                return self._line_queue.pop(0)
+                line, linenr = self._line_queue.pop(0)
+                self.linenr = linenr
+                return line, linenr
+
             return _read_physical_line()
 
         def _expand_repeat_macro(start_line):
@@ -2433,7 +2438,7 @@ class Kconfig(object):
             depth = 1
 
             while True:
-                line = _read_macro_body_line()
+                line, linenr = _read_macro_line()
                 if line is None:
                     self._line = start_line
                     self._parse_error("@repeat without matching @endrepeat@")
@@ -2442,7 +2447,7 @@ class Kconfig(object):
 
                 if stripped.startswith("@repeat") and stripped.endswith("@"):
                     depth += 1
-                    body.append(line)
+                    body.append((line, linenr))
                     continue
 
                 if stripped == "@endrepeat@":
@@ -2451,18 +2456,18 @@ class Kconfig(object):
                     if depth == 0:
                         break
 
-                    body.append(line)
+                    body.append((line, linenr))
                     continue
 
-                body.append(line)
+                body.append((line, linenr))
 
             placeholder = "$(%s)" % var
 
             out = []
             for i in range(mn_i, mx_i + 1):
                 i_s = str(i)
-                for body_line in body:
-                    out.append(body_line.replace(placeholder, i_s))
+                for body_line, body_linenr in body:
+                    out.append((body_line.replace(placeholder, i_s), body_linenr))
 
             return out
 
@@ -2482,8 +2487,7 @@ class Kconfig(object):
             depth = 1
 
             while True:
-                line = _read_macro_body_line()
-
+                line, linenr = _read_macro_line()
                 if line is None:
                     self._line = start_line
                     self._parse_error("@if without matching @endif@")
@@ -2493,7 +2497,7 @@ class Kconfig(object):
                 if (stripped.startswith("@if ") and stripped.endswith("@")) or \
                    (stripped.startswith("@ifnot ") and stripped.endswith("@")):
                     depth += 1
-                    body.append(line)
+                    body.append((line, linenr))
                     continue
 
                 if stripped == "@endif@":
@@ -2502,19 +2506,16 @@ class Kconfig(object):
                     if depth == 0:
                         break
 
-                    body.append(line)
+                    body.append((line, linenr))
                     continue
 
-                body.append(line)
+                body.append((line, linenr))
 
             return body if enabled else []
 
-        if self._line_queue:
-            line = self._line_queue.pop(0)
-        else:
-            line = _read_physical_line()
-            if line is None:
-                return False
+        line, linenr = _read_macro_line()
+        if line is None:
+            return False
 
         expanded = _expand_if_macro(line)
         if expanded is not None:
@@ -2526,11 +2527,12 @@ class Kconfig(object):
             self._line_queue = expanded + self._line_queue
             return self._next_line()
 
+        self.linenr = linenr
         self._line = line
         self._tokens = self._tokenize(line)
         self._tokens_i = 1
         return True
-    # Happy Hare added ^^^
+        # Happy Hare added ^^^
 
     def _line_after_help(self, line):
         # Tokenizes a line after a help text. This case is special in that the
@@ -2541,14 +2543,16 @@ class Kconfig(object):
         # checked in _next_line(). This special-casing gets rid of it and makes
         # _reuse_tokens alone sufficient to handle unget.
         while line.endswith("\\\n"):
-            line = line[:-2] + self._readline()
+            nxt = self._readline()
+            if not nxt:
+                break
             self.linenr += 1
+            line = line[:-2] + nxt
 
-        # Happy Hare: allow custom block macros immediately after help text
-        if line.strip().startswith("@repeat"):
+        if line.strip().startswith(("@repeat", "@if ", "@ifnot ")):
             if not hasattr(self, "_line_queue"):
                 self._line_queue = []
-            self._line_queue.insert(0, line)
+            self._line_queue.insert(0, (line, self.linenr))
             self._reuse_tokens = False
             return
 
@@ -3663,60 +3667,72 @@ class Kconfig(object):
 
         node.prompt = (prompt, self._parse_cond())
 
+    def _macro_readline(self): # Happy Hare: Added
+        if hasattr(self, "_line_queue") and self._line_queue:
+            return self._line_queue.pop(0), False
+        return self._readline(), True
+
     def _parse_help(self, node):
         if node.help is not None:
             self._warn(node.item.name_and_loc + " defined with more than "
                        "one help text -- only the last one will be used")
 
-        # Micro-optimization. This code is pretty hot.
-        readline = self._readline
+        def readline():
+            if hasattr(self, "_line_queue") and self._line_queue:
+                line, linenr = self._line_queue.pop(0)
+                self.linenr = linenr
+                return line, linenr
 
-        # Find first non-blank (not all-space) line and get its
-        # indentation
+            line = self._readline()
+            if not line:
+                return None, None
+
+            self.linenr += 1
+            return line, self.linenr
 
         while 1:
-            line = readline()
-            self.linenr += 1
-            if not line:
-                self._empty_help(node, line)
+            line, linenr = readline()
+            if line is None:
+                self._empty_help(node, "")
                 return
+
+            self.linenr = linenr
+
             if not line.isspace():
                 break
 
-        len_ = len  # Micro-optimization
+        len_ = len
 
         # Use a separate 'expline' variable here and below to avoid stomping on
         # any tabs people might've put deliberately into the first line after
         # the help text
         expline = line.expandtabs()
         indent = len_(expline) - len_(expline.lstrip())
+
         if not indent:
             self._empty_help(node, line)
             return
 
-        # The help text goes on till the first non-blank line with less indent
-        # than the first line
-
-        # Add the first line
         lines = [expline[indent:]]
-        add_line = lines.append  # Micro-optimization
+        add_line = lines.append
 
         while 1:
-            line = readline()
-            if line.isspace():
-                # No need to preserve the exact whitespace in these
-                add_line("\n")
-            elif not line:
-                # End of file
+            line, linenr = readline()
+            if line is None:
                 break
+
+            self.linenr = linenr
+
+            if line.isspace():
+                add_line("\n")
             else:
                 expline = line.expandtabs()
                 if len_(expline) - len_(expline.lstrip()) < indent:
                     break
                 add_line(expline[indent:])
 
-        self.linenr += len_(lines)
         node.help = "".join(lines).rstrip()
+
         if line:
             self._line_after_help(line)
 
