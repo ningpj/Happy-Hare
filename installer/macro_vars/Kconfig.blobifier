@@ -219,53 +219,56 @@ menu "Blobifier (_BLOBIFIER)"
   config VAR_BLOBIFIER_SHAKER_ARM_Z
     float "Shaker arm Z                   "
     default 2
-  comment "_"
-  comment "_Stepper tray (only used when Blobifier tray actuator is Stepper)"
 
-  config VAR_BLOBIFIER_TRAY_POS_OUT
-    float "Stepper tray extended pos (mm)  "
-    default 21
+  if CHOICE_BLOBIFIER_TYPE_STEPPER
+    comment "_"
+    comment "_Stepper based tray"
 
-  config VAR_BLOBIFIER_TRAY_POS_IN
-    float "Stepper tray retracted pos (mm) "
-    default 0
+    config VAR_BLOBIFIER_TRAY_POS_OUT
+      float "Stepper tray extended pos (mm) "
+      default 21
 
-  config VAR_BLOBIFIER_TRAY_STEPPER_SPEED
-    float "Stepper tray speed (mm/s)       "
-    default 110
+    config VAR_BLOBIFIER_TRAY_POS_IN
+      float "Stepper tray retracted pos (mm)"
+      default 0
+
+    config VAR_BLOBIFIER_TRAY_STEPPER_SPEED
+      float "Stepper tray speed (mm/s)      "
+      default 110
+  endif
 
   comment "_"
   comment "_Retraction tuning"
 
   config VAR_BLOBIFIER_INCLUDE_EXTRUDER_RESIDUAL
-    int "Include extruder residual (0/1) "
+    int "Include extruder residual (0/1)"
     default 0
     help
       Whether to add extruder_filament_remaining to the purge length. Set to 0 if your
       slicer purge matrix already accounts for nozzle residual to avoid over-purging.
 
   config VAR_BLOBIFIER_PURGE_PULSE_SIZE
-    float "Purge pulse size (mm)           "
+    float "Purge pulse size (mm)          "
     default 10
 
   config VAR_BLOBIFIER_RETRACT_STEP
-    float "Retract step size (mm)          "
+    float "Retract step size (mm)         "
     default 2
 
   config VAR_BLOBIFIER_PULSE_RETRACT_LENGTH
-    float "Pulse retract length (mm)       "
+    float "Pulse retract length (mm)      "
     default 4
 
   config VAR_BLOBIFIER_PULSE_RETRACT_SPEED
-    int "Pulse retract speed (mm/min)    "
+    int "Pulse retract speed (mm/min)   "
     default 2400
 
   config VAR_BLOBIFIER_PULSE_DERETRACT_SPEED
-    int "Pulse de-retract speed (mm/min) "
+    int "Pulse de-retract speed (mm/min)"
     default 800
 
   config VAR_BLOBIFIER_PURGE_RETRACT_INTERVAL
-    float "Purge retract interval (mm)     "
+    float "Purge retract interval (mm)    "
     default 20
 
 endmenu

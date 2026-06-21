@@ -2886,6 +2886,15 @@ class Kconfig(object):
 
         return expr
 
+    def _expect_str_and_cond(self): # Happy Hare: Added
+        token = self._tokens[self._tokens_i]
+        self._tokens_i += 1
+
+        if token.__class__ is not str:
+            self._parse_error("expected string")
+
+        return token, self._parse_cond()
+
     def _check_token(self, token):
         # If the next token is 'token', removes it and returns True
 
@@ -3338,7 +3347,8 @@ class Kconfig(object):
                 node.kconfig = self
                 node.item = t0  # _T_COMMENT == COMMENT
                 node.is_menuconfig = False
-                node.prompt = (self._expect_str_and_eol(), self.y)
+                #node.prompt = (self._expect_str_and_eol(), self.y)
+                node.prompt = self._expect_str_and_cond() # Happy Hare: Modification
                 node.list = None
                 node.parent = parent
                 node.filename = self.filename

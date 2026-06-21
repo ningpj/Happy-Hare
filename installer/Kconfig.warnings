@@ -8,7 +8,7 @@ config SHOW_WARNINGS
   bool
   depends on !MULTI_UNIT_ENTRY_POINT
   @repeat var=i min=1 max=10@
-  default y if W$(i)
+    default y if W$(i)
   @endrepeat@
 
 config W1
@@ -46,34 +46,15 @@ if SHOW_WARNINGS
   comment "_"
   comment "_Config Warnings"
 
-  comment "No gate homing endstop [Raw Settings/Endstops]"
-    depends on W1
-
-  comment "Caution. You opted to not install client macros [Software Options]."
-    depends on W2
-
-  comment "Leds are enabled but no MCU pin defined"
-    depends on W3
-
-  comment "Fans are enabled but no MCU pin defined"
-    depends on W4
-
-  comment "Encoder is enabled but no MCU pin defined"
-    depends on W5
-
-  comment "Shared exit sensor is enabled but no MCU pin defined"
-    depends on W6
-
-  comment "Buffer tension switch is enabled but no MCU pin defined"
-    depends on W7
-
-  comment "Buffer compression switch is enabled but no MCU pin defined"
-    depends on W8
-
-  comment "Buffer proportional feedback enabled but no analog MCU pin defined"
-    depends on W9
-
-  comment "MMU heater is enabled but heater name(s) not defined"
-    depends on W10
+  comment "No gate homing endstop [Raw Settings/Endstops]"                      if W1
+  comment "Caution. You opted to not install client macros [Software Options]"  if W2
+  comment "Leds are enabled but no MCU pin defined"                             if W3
+  comment "Fans are enabled but no MCU pin defined"                             if W4
+  comment "Encoder is enabled but no MCU pin defined"                           if W5
+  comment "Shared exit sensor is enabled but no MCU pin defined"                if W6
+  comment "Buffer tension switch is enabled but no MCU pin defined"             if W7
+  comment "Buffer compression switch is enabled but no MCU pin defined"         if W8
+  comment "Buffer proportional feedback enabled but no analog MCU pin defined"  if W9
+  comment "MMU heater is enabled but heater name(s) not defined"                if W10
 
 endif

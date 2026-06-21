@@ -69,7 +69,7 @@ menu "Software Options"
       config CHOICE_LOG_FILE_LEVEL_TRACE
         bool "Trace"
       config CHOICE_LOG_FILE_LEVEL_STEPPER
-        bool "Developer"
+        bool "Developer / Stepper"
     endchoice
 
     config PARAM_LOG_FILE_LEVEL

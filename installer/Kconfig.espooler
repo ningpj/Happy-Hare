@@ -38,8 +38,7 @@ if MMU_HAS_ESPOOLER
   menu "eSpooler pins"
     @repeat var=i min=0 max=11@
       if PARAM_NUM_GATES > $(i)
-        comment "_"
-          depends on $(i) > 0
+        comment "_" if $(i) > 0
         config PIN_ESPOOLER_EN_$(i)
           prompt "eSpooler enable $(i) pin " if HAS_ESPOOLER_ENABLE_PIN
         config PIN_ESPOOLER_RWD_$(i)

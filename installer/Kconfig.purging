@@ -98,7 +98,6 @@ menu "Purging"
     endif
 
     if CHOICE_BLOBIFIER_TYPE_STEPPER
-      comment "_Stepper-driven tray (TMC2209/UART generated; edit cfg for TMC2240/5160 SPI)"
       config PIN_BLOBIFIER_STEPPER_STEP
         prompt "Stepper step pin           "
       config PIN_BLOBIFIER_STEPPER_DIR
@@ -114,6 +113,7 @@ menu "Purging"
       config PARAM_BLOBIFIER_STEPPER_RUN_CURRENT
         string "Stepper run current        "
         default "0.6"
+      comment "Stepper-driven tray (TMC2209/UART generated; edit cfg for TMC2240/5160 SPI)"
     endif
   endif
 
