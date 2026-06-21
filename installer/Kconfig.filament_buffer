@@ -15,6 +15,9 @@ config MMU_HAS_FILAMENT_BUFFER
   forceshow
   default n
   help
-    Does MMU have a buffer to catch the uncoiled filament on unload. Note
-    that a passive rewinder like Filamentalist is not a filament buffer
-    because it alleviates the need for one!
+    Does MMU have a buffer to catch the uncoiled filament on unload?
+    Enabling this enabled a higher bowden load/unload speed when
+    Happy Hare knows the filament is in the buffer rather than on the spool.
+    Note: A passive rewinder like Filamentalist is not a filament buffer
+    because it rewinds filament onto the spool!
+    Obviously this is not required if you have an espooler.

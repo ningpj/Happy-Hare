@@ -33,4 +33,6 @@ if MMU_HAS_EJECT_BUTTONS
     @endrepeat@
   endmenu
 
+  comment "_"
+
 endif

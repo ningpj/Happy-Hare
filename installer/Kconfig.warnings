@@ -1,27 +1,79 @@
 #
 # Highlight common config warnings as comments
+# This is not exhaustive by any means.
+# It is just designed as an aid...
 #
 
 config SHOW_WARNINGS
-    bool
-    default y if !MULTI_UNIT_ENTRY_POINT && (W1 || W2)
+  bool
+  depends on !MULTI_UNIT_ENTRY_POINT
+  @repeat var=i min=1 max=10@
+  default y if W$(i)
+  @endrepeat@
 
 config W1
-    bool
-    default y if PARAM_GATE_HOMING_ENDSTOP = ""
+    def_bool y if PARAM_GATE_HOMING_ENDSTOP = ""
 
-config W1
-    bool
-    depends on !INSTALL_CLIENT_MACROS
+config W2
+    def_bool y if !INSTALL_CLIENT_MACROS
+
+config W3
+    def_bool y if MMU_HAS_LEDS && PIN_NEOPIXEL = ""
+
+config W4
+    def_bool y if MMU_HAS_FANS && PIN_FAN = ""
+
+config W5
+    def_bool y if MMU_HAS_ENCODER && PIN_ENCODER = ""
+
+config W6
+    def_bool y if MMU_HAS_SENSOR_SHARED_EXIT && PIN_SHARED_EXIT_SENSOR = ""
+
+config W7
+    def_bool y if MMU_HAS_SENSOR_BUFFER_TENSION && PIN_BUFFER_TENSION = ""
+
+config W8
+    def_bool y if MMU_HAS_SENSOR_BUFFER_COMPRESSION && PIN_BUFFER_COMPRESSION = ""
+
+config W9
+    def_bool y if MMU_HAS_SENSOR_BUFFER_PROPORTIONAL && PIN_BUFFER_ANALOG = ""
+
+config W10
+    def_bool y if MMU_HAS_HEATERS && PARAM_FILAMENT_HEATER = "" && PARAM_FILAMENT_HEATERS = ""
+
 
 if SHOW_WARNINGS
   comment "_"
   comment "_Config Warnings"
 
-  comment "No gate homing endstop (Raw Settings/Endstops)"
+  comment "No gate homing endstop [Raw Settings/Endstops]"
     depends on W1
 
-  comment "You opted to not install client macros (Software Options)"
+  comment "Caution. You opted to not install client macros [Software Options]."
     depends on W2
+
+  comment "Leds are enabled but no MCU pin defined"
+    depends on W3
+
+  comment "Fans are enabled but no MCU pin defined"
+    depends on W4
+
+  comment "Encoder is enabled but no MCU pin defined"
+    depends on W5
+
+  comment "Shared exit sensor is enabled but no MCU pin defined"
+    depends on W6
+
+  comment "Buffer tension switch is enabled but no MCU pin defined"
+    depends on W7
+
+  comment "Buffer compression switch is enabled but no MCU pin defined"
+    depends on W8
+
+  comment "Buffer proportional feedback enabled but no analog MCU pin defined"
+    depends on W9
+
+  comment "MMU heater is enabled but heater name(s) not defined"
+    depends on W10
 
 endif

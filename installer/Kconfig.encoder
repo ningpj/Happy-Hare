@@ -39,7 +39,7 @@ if MMU_HAS_ENCODER
 
     if MMU_SHARED_ENCODER
       config PARAM_ENCODER_NAME
-        prompt "Shared encoder name"
+        prompt "Shared encoder name             "
         default "-specify name-"
         help
           Enter the name of shared encoder. A shared encoder must be see the filament from
@@ -121,4 +121,7 @@ if MMU_HAS_ENCODER
   endif
 
   endmenu
+
+  comment "_"
+
 endif

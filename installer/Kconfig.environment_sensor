@@ -57,4 +57,7 @@ if MMU_HAS_ENVIRONMENT_SENSOR
           "temperature_sensor MMU_enclosure, ..." or just "MMU_enclosure, MMU_enclosure2, ..."
       
   endmenu
+
+  comment "_"
+
 endif

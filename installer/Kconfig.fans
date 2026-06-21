@@ -14,7 +14,7 @@
 config UNSELECT_MMU_HAS_FANS
   def_bool n
 config MMU_HAS_FANS
-  bool "Has MMU cooling fans?"
+  bool "Has cooling fans?"
   depends on !UNSELECT_MMU_HAS_FANS
   forceshow
   default n
@@ -66,4 +66,7 @@ if MMU_HAS_FANS
     endmenu
 
   endmenu
+
+  comment "_"
+
 endif

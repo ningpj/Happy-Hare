@@ -43,7 +43,7 @@ if MMU_HAS_HEATER
         Most designs will only have a single heater but some, like EMU have a per-gate heater
 
    config PARAM_FILAMENT_HEATER
-     string "Enclosure heater          "
+     string "Enclosure heater name     "
      depends on !MMU_HAS_PER_GATE_HEATERS
      default ""
      help
@@ -123,4 +123,7 @@ if MMU_HAS_HEATER
         Interval in minutes to rotate filament (requires eSpooler and filament end attached to spool)
 
   endmenu
+
+  comment "_"
+
 endif

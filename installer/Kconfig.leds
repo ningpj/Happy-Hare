@@ -86,7 +86,7 @@ if MMU_HAS_LEDS
       default ""
 
     config PIN_NEOPIXEL
-      prompt "Neopixel pin          " if MMU_HAS_LEDS && !MMU_HAS_PER_GATE_MCU
+      prompt "Neopixel pin    " if MMU_HAS_LEDS && !MMU_HAS_PER_GATE_MCU
 
     menu "Neopixel per-gate pins" 
       depends on MMU_HAS_LEDS && MMU_HAS_PER_GATE_MCU
@@ -108,6 +108,8 @@ if MMU_HAS_LEDS
       @endrepeat@
     endmenu
   endmenu
+
+  comment "_"
 
 endif
 

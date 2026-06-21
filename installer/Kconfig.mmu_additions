@@ -1,7 +1,7 @@
 # This aggregates configuration for MMU additions
 # (this overlaps with some of Kconfig.pins and Kconfig.raw)
 
-menu "MMU Features/Additions"
+menu "MMU Features / Additions"
   help
     Enhancements to base design
     If the base MMU design lacks a particular feature there are often

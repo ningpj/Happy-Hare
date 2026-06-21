@@ -1,0 +1,280 @@
+# Environment sensors(s)
+#
+# Responsible for setting:
+#   MMU_HAS_ENVIRONMENT_SENSOR
+#   MMU_HAS_PER_GATE_ENV_SENSORS
+#   CHOICE_ENVIRONMENT_SENSOR_TYPE_* (single MCU: AHT1X, AHT2X, BME280)
+#   CHOICE_ENVIRONMENT_SENSOR_TYPE_<TYPE>_$(i) (per-gate MCU: AHT1X_$(i), AHT2X_$(i), BME280_$(i))
+#   CHOICE_ENVIRONMENT_SENSOR_I2C_HARDWARE/SOFTWARE (single MCU: i2c bus type)
+#   CHOICE_ENVIRONMENT_SENSOR_I2C_HARDWARE/SOFTWARE_$(i) (per-gate MCU: i2c bus type)
+#   CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_* (single MCU: i2c2_PB10_PB11, i2c3_PB3_PB4)
+#   CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_<BUS>_$(i) (per-gate MCU: I2C2_$(i), I2C3_$(i))
+#
+# NOTE: per-gate symbols use the gate index as a SUFFIX so the build system
+#       arrayizes them for template access as (VAR_|d)[i]
+#   PARAM_ENVIRONMENT_SENSOR_REPORT_TIME (single MCU only)
+#   PARAM_ENVIRONMENT_SENSOR_REPORT_TIME_* (per-gate MCU)
+#   PIN_ENVIRONMENT_SENSOR_SCL/SDA (single & per-gate)
+#   PARAM_ENVIRONMENT_SENSOR_I2C_ADDRESS (single & per-gate)
+#
+# SUPPORTED SENSOR TYPES (keep in sync with mmu_hardware.cfg template):
+#   - AHT1X     (humidity/temperature, requires patched aht1x driver)
+#   - AHT2X     (humidity/temperature, requires patched aht1x driver)
+#   - BME280    (humidity/temperature/pressure)
+#
+# SUPPORTED I2C HARDWARE BUS OPTIONS (keep in sync with mmu_hardware.cfg template):
+#   - i2c2_PB10_PB11  (default)
+#   - i2c3_PB3_PB4    (alternative)
+
+
+config UNSELECT_MMU_HAS_ENVIRONMENT_SENSOR
+  def_bool n
+config MMU_HAS_ENVIRONMENT_SENSOR
+  prompt "Has environment sensor(s)?"
+  depends on !UNSELECT_MMU_HAS_ENVIRONMENT_SENSOR
+  forceshow
+  default n
+  help
+    Select if the MMU has a humidity/temperature sensor in the filament storage enclosure
+
+
+# -------------------------------------
+# Environment sensor(s) config
+# -------------------------------------
+
+if MMU_HAS_ENVIRONMENT_SENSOR
+  menu "Environment sensor config"
+    config MMU_HAS_PER_GATE_ENV_SENSORS
+      bool "Per-gate environment sensors?"
+      default n
+      help
+        Most designs will only have a single environment sensor but some, like EMU have a per-gate sensor
+
+    if !MMU_HAS_PER_GATE_ENV_SENSORS
+      choice CHOICE_ENVIRONMENT_SENSOR
+        prompt "Sensor type"
+        default CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X
+        help
+          Select the type of environment sensor being used
+
+        config CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT1X
+          bool "AHT1X"
+          help
+            AHT1X humidity/temperature sensor
+
+        config CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X
+          bool "AHT2X"
+          help
+            AHT2X humidity/temperature sensor
+
+        config CHOICE_ENVIRONMENT_SENSOR_TYPE_BME280
+          bool "BME280"
+          help
+            BME280 humidity/temperature/pressure sensor
+      endchoice
+    endif
+  endmenu
+endif
+
+#      config PARAM_ENVIRONMENT_SENSOR_REPORT_TIME
+#        int "Report time (seconds)"
+#        depends on CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT1X || CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X
+#        default 60
+#        range 5 300
+#        help
+#          Frequency to poll the sensor (default 60 seconds)
+#          
+#          NOTE: This option requires a patched aht1x driver for Klipper
+#          to support the aht10_report_time parameter
+#    endif
+
+#    #
+#    # ---- Single MCU: all settings on one page ----
+#    #
+#    if !MMU_HAS_PER_GATE_ENV_SENSORS
+#      choice
+#        prompt "i2c bus type"
+#        default CHOICE_ENVIRONMENT_SENSOR_I2C_HARDWARE
+#        help
+#          Select whether to use hardware or software i2c bus for the sensor
+#
+#        config CHOICE_ENVIRONMENT_SENSOR_I2C_HARDWARE
+#          bool "Hardware i2c"
+#          help
+#            Use hardware i2c bus (faster, recommended)
+#
+#        config CHOICE_ENVIRONMENT_SENSOR_I2C_SOFTWARE
+#          bool "Software i2c"
+#          help
+#            Use software i2c bus
+#      endchoice
+#
+#      choice
+#        prompt "Sensor type"
+#        default CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X
+#        help
+#          Select the type of environment sensor being used
+#
+#        config CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT1X
+#          bool "AHT1X"
+#          help
+#            AHT1X humidity/temperature sensor
+#
+#        config CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X
+#          bool "AHT2X"
+#          help
+#            AHT2X humidity/temperature sensor
+#
+#        config CHOICE_ENVIRONMENT_SENSOR_TYPE_BME280
+#          bool "BME280"
+#          help
+#            BME280 humidity/temperature/pressure sensor
+#      endchoice
+#
+#      config PARAM_ENVIRONMENT_SENSOR_REPORT_TIME
+#        int "Report time (seconds)"
+#        depends on CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT1X || CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X
+#        default 60
+#        range 5 300
+#        help
+#          Frequency to poll the sensor (default 60 seconds)
+#
+#          NOTE: This option requires a patched aht1x driver for Klipper
+#          to support the aht10_report_time parameter
+#
+#      config PARAM_ENVIRONMENT_SENSOR_I2C_ADDRESS
+#        hex "i2c address"
+#        default 0x38
+#        help
+#          i2c address of the environment sensor (default 0x38 for AHT sensors)
+#          Common addresses: 0x38 (AHT1X/AHT2X), 0x77 (BME280)
+#
+#      if CHOICE_ENVIRONMENT_SENSOR_I2C_HARDWARE
+#        choice
+#          prompt "i2c bus name"
+#          default CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_I2C2
+#          help
+#            Select the hardware i2c bus to use for the environment sensor
+#
+#          config CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_I2C2
+#            bool "i2c2_PB10_PB11"
+#            help
+#              Hardware i2c bus i2c2 with SCL on PB10 and SDA on PB11
+#
+#          config CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_I2C3
+#            bool "i2c3_PB3_PB4"
+#            help
+#              Hardware i2c bus i2c3 with SCL on PB3 and SDA on PB4
+#        endchoice
+#      endif
+#
+#      if CHOICE_ENVIRONMENT_SENSOR_I2C_SOFTWARE
+#        config PIN_ENVIRONMENT_SENSOR_SCL
+#          string "SCL pin"
+#          default ""
+#          help
+#            Software i2c SCL pin (e.g., "PB10")
+#
+#        config PIN_ENVIRONMENT_SENSOR_SDA
+#          string "SDA pin"
+#          default ""
+#          help
+#            Software i2c SDA pin (e.g., "PB11")
+#      endif
+#    endif
+
+#    if MMU_HAS_PER_GATE_ENV_SENSORS
+#      if PARAM_NUM_GATES > 0
+#        menu "Gate 0 sensor"
+#          choice
+#            prompt "Gate 0 sensor type"
+#            default CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X_0
+#
+#              config CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT1X_0
+#                bool "AHT1X"
+#
+#              config CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X_0
+#                bool "AHT2X"
+#
+#              config CHOICE_ENVIRONMENT_SENSOR_TYPE_BME280_0
+#                bool "BME280"
+#          endchoice
+#        endmenu
+#      endif
+#    endif
+
+#  endmenu
+#endif
+
+
+    #
+    # ---- Per-gate MCU: one menu per gate grouping all of that gate's settings ----
+    #
+#    if MMU_HAS_PER_GATE_ENV_SENSORS
+#      @repeat var=i min=0 max=0@
+#        if PARAM_NUM_GATES > $(i)
+#          menu "Gate $(i) sensor"
+#            choice
+#              prompt "Gate $(i) sensor type"
+#              default CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X_$(i)
+#
+#              config CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT1X_$(i)
+#                bool "AHT1X"
+#
+#              config CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X_$(i)
+#                bool "AHT2X"
+#
+#              config CHOICE_ENVIRONMENT_SENSOR_TYPE_BME280_$(i)
+#                bool "BME280"
+#            endchoice
+#
+#            config PARAM_ENVIRONMENT_SENSOR_REPORT_TIME_$(i)
+#              int "Gate $(i) report time (seconds)"
+#              depends on CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT1X_$(i) || CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X_$(i)
+#              default 60
+#              range 5 300
+#
+#            config PARAM_ENVIRONMENT_SENSOR_I2C_ADDRESS_$(i)
+#              hex "Gate $(i) i2c address"
+#              default 0x38
+#
+#            choice
+#              prompt "Gate $(i) i2c bus type"
+#              default CHOICE_ENVIRONMENT_SENSOR_I2C_HARDWARE_$(i)
+#
+#              config CHOICE_ENVIRONMENT_SENSOR_I2C_HARDWARE_$(i)
+#                bool "Hardware i2c"
+#
+#              config CHOICE_ENVIRONMENT_SENSOR_I2C_SOFTWARE_$(i)
+#                bool "Software i2c"
+#            endchoice
+#
+#            if CHOICE_ENVIRONMENT_SENSOR_I2C_HARDWARE_$(i)
+#              choice
+#                prompt "Gate $(i) i2c bus name"
+#                default CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_I2C2_$(i)
+#
+#                config CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_I2C2_$(i)
+#                  bool "i2c2_PB10_PB11"
+#
+#                config CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_I2C3_$(i)
+#                  bool "i2c3_PB3_PB4"
+#              endchoice
+#            endif
+#
+#            if CHOICE_ENVIRONMENT_SENSOR_I2C_SOFTWARE_$(i)
+#              config PIN_ENVIRONMENT_SENSOR_SCL_$(i)
+#                string "Gate $(i) SCL pin"
+#                default ""
+#
+#              config PIN_ENVIRONMENT_SENSOR_SDA_$(i)
+#                string "Gate $(i) SDA pin"
+#                default ""
+#            endif
+#          endmenu
+#        endif
+#      @endrepeat@
+#    endif
+#  endmenu
+#
+#endif
