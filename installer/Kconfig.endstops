@@ -191,7 +191,7 @@ menu "Endstops for Bowden movement"
 
     config CHOICE_EXTRUDER_HOMING_ENDSTOP_COMPRESSION
       bool "Filament compression"
-      depends on MMU_HAS_SENSOR_BUFFER_COMPRESSION
+      depends on MMU_HAS_SENSOR_BUFFER_COMPRESSION || MMU_HAS_SENSOR_BUFFER_PROPORTIONAL
       help
         If you have a "sync-feedback" sensor (often called a "buffer")
         with compression switch configured. E.g like Belay or TurtleNeck

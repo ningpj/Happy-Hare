@@ -57,6 +57,7 @@ menu "Tip Forming / Cutting"
 
   choice CHOICE_FORM_TIP_MACRO
     bool "Select standalone tip shaping option"
+    default CHOICE_FORM_TIP_MACRO_CUT_TIP if MMU_HAS_TOOLHEAD_CUTTER
     default CHOICE_FORM_TIP_MACRO_FORM_TIP
     help
       How to perform standalone tip shaping (forming or cutting)
@@ -65,7 +66,7 @@ menu "Tip Forming / Cutting"
       bool "Tip shaping using filament movement"
       help
         Uses repeated retract/extrude operations to shape filament
-        tip into a torpedeo shape without strings.
+        tip into a torpedo shape without strings.
         Needs careful tuning.
 
     config CHOICE_FORM_TIP_MACRO_CUT_TIP
@@ -74,6 +75,11 @@ menu "Tip Forming / Cutting"
       help
         If toolhead contains a filament cutter with activation
         via toolhead movement.
+
+    config CHOICE_FORM_TIP_MACRO_SLICER
+      bool "Slicer controlled tip forming"
+      help
+        Tip forming is controlled and managed by the slicer rather than Happy Hare.
 
     config CHOICE_FORM_TIP_MACRO_OTHER
       bool "Other / manually entered macro"
@@ -91,6 +97,7 @@ menu "Tip Forming / Cutting"
     string
     default "_MMU_FORM_TIP" if CHOICE_FORM_TIP_MACRO_FORM_TIP
     default "_MMU_CUT_TIP" if CHOICE_FORM_TIP_MACRO_CUT_TIP
+    default ""                if CHOICE_FORM_TIP_MACRO_SLICER
     default FORM_TIP_MACRO_OTHER if CHOICE_FORM_TIP_MACRO_OTHER
     default ""
 
@@ -119,6 +126,7 @@ menu "Tip Forming / Cutting"
 
   config BOOL_FORCE_FORM_TIP_STANDALONE
     bool "Happy Hare controlled in-print tip forming/cutting"
+    def_bool n if CHOICE_FORM_TIP_MACRO_SLICER
     def_bool y
     help
       You can choose whether you want the slicer or Happy Hare (recommended) to control tip forming.

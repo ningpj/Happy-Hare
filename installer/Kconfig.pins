@@ -314,13 +314,23 @@ menu "Pins / TMC"
     string
     prompt "Neopixel pin          " if MMU_HAS_LEDS && !MMU_HAS_PER_GATE_MCU
 
-  menu "Neopixel per-gate pins"
+  menu "Neopixel per-gate pins    " 
     depends on MMU_HAS_LEDS && MMU_HAS_PER_GATE_MCU
 
     @repeat var=i min=0 max=11@
       config PIN_NEOPIXEL_$(i)
         string
         prompt "Neopixel gate $(i) pin" if PARAM_NUM_GATES > $(i)
+    @endrepeat@
+  endmenu
+
+  menu "Neopixel box pins         " 
+    depends on MMU_HAS_LEDS && MMU_HAS_PER_GATE_MCU
+
+    @repeat var=i min=0 max=11@
+      config PIN_NEOPIXEL_BOX_$(i)
+        string
+        prompt "Neopixel box gate $(i) pin" if PARAM_NUM_GATES > $(i)
     @endrepeat@
   endmenu
 
