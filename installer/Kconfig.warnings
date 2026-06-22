@@ -27,10 +27,10 @@ config W5
     def_bool y if !INSTALL_CLIENT_MACROS
 
 config W6
-    def_bool y if MMU_HAS_LEDS && PIN_NEOPIXEL = ""
+    def_bool y if MMU_HAS_LEDS && PIN_NEOPIXEL = "" && !MMU_HAS_PER_GATE_MCU
 
 config W7
-    def_bool y if MMU_HAS_FANS && PIN_FAN = ""
+    def_bool y if MMU_HAS_FANS && PIN_FAN = "" && !MMU_HAS_PER_GATE_MCU
 
 config W8
     def_bool y if MMU_HAS_ENCODER && PIN_ENCODER = ""
@@ -60,7 +60,7 @@ if SHOW_WARNINGS
 
   comment "Custom MMU selected. You will need to carefully check configuration" if W1
   comment "Unknown MCU selected. You will need to configure all pins"           if W2
-  comment "Toolhead type is 'other'. Are you sure it is not already defined?"   if W3
+  comment "Toolhead type is 'other'. Are you sure yours is not listed?"         if W3
   comment "No gate homing endstop [Raw Settings/Endstops]"                      if W4
   comment "Caution. You opted to not install client macros [Software Options]"  if W5
   comment "Leds are enabled but no MCU pin defined"                             if W6
