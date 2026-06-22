@@ -42,10 +42,11 @@
 #          string "CANbus UUID for MMU unit $(i)"
 #      @endrepeat@
 # 6. help added to menus
+# 7. "if XX" construct is allowed on comment lines
 #
 # Menuconfig:
 # 1. 'r' to reset value to default
-# 2. Flexible comment lines and section separated
+# 2. Flexible comment lines and section separator using "_" and "_comment"
 # 3. Lots of formatting changes and style options
 # 4. Variable input dialogs with better parsing
 #
@@ -59,9 +60,9 @@
 #   MMU_HAS_FILAMENT_BUFFER
 #   MMU_HAS_HEATER
 #   MMU_HAS_LEDS
+#   MMU_HAS_PER_GATE_MCU (currently only EMU design)
 #   MMU_HAS_PER_GATE_ENV_SENSORS
 #   MMU_HAS_PER_GATE_HEATERS
-#   MMU_HAS_PER_GATE_MCU (currently only EMU design)
 #   MMU_HAS_SELECTOR
 #   MMU_HAS_SELECTOR_SERVO
 #   MMU_HAS_SELECTOR_STEPPER
@@ -69,10 +70,10 @@
 #   MMU_HAS_SENSOR_EXIT
 #   MMU_HAS_SENSOR_GEAR_TOUCH
 #   MMU_HAS_SENSOR_SHARED_EXIT
-#   MMU_HAS_SENSOR_BUFFER_COMPRESSION
-#   MMU_HAS_SENSOR_BUFFER_PROPORTIONAL
-#   MMU_HAS_SENSOR_BUFFER_TENSION
 #   MMU_HAS_SYNC_FEEDBACK_BUFFER
+#     MMU_HAS_SENSOR_BUFFER_COMPRESSION
+#     MMU_HAS_SENSOR_BUFFER_PROPORTIONAL
+#     MMU_HAS_SENSOR_BUFFER_TENSION
 #
 # These will only be in shared config on multi-unit because they are on printer and not per-unit
 #   MMU_HAS_SENSOR_EXTRUDER
