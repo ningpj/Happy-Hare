@@ -844,9 +844,9 @@ class MmuController(MmuFilamentMovement):
             value = sf_state['sync_feedback_bias_modelled']
 
             if state == "disabled":
-                return "[  X  ]"
+                return " [ X ] "
             if state == "inactive":
-                return "[  -  ]"
+                return " [ - ] "
             if state == "compressed":
                 return f"[{UI_ARROW_HOLLOW_RIGHT} C {UI_ARROW_HOLLOW_LEFT}]"
             if state == "tension":
@@ -855,7 +855,7 @@ class MmuController(MmuFilamentMovement):
                 if value is not None:
                     return f"[{f'{value:.1f}'.center(5)}]"
                 return "[  N  ]"
-            return "[  ?  ]"
+            return " [ ? ] "
 
         def _color_filament(text, *chars):
             if not self.gate_color[gate]:
