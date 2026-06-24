@@ -839,23 +839,31 @@ class MmuController(MmuFilamentMovement):
             return space + gate_mark + "Nz"
 
         def buffer_segment():
-            sf_state = self.mmu_unit().sync_feedback.get_status(0)
-            state = sf_state['sync_feedback_state']
-            value = sf_state['sync_feedback_bias_modelled']
+            t_sensor = self.sensor_manager.check_sensor(SENSOR_TENSION)
+            c_sensor = self.sensor_manager.check_sensor(SENSOR_COMPRESSION)
+            sf_status = self.mmu_unit().sync_feedback.get_status(0)
+            sf_state = sf_status['sync_feedback_state']
+            sf_value = sf_status['sync_feedback_bias_modelled']
 
-            if state == "disabled":
-                return " [ X ] "
-            if state == "inactive":
-                return " [ - ] "
-            if state == "compressed":
-                return f"[{UI_ARROW_HOLLOW_RIGHT} C {UI_ARROW_HOLLOW_LEFT}]"
-            if state == "tension":
-                return f" [{UI_ARROW_HOLLOW_LEFT}T{UI_ARROW_HOLLOW_RIGHT}] "
-            if state == "neutral":
-                if value is not None:
+            sf_char = "?"
+            if sf_state == "disabled":
+                sf_char = "x"
+            if sf_state == "inactive":
+                sf_char = " "
+            if sf_state == "compressed":
+                sf_char = "C"
+            if sf_state == "tension":
+                return "T"
+            if sf_state == "neutral":
+                if self.has_sensor(SENSOR_PROPORTIONAL) and sf_value is not None:
                     return f"[{f'{value:.1f}'.center(5)}]"
-                return "[  N  ]"
-            return " [ ? ] "
+                sf_char = "N"
+
+            if c_sensor:
+                return f"[ {UI_ARROW_HOLLOW_RIGHT}{sf_char}{UI_ARROW_HOLLOW_LEFT} ]"
+            elif t_sensor:
+                return f" [{UI_ARROW_HOLLOW_LEFT}{sf_char}{UI_ARROW_HOLLOW_RIGHT}] "
+            return f" [ {sf_char} ] "
 
         def _color_filament(text, *chars):
             if not self.gate_color[gate]:
