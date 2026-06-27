@@ -625,6 +625,10 @@ class MmuController(MmuFilamentMovement):
         # Merge environment status and fill in units without heater
         status["drying_state"] = merge_unit_status_list(eventtime, attr="environment_manager", key="drying_state", fill_value=DRYING_STATE_NONE)
 
+        # Development/testing hook
+        if hasattr(self, "developer_status_update"):
+            status.update(self.developer_status_update)
+
         return status
 
 
@@ -896,7 +900,7 @@ class MmuController(MmuFilamentMovement):
 
         if tool >= 0:
             tool_text = f"[T{tool}] "
-        elif tool == self.TOOL_GATE_BYPASS:
+        elif tool == TOOL_GATE_BYPASS:
             tool_text = "[BYPASS] "
         else:
             tool_text = "[T?] "
@@ -2329,14 +2333,15 @@ class MmuController(MmuFilamentMovement):
 # TOOL SELECTION FUNCTIONS
 # -----------------------------------------------------------------------------------------------------------
 
-    def refresh_tool_gate(self):
+    def refresh_tool_gate(self, quiet=False):
         """
         Ensure correct tool mapping to gate and visualize state
         """
         self.gate_maps.ensure_ttg_match()
-        msg = self._mmu_visual_to_string()
-        msg += "\n%s" % self.get_filament_position_string(color=True)
-        self.log_info(msg, color=True)
+        if not quiet:
+            msg = self._mmu_visual_to_string()
+            msg += "\n%s" % self.get_filament_position_string(color=True)
+            self.log_info(msg, color=True)
 
 
     def _get_current_override(self):
