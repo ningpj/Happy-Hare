@@ -44,7 +44,7 @@ Happy Hare is under active development, with a meticulous focus on the quality o
 - **Additional MMU Support:** _Striving for inclusivity—support for Prusa MMU and others is in progress_
 - **v4 Rework:** _This release will allow for even more modularity and in particular support for dissimilar MMU/AFC's on the same printer!  Yes, mix your old ERCF and BoxTurtle on the same machine or even direct to different toolheads in a IDEX design!_
 
-Some users have inquired about making donations to support this project (and to keep my coffee or G&T supply steady!). While this project is a labor of love and not financially motivated, it is a monster undertaking comprising:
+Some users have inquired about making donations to support this project (and to keep my coffee or G&T supply steady!). While this project is a labor of love and not financially motivated, it is a MONSTER undertaking comprising:
 ```
 Happy Hare:
  >45,000 lines of code
@@ -54,7 +54,7 @@ Wiki Doc:
   12,500 lines documention
     ~200 images/illustrations
 KlipperScreen integration:
-   4,000 lines of code
+  >4,000 lines of code
       74 custom SVG images
 Mainsail integration:
   ~6,000 lines of code

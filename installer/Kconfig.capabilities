@@ -33,6 +33,13 @@
 #   PARAM_VARIABLE_ROTATION_DISTANCES
 #   PARAM_REQUIRE_BOWDEN_MOVE
 #   PARAM_FILAMENT_ALWAYS_GRIPPED
+#
+# Some custom designs have special hardware setup. If so that is included
+# in MISC_HARDWARE and and these totken may be 'y' to prevent duplicate setup.
+#   CUSTOM_LED_SETUP
+#   CUSTOM_ENVIRONMENT_SENSOR_SETUP
+#   CUSTOM_HEATER_SETUP
+#
 
 config MMU_HAS_SELECTOR_STEPPER
   def_bool n

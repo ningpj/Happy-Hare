@@ -37,6 +37,14 @@ endif
 
 if MMU_TYPE_VVD_1_0
 
+  # MISC_HARDWARE configured these
+  config CUSTOM_LED_SETUP
+    def_bool y
+  config CUSTOM_ENVIRONMENT_SENSOR_SETUP
+    def_bool y
+  config CUSTOM_HEATER_SETUP
+    def_bool y
+
   if SHOW_MMU_ADDITIONS_WITH_TYPE
     source "Kconfig.mmu_additions"
   endif

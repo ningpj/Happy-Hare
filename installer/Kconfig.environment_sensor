@@ -20,6 +20,13 @@
 #   - i2c2_PB10_PB11  (default)
 #   - i2c3_PB3_PB4    (alternative)
 
+
+config MMU_CREATE_MCU_ENVIRONMENT_SENSORS
+  bool "Create MCU temperature sensor(s)?"
+  default y
+  help
+    Create [temperature_sensor] sections for the MCU(s) themselves for CPU temperature monitoring.
+
 config UNSELECT_MMU_HAS_ENVIRONMENT_SENSOR
   def_bool n
 
@@ -36,7 +43,12 @@ config MMU_HAS_ENVIRONMENT_SENSOR
   help
     Select if the MMU has a humidity/temperature sensor in the filament storage enclosure
 
-if MMU_HAS_ENVIRONMENT_SENSOR
+
+# -------------------------------------
+# Environment/temperature sensor config
+# -------------------------------------
+
+if MMU_HAS_ENVIRONMENT_SENSOR && !CUSTOM_ENVIRONMENT_SENSOR_SETUP
   menu "Environment sensor config"
     config MMU_HAS_PER_GATE_ENV_SENSORS
       bool "Per-gate environment sensors?"
@@ -54,7 +66,11 @@ if MMU_HAS_ENVIRONMENT_SENSOR
           E.g., "temperature_sensor MMU_enclosure" or just "MMU_enclosure"
     endif
 
-    # ---- Single MCU: all settings on one page ----
+
+    # -------------------------------------
+    # Single MCU: all settings on one page
+    # -------------------------------------
+
     if !MMU_HAS_PER_GATE_ENV_SENSORS
       choice CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_TYPE
         prompt "i2c bus type      "
@@ -153,7 +169,11 @@ if MMU_HAS_ENVIRONMENT_SENSOR
       endif
     endif
 
-    # ---- Per-gate MCU: one menu per gate grouping all of that gate's settings ----
+
+    # -------------------------------------
+    # Per-gate MCU: one menu per gate grouping
+    # all of that gate's settings
+    # -------------------------------------
 
     if MMU_HAS_PER_GATE_ENV_SENSORS
       @repeat var=i min=0 max=11@
@@ -255,6 +275,7 @@ if MMU_HAS_ENVIRONMENT_SENSOR
         endif
       @endrepeat@
     endif
-  endmenu
 
+  endmenu
+  comment "_"
 endif
