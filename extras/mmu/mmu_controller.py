@@ -449,8 +449,10 @@ class MmuController(MmuFilamentMovement):
             else:
                 self.log_error(
                     "Blobifier is not correctly installed. "
-                    "Re-run './install.sh -i' and enable Blobifier."
+                    "Re-run './install.sh -i' and enable Blobifier "
+                    "or turn off as the 'purge_macro' in mmu.cfg"
                 )
+                self.p.purge_macro = ""
 
 
     # Wrap execution of gcode command to allow for control over:
