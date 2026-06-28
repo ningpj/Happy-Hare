@@ -29,10 +29,16 @@ config MMU_CREATE_MCU_ENVIRONMENT_SENSORS
 
 config UNSELECT_MMU_HAS_ENVIRONMENT_SENSOR
   def_bool n
+
+config MMU_CREATE_MCU_ENVIRONMENT_SENSORS
+  bool "Create MCU CPU sensor(s)?"
+  default y
+  help
+    Create [temperature_sensor] sections for the MCU(s) themselves for CPU temperature monitoring.
+
 config MMU_HAS_ENVIRONMENT_SENSOR
-  prompt "Has environment sensor(s)?"
+  bool "Has environment sensor(s)?"
   depends on !UNSELECT_MMU_HAS_ENVIRONMENT_SENSOR
-  forceshow
   default n
   help
     Select if the MMU has a humidity/temperature sensor in the filament storage enclosure
