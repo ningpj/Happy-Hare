@@ -140,8 +140,9 @@ class MmuMachineParameters(TunableParametersBase):
         ParamSpec('console_always_output_full',    'int',      1, section="CONSOLE", limits=dict(minval=0, maxval=1)),
 
         # Turn off splash bling for boring people
-        ParamSpec('console_show_colored_text',     'int',      1, section="CONSOLE", limits=dict(minval=0, maxval=1), hidden=True),
-        ParamSpec('console_show_filament_color',   'int',      1, section="CONSOLE", limits=dict(minval=0, maxval=1), hidden=True),
+        ParamSpec('console_show_colored_text',     'int',      1, section="CONSOLE", limits=dict(minval=0, maxval=1)),
+        ParamSpec('console_show_filament_color',   'int',      1, section="CONSOLE", limits=dict(minval=0, maxval=1)),
+        ParamSpec('console_show_bold_filament',    'int',      1, section="CONSOLE", limits=dict(minval=0, maxval=1)),
 
         # Build tuples of drying temp / drying time indexed by filament type
         # Stored as a string in config and parsed into a dict in _post_load_fixups()
