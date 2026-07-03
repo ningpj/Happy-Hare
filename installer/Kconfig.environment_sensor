@@ -20,13 +20,6 @@
 #   - i2c2_PB10_PB11  (default)
 #   - i2c3_PB3_PB4    (alternative)
 
-
-config MMU_CREATE_MCU_ENVIRONMENT_SENSORS
-  bool "Create MCU temperature sensor(s)?"
-  default y
-  help
-    Create [temperature_sensor] sections for the MCU(s) themselves for CPU temperature monitoring.
-
 config UNSELECT_MMU_HAS_ENVIRONMENT_SENSOR
   def_bool n
 
@@ -36,13 +29,23 @@ config MMU_CREATE_MCU_ENVIRONMENT_SENSORS
   help
     Create [temperature_sensor] sections for the MCU(s) themselves for CPU temperature monitoring.
 
+if MMU_CREATE_MCU_ENVIRONMENT_SENSORS
+  config MMU_HIDE_MCU_ENVIRONMENT_SENSORS
+    bool "Hide in Mainsail / Fluidd"
+    default y if MMU_HAS_ENVIRONMENT_SENSOR
+    default n
+    help
+      Hide MCU temperature sensor(s) in Mainsail / Fluidd interface.
+endif
+
+comment "_"
+
 config MMU_HAS_ENVIRONMENT_SENSOR
   bool "Has environment sensor(s)?"
   depends on !UNSELECT_MMU_HAS_ENVIRONMENT_SENSOR
   default n
   help
     Select if the MMU has a humidity/temperature sensor in the filament storage enclosure
-
 
 # -------------------------------------
 # Environment/temperature sensor config
@@ -55,7 +58,8 @@ if MMU_HAS_ENVIRONMENT_SENSOR && !CUSTOM_ENVIRONMENT_SENSOR_SETUP
       depends on MMU_HAS_PER_GATE_MCU
       default n
       help
-        Most designs will only have a single environment sensor but some, like EMU have a per-gate sensor
+        Most designs will only have a single environment sensor but some, like EMU have a per-gate sensor.
+        Blank the Sensor Name if you don't have one fitted to every gate.
 
     if !MMU_HAS_PER_GATE_ENV_SENSORS
       config PARAM_ENVIRONMENT_SENSOR
