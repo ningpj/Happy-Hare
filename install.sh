@@ -291,9 +291,9 @@ if [ -r "${KCONFIG_CONFIG}" ] && [ -n "${F_MENUCONFIG:-}" ]; then
     echo
     echo "${C_WARNING}2) Replace (select 2)${C_OFF}"
     echo "   This will OVERWRITE changes made directly to your .cfg files and create new default"
-    echo "   configuration based on choices made in menuconfig. It is useful if you get into"
-    echo "   trouble and want to reset your starting position. It is also great if you make ALL"
-    echo "   your configuration changes via menuconfig"
+    echo "   configuration based on choices made in menuconfig (which retains your previous config)."
+    echo "   This is RECOMMENDED if you make ALL your configuration changes via menuconfig. It is also"
+    echo "   useful if you get into trouble and want to reset your starting position."
     echo
     echo "${C_WARNING}3) Merge (select 3)${C_OFF}"
     echo "   This will MERGE simple parameter values set in menuconfig but will retain other changes"

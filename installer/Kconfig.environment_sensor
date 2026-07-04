@@ -38,14 +38,13 @@ if MMU_CREATE_MCU_ENVIRONMENT_SENSORS
       Hide MCU temperature sensor(s) in Mainsail / Fluidd interface.
 endif
 
-comment "_"
-
 config MMU_HAS_ENVIRONMENT_SENSOR
   bool "Has environment sensor(s)?"
   depends on !UNSELECT_MMU_HAS_ENVIRONMENT_SENSOR
   default n
   help
     Select if the MMU has a humidity/temperature sensor in the filament storage enclosure
+
 
 # -------------------------------------
 # Environment/temperature sensor config
@@ -281,5 +280,4 @@ if MMU_HAS_ENVIRONMENT_SENSOR && !CUSTOM_ENVIRONMENT_SENSOR_SETUP
     endif
 
   endmenu
-  comment "_"
 endif

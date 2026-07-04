@@ -255,8 +255,6 @@ if MMU_HAS_SYNC_FEEDBACK_BUFFER
         default 0
 
     endif
+
   endmenu
-
-  comment "_"
-
 endif

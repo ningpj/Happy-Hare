@@ -121,7 +121,4 @@ if MMU_HAS_ENCODER
   endif
 
   endmenu
-
-  comment "_"
-
 endif

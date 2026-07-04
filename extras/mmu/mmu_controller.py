@@ -742,7 +742,6 @@ class MmuController(MmuFilamentMovement):
                 sf_char = "C"
             if sf_state == "tension":
                 sf_char = "T"
-            logging.info(f"PAUL: prop={self.sensor_manager.has_sensor(SENSOR_PROPORTIONAL)}, state={sf_state}, sf_value={sf_value}")
             if sf_state == "neutral":
                 if self.sensor_manager.has_sensor(SENSOR_PROPORTIONAL) and sf_value is not None:
                     return f"[{f'{sf_value:.1f}'.center(5)}]"
@@ -919,7 +918,7 @@ class MmuController(MmuFilamentMovement):
         """
         show_letter = (
             show_letter and
-            self.mmu_unit(gate).p.has_filament_buffer and
+            self.mmu_unit(gate).has_filament_buffer() and
             not self.has_espooler(gate)
         )
         gate_status = self.gate_status[gate]

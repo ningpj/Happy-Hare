@@ -30,6 +30,9 @@ class MmuUnitParameters(TunableParametersBase):
     def _guard_has_encoder(self):
         return self._mmu_unit.has_encoder()
 
+    def _guard_has_filament_buffer(self):
+        return self._mmu_unit.has_filament_buffer()
+
     def _guard_has_buffer(self):
         return self._mmu_unit.has_buffer()
 
@@ -126,14 +129,13 @@ class MmuUnitParameters(TunableParametersBase):
         ParamSpec('sync_gear_current',                'int',      50, section="MOTOR CONTROL", limits=dict(minval=10, maxval=100)),
 
         # Filament motion
-        ParamSpec('gear_from_filament_buffer_speed',  'float', 150.0, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=10.0), guard=lambda self: self.has_filament_buffer),
-        ParamSpec('gear_from_filament_buffer_accel',  'float', 400.0, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=10.0), guard=lambda self: self.has_filament_buffer),
-
-        ParamSpec('gear_from_spool_speed',            'float',  60.0, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=10.0)),
-        ParamSpec('gear_from_spool_accel',            'float', 100.0, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=10.0)),
-        ParamSpec('gear_unload_speed',                'float', lambda self: self.gear_from_spool_speed, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=10.0)),
-        ParamSpec('gear_unload_accel',                'float', lambda self: self.gear_from_spool_accel, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=10.0)),
-        ParamSpec('gear_short_move_speed',            'float',  60.0, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=1.0)),
+        ParamSpec('gear_load_speed',                  'float', 100.0, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=10.0)),
+        ParamSpec('gear_load_accel',                  'float', 100.0, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=10.0)),
+        ParamSpec('gear_from_filament_buffer_speed',  'float', 150.0, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=10.0), guard=_guard_has_filament_buffer),
+        ParamSpec('gear_from_filament_buffer_accel',  'float', 400.0, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=10.0), guard=_guard_has_filament_buffer),
+        ParamSpec('gear_unload_speed',                'float', lambda self: self.gear_load_speed, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=10.0)),
+        ParamSpec('gear_unload_accel',                'float', lambda self: self.gear_load_accel, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=10.0)),
+        ParamSpec('gear_short_move_speed',            'float',  80.0, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=1.0)),
         ParamSpec('gear_short_move_accel',            'float', 400.0, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=10.0)),
         ParamSpec('gear_short_move_threshold',        'float', lambda self: self.gate_homing_max, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=1.0)),
         ParamSpec('gear_homing_speed',                'float', 150.0, section="FILAMENT MOVEMENT SPEEDS", limits=dict(minval=1.0)),
@@ -200,7 +202,6 @@ class MmuUnitParameters(TunableParametersBase):
 
         # Optional
         ParamSpec('startup_home_selector',            'int',       0, section="OPTIONAL", limits=dict(minval=0, maxval=1)),
-        ParamSpec('has_filament_buffer',              'int',       1, section="OPTIONAL", limits=dict(minval=0, maxval=1)),
         ParamSpec('encoder_move_validation',          'int',       1, section="OPTIONAL", limits=dict(minval=0, maxval=1)),
     )
 

@@ -1417,6 +1417,7 @@ class MmuFilamentMovement:
             return synced, overshoot
 
 
+# PAUL
 # IGIANNAKAS: this seems to be problematic ... the extruder could pick up the filament again!
 # IGIANNAKAS: if probe distance > unload safety then it probably will and springiness in the filament
 # IGIANNAKAS: could cause it to catch.
@@ -1434,6 +1435,7 @@ class MmuFilamentMovement:
         Return:
           bool Validation success
         """
+        return True # Temp until logic confirmed
         u = self.mmu_unit()
 
         prop = self.sensor_manager.get_sensor_obj(SENSOR_PROPORTIONAL)
@@ -2224,19 +2226,22 @@ class MmuFilamentMovement:
         if motor in ["gear"]:
             if homing_move != 0:
                 speed = speed or u.p.gear_homing_speed
-                accel = accel or min(u.p.gear_from_filament_buffer_accel, u.p.gear_from_spool_accel)
+                accel = accel or min(u.p.gear_load_accel, u.p.gear_unload_accel)
             else:
                 if abs(dist) > u.p.gear_short_move_threshold:
                     if dist < 0:
                         speed = speed or u.p.gear_unload_speed
                         accel = accel or u.p.gear_unload_accel
-                    elif (not u.p.has_filament_buffer or
-                            (self.gate_selected >= 0 and self.gate_status[self.gate_selected] != GATE_AVAILABLE_FROM_BUFFER)):
-                        speed = speed or u.p.gear_from_spool_speed
-                        accel = accel or u.p.gear_from_spool_accel
-                    else:
+                    elif (
+                        u.has_filament_buffer()
+                        and self.gate_selected >= 0
+                        and self.gate_status[self.gate_selected] == GATE_AVAILABLE_FROM_BUFFER
+                    ):
                         speed = speed or u.p.gear_from_filament_buffer_speed
                         accel = accel or u.p.gear_from_filament_buffer_accel
+                    else:
+                        speed = speed or u.p.gear_load_speed
+                        accel = accel or u.p.gear_load_accel
                 else:
                     speed = speed or u.p.gear_short_move_speed
                     accel = accel or u.p.gear_short_move_accel
@@ -2244,10 +2249,10 @@ class MmuFilamentMovement:
         elif motor in ["gear+extruder", "synced"]:
             if homing_move != 0:
                 speed = speed or min(u.p.gear_homing_speed, self.p.extruder_homing_speed)
-                accel = accel or min(max(u.p.gear_from_filament_buffer_accel, u.p.gear_from_spool_accel), self.p.extruder_accel)
+                accel = accel or min(max(u.p.gear_from_filament_buffer_accel, u.p.gear_load_accel), self.p.extruder_accel)
             else:
                 speed = speed or (self.p.extruder_sync_load_speed if dist > 0 else self.p.extruder_sync_unload_speed)
-                accel = accel or min(max(u.p.gear_from_filament_buffer_accel, u.p.gear_from_spool_accel), self.p.extruder_accel)
+                accel = accel or min(max(u.p.gear_from_filament_buffer_accel, u.p.gear_load_accel), self.p.extruder_accel)
 
         elif motor in ["extruder"]:
             if homing_move != 0:
