@@ -251,8 +251,8 @@ if !MULTI_UNIT_ENTRY_POINT
   endif
   comment "_"
   source "connection/Kconfig"       # MCU Connection
+  source "Kconfig.pins"             # Raw pin editing
   if !MULTI_UNIT
-    source "Kconfig.pins"           # Raw pin editing
     comment "_"
     source "toolheads/Kconfig"      # Toolhead Selection menu
     source "Kconfig.toolhead"       # Toolhead Sensors/Settings
@@ -266,6 +266,10 @@ if !MULTI_UNIT_ENTRY_POINT
     comment "_"
     source "Kconfig.paths_services" # Advanced install options
   endif
-
-  source "Kconfig.warnings"
 endif
+
+
+# -------------------------------------
+# Warning - works for single and multi-unit
+# -------------------------------------
+source "Kconfig.warnings"

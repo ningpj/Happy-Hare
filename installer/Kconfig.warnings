@@ -4,10 +4,28 @@
 # It is just designed as an aid...
 #
 
-config SHOW_WARNINGS
+
+config SHOW_SHARED_WARNINGS
+  bool
+  depends on MULTI_UNIT_ENTRY_POINT || !MULTI_UNIT
+  @repeat var=i min=1 max=3@
+    default y if SW$(i)
+  @endrepeat@
+
+config SW1
+    def_bool y if !INSTALL_CLIENT_MACROS
+
+config SW2
+    def_bool y if MMU_HAS_SENSOR_TOOLHEAD && PIN_TOOLHEAD_SENSOR = ""
+
+config SW3
+    def_bool y if MMU_HAS_SENSOR_EXTRUDER && PIN_EXTRUDER_SENSOR = ""
+
+
+config SHOW_PER_UNIT_WARNINGS
   bool
   depends on !MULTI_UNIT_ENTRY_POINT
-  @repeat var=i min=1 max=20@
+  @repeat var=i min=1 max=15@
     default y if W$(i)
   @endrepeat@
 
@@ -24,7 +42,7 @@ config W4
     def_bool y if PARAM_GATE_HOMING_ENDSTOP = ""
 
 config W5
-    def_bool y if !INSTALL_CLIENT_MACROS
+    def_bool n # Spare
 
 config W6
     def_bool y if MMU_HAS_LEDS && PIN_NEOPIXEL = "" && !MMU_HAS_PER_GATE_MCU && !CUSTOM_LED_SETUP
@@ -33,19 +51,19 @@ config W7
     def_bool y if MMU_HAS_FANS && PIN_FAN = "" && !MMU_HAS_PER_GATE_MCU
 
 config W8
-    def_bool y if MMU_HAS_ENCODER && PIN_ENCODER = ""
+    def_bool y if MMU_HAS_ENCODER && PIN_ENCODER = "" && !MMU_SHARED_ENCODER
 
 config W9
     def_bool y if MMU_HAS_SENSOR_SHARED_EXIT && PIN_SHARED_EXIT_SENSOR = ""
 
 config W10
-    def_bool y if MMU_HAS_SENSOR_BUFFER_TENSION && PIN_BUFFER_TENSION = ""
+    def_bool y if MMU_HAS_SENSOR_BUFFER_TENSION && PIN_BUFFER_TENSION = "" && !MMU_SHARED_SYNC_FEEDBACK_BUFFER
 
 config W11
-    def_bool y if MMU_HAS_SENSOR_BUFFER_COMPRESSION && PIN_BUFFER_COMPRESSION = ""
+    def_bool y if MMU_HAS_SENSOR_BUFFER_COMPRESSION && PIN_BUFFER_COMPRESSION = "" && !MMU_SHARED_SYNC_FEEDBACK_BUFFER
 
 config W12
-    def_bool y if MMU_HAS_SENSOR_BUFFER_PROPORTIONAL && PIN_BUFFER_ANALOG = ""
+    def_bool y if MMU_HAS_SENSOR_BUFFER_PROPORTIONAL && PIN_BUFFER_ANALOG = "" && !MMU_SHARED_SYNC_FEEDBACK_BUFFER
 
 config W13
     def_bool y if MMU_HAS_HEATERS && PARAM_FILAMENT_HEATER = "" && PARAM_FILAMENT_HEATERS = ""
@@ -53,24 +71,36 @@ config W13
 config W14
     def_bool y if MMU_HAS_ENVIRONMENT_SENSOR && PARAM_ENVIRONMENT_SENSOR = "" && PARAM_ENVIRONMENT_SENSORS = ""
 
+config W15
+    def_bool y if MMU_HAS_SYNC_FEEDBACK_BUFFER && !MMU_SHARED_SYNC_FEEDBACK_BUFFER && !(MMU_HAS_SENSOR_BUFFER_TENSION || MMU_HAS_SENSOR_BUFFER_COMPRESSION || MMU_HAS_SENSOR_BUFFER_PROPORTIONAL)
 
-if SHOW_WARNINGS
+
+
+if SHOW_PER_UNIT_WARNINGS || SHOW_SHARED_WARNINGS
   comment "_"
-  comment "_Config Warnings"
+  comment "_Config Warnings / Errors"
 
-  comment "Custom MMU selected. You will need to carefully check configuration" if W1
-  comment "Unknown MCU selected. You will need to configure all pins"           if W2
-  comment "Toolhead type is 'other'. Are you sure yours is not listed?"         if W3
-  comment "No gate homing endstop [Raw Settings/Endstops]"                      if W4
-  comment "Caution. You opted to not install client macros [Software Options]"  if W5
-  comment "Leds are enabled but no MCU pin defined"                             if W6
-  comment "Fans are enabled but no MCU pin defined"                             if W7
-  comment "Encoder is enabled but no MCU pin defined"                           if W8
-  comment "Shared exit sensor is enabled but no MCU pin defined"                if W9
-  comment "Buffer tension switch is enabled but no MCU pin defined"             if W10
-  comment "Buffer compression switch is enabled but no MCU pin defined"         if W11
-  comment "Buffer proportional feedback enabled but no analog MCU pin defined"  if W12
-  comment "MMU heater is enabled but heater name(s) not defined"                if W13
-  comment "MMU environment sensor is enabled but sensor name(s) not defined"    if W14
+  if SHOW_SHARED_WARNINGS
+    comment "Caution. You opted to not install client macros [Software Options]"  if SW1
+    comment "Toolhead sensor is enabled but no MCU pin defined"                   if SW2
+    comment "Extruder sensor is enabled but no MCU pin defined"                   if SW3
+  endif
 
+  if SHOW_PER_UNIT_WARNINGS
+    comment "Custom MMU selected. You will need to carefully check configuration" if W1
+    comment "Unknown MCU selected. You will need to configure all pins"           if W2
+    comment "Toolhead type is 'other'. Are you sure yours is not listed?"         if W3
+    comment "No gate homing endstop [Raw Settings/Endstops]"                      if W4
+    comment "-unused-"                                                            if W5
+    comment "Leds are enabled but no MCU pin defined"                             if W6
+    comment "Fans are enabled but no MCU pin defined"                             if W7
+    comment "Encoder is enabled but no MCU pin defined"                           if W8
+    comment "Shared exit sensor is enabled but no MCU pin defined"                if W9
+    comment "Buffer tension switch is enabled but no MCU pin defined"             if W10
+    comment "Buffer compression switch is enabled but no MCU pin defined"         if W11
+    comment "Buffer proportional feedback enabled but no analog MCU pin defined"  if W12
+    comment "MMU heater is enabled but heater name(s) not defined"                if W13
+    comment "MMU environment sensor is enabled but sensor name(s) not defined"    if W14
+    comment "Sync-feedback buffer configured but it had no sensors defined"       if W15
+  endif
 endif
