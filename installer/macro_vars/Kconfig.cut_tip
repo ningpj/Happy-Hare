@@ -73,6 +73,14 @@ menu "Toolhead tip cutting (_MMU_CUT_TIP)"
     default "'y'" if CHOICE_CUT_TIP_CUTTING_AXIS_Y
     default "'x'"
 
+  config VAR_CUT_TIP_ITERATIONS
+    int "Cutting iterations           "
+    default 1
+    range 1 5
+    help
+      Number of cutting actions to perform.  
+      Increase if your cutter struggles to cut certain types of filament.
+
   config VAR_CUT_TIP_PIN_LOC_XY
     string "Pin location (X,Y)           "
     default "14, 250"
