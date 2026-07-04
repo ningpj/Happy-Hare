@@ -143,7 +143,7 @@ menu "Sequence macros (_MMU_SEQUENCE)"
 
   config VAR_SEQUENCE_RESTORE_XY_POS
     string
-    default "'next" if CHOICE_SEQUENCE_RESTORE_XY_POS_NEXT
+    default "'next'" if CHOICE_SEQUENCE_RESTORE_XY_POS_NEXT
     default "'none'" if CHOICE_SEQUENCE_RESTORE_XY_POS_NONE
     default "'last'"
 
