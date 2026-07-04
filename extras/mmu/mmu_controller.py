@@ -729,7 +729,7 @@ class MmuController(MmuFilamentMovement):
         def buffer_segment():
             t_sensor = self.sensor_manager.check_sensor(SENSOR_TENSION)
             c_sensor = self.sensor_manager.check_sensor(SENSOR_COMPRESSION)
-            sf_status = self.mmu_unit().sync_feedback.get_status(0)
+            sf_status = self.get_status(0)
             sf_state = sf_status['sync_feedback_state']
             sf_value = sf_status['sync_feedback_bias_modelled']
 
@@ -741,7 +741,8 @@ class MmuController(MmuFilamentMovement):
             if sf_state == "compressed":
                 sf_char = "C"
             if sf_state == "tension":
-                return "T"
+                sf_char = "T"
+            logging.info(f"PAUL: prop={self.sensor_manager.has_sensor(SENSOR_PROPORTIONAL)}, state={sf_state}, sf_value={sf_value}")
             if sf_state == "neutral":
                 if self.sensor_manager.has_sensor(SENSOR_PROPORTIONAL) and sf_value is not None:
                     return f"[{f'{sf_value:.1f}'.center(5)}]"
