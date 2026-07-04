@@ -53,15 +53,6 @@ menu "Sequence macros (_MMU_SEQUENCE)"
 
       Use -999,-999 for no XY move. Use 0 for no Z-hop.
 
-  config VAR_SEQUENCE_PARK_COMPLETE
-    string "Complete park position  "
-    default "50,   50,   10, 0, 5"
-    help
-      Parking movement and location for print complete operation.
-      x, y, z-hop, z_hop_ramp, retract
-
-      Use -999,-999 for no XY move. Use 0 for no Z-hop.
-
   config VAR_SEQUENCE_PARK_PAUSE
     string "Pause park position     "
     default "50,   50,   5,  0, 2"
@@ -77,6 +68,15 @@ menu "Sequence macros (_MMU_SEQUENCE)"
     default "-999, -999, 10, 0, 5"
     help
       Parking movement and location for print cancel operation.
+      x, y, z-hop, z_hop_ramp, retract
+
+      Use -999,-999 for no XY move. Use 0 for no Z-hop.
+
+  config VAR_SEQUENCE_PARK_COMPLETE
+    string "Complete park position  "
+    default "50,   50,   10, 0, 5"
+    help
+      Parking movement and location for print complete operation.
       x, y, z-hop, z_hop_ramp, retract
 
       Use -999,-999 for no XY move. Use 0 for no Z-hop.
