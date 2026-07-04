@@ -213,6 +213,12 @@ menu "Sequence macros (_MMU_SEQUENCE)"
     help
       Executed after default logic but before restoring toolhead position.
 
+  config VAR_SEQUENCE_USER_POST_PRELOAD_EXTENSION
+    string "Post-preload extension macro "
+    default ""
+    help
+      Executed after successful MMU_PRELOAD with GATE=<n>. 
+
   comment "_"
   comment "_Misc"
 
