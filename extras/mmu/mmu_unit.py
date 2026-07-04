@@ -129,7 +129,7 @@ class MmuUnit:
         self.require_bowden_move =         bool(config.getint('require_bowden_move', profile.require_bowden_move))
         self.filament_always_gripped =     bool(config.getint('filament_always_gripped', profile.filament_always_gripped))
         self.show_bypass =                 bool(config.getint('show_bypass', profile.show_bypass))
-        self.filament_buffer =             bool(config.getint('filament_buffer', profile.has_filament_buffer))
+        self.filament_buffer =             bool(config.getint('filament_buffer', profile.filament_buffer))
 
         # Can selector mechanism allow selection of other gates on unit when filament is loaded
         self.can_crossload = self.selector_type in [SELECTOR_VIRTUAL, SELECTOR_SERVO, SELECTOR_INDEXED, SELECTOR_MACRO, SELECTOR_ROTARY]
