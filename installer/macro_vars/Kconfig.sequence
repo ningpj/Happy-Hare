@@ -217,7 +217,7 @@ menu "Sequence macros (_MMU_SEQUENCE)"
     string "Post-preload extension macro "
     default ""
     help
-      Executed after successful MMU_PRELOAD with GATE=<n>. 
+      Executed after successful filament preload
 
   comment "_"
   comment "_Misc"
