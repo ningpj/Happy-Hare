@@ -453,14 +453,14 @@ register_mmu_sensors      : [[PARAM_REGISTER_MMU_SENSORS]]
 
 
 
-[% if MMU_HAS_ENVIRONMENT_SENSOR or MMU_CREATE_MCU_ENVIRONMENT_SENSORS %]
+[% if MMU_HAS_ENVIRONMENT_SENSOR or MMU_HAS_BUFFER_MCU or MMU_CREATE_MCU_ENVIRONMENT_SENSORS %]
 # ┌──────────────────────────────────────────────────────────────────────────────────────────┐
 # │ ███████╗███╗   ██╗██╗   ██╗   ███████╗███████╗███╗   ██╗███████╗ ██████╗ ██████╗ ███████╗│
 # │ ██╔════╝████╗  ██║██║   ██║   ██╔════╝██╔════╝████╗  ██║██╔════╝██╔═══██╗██╔══██╗██╔════╝│
 # │ █████╗  ██╔██╗ ██║██║   ██║   ███████╗█████╗  ██╔██╗ ██║███████╗██║   ██║██████╔╝███████╗│
 # │ ██╔══╝  ██║╚██╗██║╚██╗ ██╔╝   ╚════██║██╔══╝  ██║╚██╗██║╚════██║██║   ██║██╔══██╗╚════██║│
-# │ ███████╗██║ ╚████║ ╚████╔╝██║ ███████╗███████╗██║ ╚████║███████║╚██████╔╝██║  ██║███████║│
-# │ ╚══════╝╚═╝  ╚═══╝  ╚═══╝ ╚═╝ ╚══════╝╚══════╝╚═╝  ╚═══╝╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝│
+# │ ███████╗██║ ╚████║ ╚████╔╝██║ ███████╗███████╗██║ ╚████║███████║╚██████╔╝██║  ██║███████║│ 
+# │ ╚══════╝╚═╝  ╚═══╝  ╚═══╝ ╚═╝ ╚══════╝╚══════╝╚═╝  ╚═══╝╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝│ 
 # └──────────────────────────────────────────────────────────────────────────────────────────┘
 #
 # Temperature/humidity sensors for MMU units and MCU's
@@ -469,14 +469,20 @@ register_mmu_sensors      : [[PARAM_REGISTER_MMU_SENSORS]]
 [% if not MMU_HAS_PER_GATE_ENV_SENSORS %]
 [% if PARAM_ENVIRONMENT_SENSOR != "" %]
 [temperature_sensor [[UNIT_NAME]]_env]
-sensor_type               : [[PARAM_ENVIRONMENT_SENSOR_I2C_BUS]]
+sensor_type               : [% if CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT1X_b %]AHT1X
+[% elif CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X_b %]AHT2X
+[% elif CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT3X_b %]AHT3X
+[% elif CHOICE_ENVIRONMENT_SENSOR_TYPE_BME280_b %]BME280
+[% endif %]
 i2c_address               : [[PARAM_ENVIRONMENT_SENSOR_I2C_ADDRESS]]
-[% if PARAM_ENVIRONMENT_SENSOR_REPORT_TIME %]
+[% if PARAM_ENVIRONMENT_SENSOR_REPORT_TIME|int > 0 and (CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT1X_b or CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X_b or CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT3X_b) %]
 aht10_report_time         : [[PARAM_ENVIRONMENT_SENSOR_REPORT_TIME]]
 [% endif %]
 i2c_mcu                   : [[MCU_NAME]]
 [% if CHOICE_ENVIRONMENT_SENSOR_I2C_HARDWARE %]
-i2c_bus                   : [[PARAM_ENVIRONMENT_SENSOR_I2C_BUS]]
+i2c_bus                   : [% if CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_I2C2_b %]i2c2_PB10_PB11
+[% elif CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_I2C3_b %]i2c3_PB3_PB4
+[% endif %]
 [% else %]
 i2c_software_scl_pin      : [[MCU_NAME]]:[[PIN_ENVIRONMENT_SENSOR_SCL]]
 i2c_software_sda_pin      : [[MCU_NAME]]:[[PIN_ENVIRONMENT_SENSOR_SDA]]
@@ -487,14 +493,20 @@ i2c_software_sda_pin      : [[MCU_NAME]]:[[PIN_ENVIRONMENT_SENSOR_SDA]]
 [% for i in range(0, PARAM_NUM_GATES|int) %]
 [% if (PARAM_ENVIRONMENT_SENSOR_NAME_|d)[i] != "" %]
 [temperature_sensor [[UNIT_NAME]]_env[[i]]]
-sensor_type               : [[PARAM_ENVIRONMENT_SENSOR_TYPE]]
+sensor_type               : [% if (CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT1X_|d)[i] %]AHT1X
+[% elif (CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X_|d)[i] %]AHT2X
+[% elif (CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT3X_|d)[i] %]AHT3X
+[% elif (CHOICE_ENVIRONMENT_SENSOR_TYPE_BME280_|d)[i] %]BME280
+[% endif %]
 i2c_address               : [[(PARAM_ENVIRONMENT_SENSOR_I2C_ADDRESS_|d)[i]]]
-[% if (PARAM_ENVIRONMENT_SENSOR_REPORT_TIME_|d)[i] %]
-aht10_report_time         : [[(PARAM_ENVIRONMENT_SENSOR_REPORT_TIME_|d)[i]]]
+[% if (PARAM_ENVIRONMENT_SENSOR_REPORT_TIME_|d)[i]|int > 0 and ((CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT1X_|d)[i] or (CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X_|d)[i] or (CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT3X_|d)[i]) %]
+aht10_report_time: [[(PARAM_ENVIRONMENT_SENSOR_REPORT_TIME_|d)[i]]]
 [% endif %]
 i2c_mcu                   : [[MCU_NAME]]_gate[[i]]
 [% if (CHOICE_ENVIRONMENT_SENSOR_I2C_HARDWARE_|d)[i] %]
-i2c_bus                   : [[(PARAM_ENVIRONMENT_SENSOR_I2C_BUS_|d)[i]]]
+i2c_bus                   : [% if (CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_I2C2_|d)[i] %]i2c2_PB10_PB11
+[% elif (CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_I2C3_|d)[i] %]i2c3_PB3_PB4
+[% endif %]
 [% else %]
 i2c_software_scl_pin      : [[MCU_NAME]]_gate[[i]]:[[(PIN_ENVIRONMENT_SENSOR_SCL_|d)[i]]]
 i2c_software_sda_pin      : [[MCU_NAME]]_gate[[i]]:[[(PIN_ENVIRONMENT_SENSOR_SDA_|d)[i]]]
@@ -507,7 +519,7 @@ i2c_software_sda_pin      : [[MCU_NAME]]_gate[[i]]:[[(PIN_ENVIRONMENT_SENSOR_SDA
 [% if MMU_CREATE_MCU_ENVIRONMENT_SENSORS %]
 [% if MMU_HAS_PER_GATE_MCU %]
 [% for i in range(0, PARAM_NUM_GATES|int) %]
-[temperature_sensor [[ ('_' if MMU_HIDE_MCU_ENVIRONMENT_SENSORS else '') ~ UNIT_NAME ~ '_mcu' ~ i ]]]
+[temperature_sensor [[UNIT_NAME]]_mcu[[i]]]
 sensor_type               : temperature_mcu
 sensor_mcu                : [[MCU_NAME]]_gate[[i]]
 

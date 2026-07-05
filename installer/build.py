@@ -271,10 +271,15 @@ class HHConfig(ConfigBuilder):
         for section in sorted(builder.sections(scope="included")):
             for option in sorted(builder.options(section)):
                 if self.has_option(section, option):
+
                     is_gcode = option.startswith("gcode")
+                    is_macro_section = section.startswith("gcode_macro")
                     is_var_section = section in excluded_var_sections
                     is_excluded_var = (section, option) in excluded_vars
-                    is_excluded_param = option in excluded_params
+                    is_excluded_param = (
+                        not is_macro_section
+                        and option in excluded_params
+                    )
 
                     if (
                         not is_gcode

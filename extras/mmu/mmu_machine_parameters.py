@@ -74,7 +74,8 @@ class MmuMachineParameters(TunableParametersBase):
         ParamSpec('post_form_tip_macro',           'str',   '_MMU_POST_FORM_TIP',      section="MACROS"),
         ParamSpec('post_unload_macro',             'str',   '_MMU_POST_UNLOAD',        section="MACROS"),
         ParamSpec('pre_load_macro',                'str',   '_MMU_PRE_LOAD',           section="MACROS"),
-        ParamSpec('post_load_macro',               'str',   '_MMU_POST_LOAD_MACRO',    section="MACROS"),
+        ParamSpec('post_load_macro',               'str',   '_MMU_POST_LOAD',           section="MACROS"),
+        ParamSpec('post_preload_macro',            'str',   '_MMU_POST_PRELOAD',        section="MACROS"),
         ParamSpec('unload_sequence_macro',         'str',   '_MMU_UNLOAD_SEQUENCE',    section="MACROS", hidden=True),
         ParamSpec('load_sequence_macro',           'str',   '_MMU_LOAD_SEQUENCE',      section="MACROS", hidden=True),
 
