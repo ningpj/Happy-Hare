@@ -14,6 +14,8 @@
 #
 
 # Happy Hare imports
+from extras.mmu.commands import mmu
+
 from ..mmu_constants   import *
 from ..mmu_utils       import MmuError
 from .mmu_base_command import *
@@ -110,6 +112,14 @@ class MmuPreloadCommand(BaseCommand):
 
                         try:
                             mmu._preload_gate()
+
+                            # Callout to user defined post preload macro with GATE=n of preloaded gate
+                            sequence_vars_macro = mmu.printer.lookup_object("gcode_macro _MMU_SEQUENCE_VARS", None)
+                            if sequence_vars_macro and (user_post_preload_extension := sequence_vars_macro.variables.get('user_post_preload_extension', '')):
+                                mmu.log_debug(f"Calling user post preload extension: {user_post_preload_extension} GATE={gate}")
+                                mmu.reset_sync_gear_to_extruder(False, force_grip=True)  # No extruder in preload to worry about
+                                mmu.wrap_gcode_command(f"{user_post_preload_extension} GATE={gate}", exception=True, wait=True)
+
                             # Type-B: disable idle gear stepper after preload
                             mmu.disable_idle_gear_stepper(gate)
 
