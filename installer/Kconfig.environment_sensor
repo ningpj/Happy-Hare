@@ -3,12 +3,21 @@
 # Responsible for setting:
 #   MMU_HAS_ENVIRONMENT_SENSOR
 #   MMU_HAS_PER_GATE_ENV_SENSORS
-#   CHOICE_ENVIRONMENT_SENSOR_TYPE_*_b (single MCU: AHT1X_b, AHT2X_b, AHT3X_b, BME280_b)
-#   CHOICE_ENVIRONMENT_SENSOR_TYPE_<TYPE>_$(i) (per-gate MCU: AHT1X_$(i), AHT2X_$(i), AHT3X_$(i), BME280_$(i))
-#   CHOICE_ENVIRONMENT_SENSOR_I2C_HARDWARE/SOFTWARE (single MCU: i2c bus type)
-#   CHOICE_ENVIRONMENT_SENSOR_I2C_HARDWARE/SOFTWARE_$(i) (per-gate MCU: i2c bus type)
-#   CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_*_b (single MCU: i2c2_PB10_PB11, i2c3_PB3_PB4)
-#   CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_<BUS>_$(i) (per-gate MCU: I2C2_$(i), I2C3_$(i))
+#
+# Single MCU:
+#   PARAM_ENVIRONMENT_SENSOR_TYPE
+#   PARAM_ENVIRONMENT_SENSOR_REPORT_TIME (if AHT type)
+#   PARAM_ENVIRONMENT_SENSOR_I2C_ADDRESS
+#
+#   CHOICE_ENVIRONMENT_SENSOR_I2C_HARDWARE (i2c bus type)
+#     PARAM_ENVIRONMENT_SENSOR_I2C_BUS
+#
+#   CHOICE_ENVIRONMENT_SENSOR_I2C_SOFTWARE (i2c bus type)
+#     PIN_ENVIRONMENT_SENSOR_SCL
+#     PIN_ENVIRONMENT_SENSOR_SDA
+#
+# Per-gate:
+#   as above with _<gate_index> extension
 #
 # SUPPORTED SENSOR TYPES (keep in sync with mmu_hardware.cfg template):
 #   - AHT1X     (humidity/temperature, requires patched aht1x driver)
@@ -16,7 +25,7 @@
 #   - AHT3X     (humidity/temperature, requires patched aht1x driver)
 #   - BME280    (humidity/temperature/pressure)
 #
-# SUPPORTED I2C HARDWARE BUS OPTIONS (keep in sync with mmu_hardware.cfg template):
+# SUPPORTED I2C HARDWARE BUS OPTIONS:
 #   - i2c2_PB10_PB11  (default)
 #   - i2c3_PB3_PB4    (alternative)
 
@@ -75,6 +84,7 @@ if MMU_HAS_ENVIRONMENT_SENSOR && !CUSTOM_ENVIRONMENT_SENSOR_SETUP
     # -------------------------------------
 
     if !MMU_HAS_PER_GATE_ENV_SENSORS
+
       choice CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_TYPE
         prompt "i2c bus type      "
         default CHOICE_ENVIRONMENT_SENSOR_I2C_HARDWARE
@@ -94,46 +104,54 @@ if MMU_HAS_ENVIRONMENT_SENSOR && !CUSTOM_ENVIRONMENT_SENSOR_SETUP
 
       choice CHOICE_ENVIRONMENT_SENSOR_TYPE
         prompt "Sensor type       "
-        default CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X_b
+        default CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X
         help
           Select the type of environment sensor being used
 
-        config CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT1X_b
+        config CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT1X
           bool "AHT1X"
           help
             AHT1X humidity/temperature sensor
 
-        config CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X_b
+        config CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X
           bool "AHT2X"
           help
             AHT2X humidity/temperature sensor
 
-        config CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT3X_b
+        config CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT3X
           bool "AHT3X"
           help
             AHT3X humidity/temperature sensor
 
-        config CHOICE_ENVIRONMENT_SENSOR_TYPE_BME280_b
+        config CHOICE_ENVIRONMENT_SENSOR_TYPE_BME280
           bool "BME280"
           help
             BME280 humidity/temperature/pressure sensor
       endchoice
 
-      config PARAM_ENVIRONMENT_SENSOR_REPORT_TIME
-        int "Report time (secs)"
-        depends on CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT1X_b || CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X_b || CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT3X_b
-        default 60
-        range 0 300
-        help
-          Frequency to poll the sensor (default 60 seconds)
+      config PARAM_ENVIRONMENT_SENSOR_TYPE
+        string
+        default "AHT1X"  if CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT1X
+        default "AHT2X"  if CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X
+        default "AHT3X"  if CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT3X
+        default "BME280" if CHOICE_ENVIRONMENT_SENSOR_TYPE_BME280
 
-          NOTE: This option requires a patched aht1x driver for Klipper
-          to support the aht10_report_time parameter.
-          Recommend setting this to >= 60sec or 0 to disable.
+      if CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT1X || CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X || CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT3X
+        config PARAM_ENVIRONMENT_SENSOR_REPORT_TIME
+          int "Report time (secs)"
+          default 60
+          range 1 300
+          help
+            Frequency to poll the sensor (default 60 seconds)
+
+            NOTE: This option requires a patched aht1x driver for Klipper
+            to support the aht10_report_time parameter.
+            Recommend setting this to >= 60sec or 0 to disable.
+      endif
 
       config PARAM_ENVIRONMENT_SENSOR_I2C_ADDRESS
         int "i2c address       "
-        default 119 if CHOICE_ENVIRONMENT_SENSOR_TYPE_BME280_b
+        default 119 if CHOICE_ENVIRONMENT_SENSOR_TYPE_BME280
         default 56
         help
           i2c address of the environment sensor (default 56 [0x38] for AHT sensors, 119 [0x77] for BME280)
@@ -141,20 +159,25 @@ if MMU_HAS_ENVIRONMENT_SENSOR && !CUSTOM_ENVIRONMENT_SENSOR_SETUP
       if CHOICE_ENVIRONMENT_SENSOR_I2C_HARDWARE
         choice CHOICE_ENVIRONMENT_SENSOR_I2C_BUS
           prompt "i2c bus name      "
-          default CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_I2C2_b
+          default CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_I2C2
           help
             Select the hardware i2c bus to use for the environment sensor
 
-        config CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_I2C2_b
+        config CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_I2C2
             bool "i2c2_PB10_PB11"
             help
               Hardware i2c bus i2c2 with SCL on PB10 and SDA on PB11
 
-        config CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_I2C3_b
+        config CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_I2C3
             bool "i2c3_PB3_PB4"
             help
               Hardware i2c bus i2c3 with SCL on PB3 and SDA on PB4
         endchoice
+
+        config PARAM_ENVIRONMENT_SENSOR_I2C_BUS
+            string
+            default "i2c2_PB10_PB11" if CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_I2C2
+            default "i2c3_PB3_PB4"   if CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_I2C3
       endif
 
       if CHOICE_ENVIRONMENT_SENSOR_I2C_SOFTWARE
@@ -208,6 +231,13 @@ if MMU_HAS_ENVIRONMENT_SENSOR && !CUSTOM_ENVIRONMENT_SENSOR_SETUP
                 bool "BME280"
             endchoice
 
+            config PARAM_ENVIRONMENT_SENSOR_TYPE
+              string
+              default "AHT1X"  if CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT1X_$(i)
+              default "AHT2X"  if CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X_$(i)
+              default "AHT3X"  if CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT3X_$(i)
+              default "BME280" if CHOICE_ENVIRONMENT_SENSOR_TYPE_BME280_$(i)
+
             config PARAM_ENVIRONMENT_SENSOR_REPORT_TIME_$(i)
               int "Gate $(i) report time (secs)"
               depends on CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT1X_$(i) || CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT2X_$(i) || CHOICE_ENVIRONMENT_SENSOR_TYPE_AHT3X_$(i)
@@ -251,6 +281,11 @@ if MMU_HAS_ENVIRONMENT_SENSOR && !CUSTOM_ENVIRONMENT_SENSOR_SETUP
                   help
                     Hardware i2c bus i2c3 with SCL on PB3 and SDA on PB4
               endchoice
+
+              config PARAM_ENVIRONMENT_SENSOR_I2C_BUS_$(i)
+                  string
+                  default "i2c2_PB10_PB11" if CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_I2C2_$(i)
+                  default "i2c3_PB3_PB4"   if CHOICE_ENVIRONMENT_SENSOR_I2C_BUS_I2C3_$(i)
             endif
 
             config PARAM_ENVIRONMENT_SENSOR_I2C_ADDRESS_$(i)
