@@ -44,7 +44,8 @@ CONFIG_SPEC = [
     ("template", re.compile(r"^\{\{[^\n]*\}\}")),
     ("unknown", re.compile(r"^\S")),
 ]
-
+ 
+GCODE_BOUNDARY_OPTION   = re.compile(r"^variable_\w+[ \t]*[:=]")
 MAGIC_EXCLUSION_COMMENT = re.compile(r"^# EXCLUDE FROM CONFIG BUILDER.*")
 
 if sys.version_info[0] >= 3:
@@ -548,6 +549,13 @@ class Parser(object):
                 elif ch == ")":
                     paren_depth = max(0, paren_depth - 1)
 
+        def _looks_like_gcode_boundary(s):
+            first_line = s.lstrip(" \t\r\n").splitlines()[0] if s.strip() else ""
+            return (
+                first_line.startswith("[")
+                or GCODE_BOUNDARY_OPTION.match(first_line) is not None
+            )
+
         peek = tokenizer.peek()
         while peek:
             if peek.type == "whitespace":
@@ -555,23 +563,19 @@ class Parser(object):
                     # Original rule: end multi-line value when newline isn't followed by indent.
                     # Extension: if we're inside a bracketed structure, keep going so we can see the closing brace.
                     if (brace_depth == 0 and bracket_depth == 0 and paren_depth == 0 and not in_sq and not in_dq):
-                        # Your existing as_is exception for gcode blocks
+                        # gcode block exception
                         if as_is:
-                            next_ch = tokenizer.slice[:1]  # IMPORTANT: slice is already after peek
-                            if next_ch in ("#", ";"):
-                                pass
-                            elif next_ch == "{":
-                                next2 = tokenizer.slice[1:2]
-                                if next2 in ("%", "{", "#"):  # {%  {{  {#
-                                    pass
-                                else:
-                                    break
-                            else:
+                            next_text = tokenizer.slice.lstrip(" \t\r\n")
+
+                            if _looks_like_gcode_boundary(next_text):
                                 break
+
+                            # Otherwise keep consuming gcode lines.
+                            pass
                         else:
                             break
                     # else: we're inside {...}/(...)/[...] so don't break
- 
+
                 token = tokenizer.take("whitespace")
  
                 # Ensure whitespace for empty options is tokenized in ValueLineNode (only newline is standalone)
@@ -599,6 +603,11 @@ class Parser(object):
                     current_line.append(ValueEntryNode(current_entry))
                     current_entry = ""
                 current_line.append(self.parse_comment(tokenizer))
+
+            # Escape hatch, so that a [section] token doesn't fall into the generic
+            # else and get swallowed into the gcode value
+            elif as_is and peek.type == "section":
+                break
  
             elif not as_is and peek.type == "placeholder":
                 if len(current_entry) > 0:
@@ -792,9 +801,6 @@ class ConfigBuilder(object):
             out = callback(sec, out)
         return out
 
-    def sections(self, scope="all"):
-        return [x.name for x in self._for_section(None, collect, [], scope=scope)]
-
     def _get_section(self, section_name):
         section = self._for_section(section_name, identity)
         if section:
@@ -803,6 +809,7 @@ class ConfigBuilder(object):
             raise KeyError("Section [{}] not found".format(section_name))
 
     def sections(self, scope="all"):
+        sections = [x.name for x in self._for_section(None, collect, [], scope=scope)]
         return [x.name for x in self._for_section(None, collect, [], scope=scope)]
 
     def has_section(self, section_name):
