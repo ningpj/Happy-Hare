@@ -249,6 +249,7 @@ if !MULTI_UNIT_ENTRY_POINT
   if !SHOW_MMU_ADDITIONS_WITH_TYPE
     source "Kconfig.mmu_additions"  # MMU Additions/Customization menu (if not inlined with mmu type)
   endif
+  source "Kconfig.name"             # Simple display name
   comment "_"
   source "connection/Kconfig"       # MCU Connection
   source "Kconfig.pins"             # Raw pin editing
