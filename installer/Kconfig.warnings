@@ -88,7 +88,7 @@ if SHOW_PER_UNIT_WARNINGS || SHOW_SHARED_WARNINGS
 
   if SHOW_PER_UNIT_WARNINGS
     comment "Custom MMU selected. You will need to carefully check configuration" if W1
-    comment "Unknown MCU selected. You will need to configure all pins"           if W2
+    comment "Unknown MCU board selected. You will need to configure all pins"     if W2
     comment "Toolhead type is 'other'. Are you sure yours is not listed?"         if W3
     comment "No gate homing endstop [Raw Settings/Endstops]"                      if W4
     comment "-unused-"                                                            if W5
