@@ -54,9 +54,6 @@ if BOARD_TYPE_VVD_1_0
   config PIN_ENTRY_SENSOR_3
     default "$(MCU_NAME):PA3"
 
-  config CUSTOM_LED_SETUP
-    def_bool y
-
   config PARAM_MISC_HARDWARE
     default "$(ml,\
 [neopixel $(UNIT_NAME)_leds_1]\n\

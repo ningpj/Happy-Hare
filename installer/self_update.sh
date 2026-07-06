@@ -58,5 +58,4 @@ self_update() {
     fi
 }
 
-echo "PAUL: temp disabled auto-update to protect against overwriting changes whilst developing"
-#self_update
+self_update

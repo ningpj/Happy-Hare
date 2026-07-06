@@ -31,8 +31,6 @@ if MMU_HAS_EJECT_BUTTONS
       config PIN_EJECT_BUTTON_$(i)
         prompt "Eject button $(i) pin " if PARAM_NUM_GATES > $(i)
     @endrepeat@
+
   endmenu
-
-  comment "_"
-
 endif

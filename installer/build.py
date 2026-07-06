@@ -85,6 +85,21 @@ hidden_params = [
     "hall_max_diameter",
 ]
 
+# This mapping is used to identify Kconfig parameter names and map then to the
+# correct cfg config section. This is used for the "merge" (option 3) approach
+VAR_SECTION_MAP = {
+    "var_software_":     "gcode_macro _MMU_SOFTWARE_VARS",
+    "var_state_":        "gcode_macro _MMU_STATE_VARS",
+    "var_sequence_":     "gcode_macro _MMU_STATE_VARS",
+    "var_client_":       "gcode_macro _MMU_CLIENT_VARS",
+    "var_cut_tip_":      "gcode_macro _MMU_CUT_TIP_VARS",
+    "var_form_tip_":     "gcode_macro _MMU_CUT_TIP_VARS",
+    "var_servo_cutter_": "gcode_macro _MMU_SERVO_CUTTER_VARS",
+    "var_blobifer_":     "gcode_macro _BLOBIFIER_VARS",
+    "var_purge_":        "gcode_macro _MMU_PURGE_VARS",
+    "var_fan_":          "gcode_macro _MMU_FAN_VARS",
+}
+
 happy_hare = '\n(\\_/)\n( *,*)\n(")_(") {caption}\n'
 unhappy_hare = '\n(\\_/)\n( V,V)\n(")^(") {caption}\n'
 
@@ -241,25 +256,42 @@ class HHConfig(ConfigBuilder):
                 self.origins.pop((section_name, option))
             self.remove_section(section_name)
 
-    def update_builder(self, builder, ignore_params, origin=None):
+    def update_builder(self, builder, excluded_params, excluded_vars, origin=None):
         """
-        Update the builder config selectively from the existing config HH data
-        ignore_params is a list of params that should NOT be updated. It is empty
-        for the non-interactive upgrade case where all previous params are retained
+        Update the builder config selectively from the existing config HH data.
+        'excluded_params' is a list of params that should NOT be updated (we want the
+        new values from Kconfig to win. It is empty for the non-interactive upgrade
+        case where all previous params are retained
         """
 
+        excluded_var_sections = {section for section, _ in excluded_vars}
+        excluded_vars = set(excluded_vars)
+
         # Copy over included options
-        for section in builder.sections(scope="included"):
-            for option in builder.options(section):
+        for section in sorted(builder.sections(scope="included")):
+            for option in sorted(builder.options(section)):
                 if self.has_option(section, option):
+
+                    is_gcode = option.startswith("gcode")
+                    is_macro_section = section.startswith("gcode_macro")
+                    is_var_section = section in excluded_var_sections
+                    is_excluded_var = (section, option) in excluded_vars
+                    is_excluded_param = (
+                        not is_macro_section
+                        and option in excluded_params
+                    )
+
                     if (
-                        not option.startswith("gcode")     # Don't ever resuse the gcode
-                        and option not in ignore_params
+                        not is_gcode
+                        and not is_excluded_var
+                        and (is_var_section or not is_excluded_param)
                     ):
                         builder.set(section, option, self.get(section, option))
-                        logging.debug("Using previous [%s] %s: %s" % (section, option, self.get(section, option)))
-                    elif not option.startswith("gcode"):
-                        logging.debug("Ignoring previous [%s] %s: %s" % (section, option, self.get(section, option)))
+                        logging.debug("Restoring previous: [%s] %s: %s", section, option, self.get(section, option))
+
+                    elif not is_gcode:
+                        logging.debug("Kconfig override:   [%s] %s: %s --> Using: %s", section, option, self.get(section, option), builder.get(section, option))
+
                     self.used_options.add((section, option))
 
         # If existing config has excluded options use them in lieu of builder excluded options
@@ -413,7 +445,7 @@ def build_config_file(cfg_file_basename, dest_file, kcfg, input_files, extra_par
     elif cfg_file_basename == "config/base/mmu.cfg":
         add_supplemental_params(builder, hhcfg, "mmu_parameters")
 
-    # 6. Determine how much of the HHConfig (existing .cfg's) do we re-apply
+    # 6.Determine how much of the HHConfig (existing .cfg's) do we re-apply
     refresh_mode = os.getenv("F_CFG_UPGRADE_MODE", 'refresh').lower()
 
     if refresh_mode == 'refresh':
@@ -421,29 +453,44 @@ def build_config_file(cfg_file_basename, dest_file, kcfg, input_files, extra_par
         # Here we use the refreshed cfg templates as a starting point but
         # then replace every matching parameter with existing value.
         # Unused options will be reported.
-        filtered_params = [] # Don't filter out any existing params in HHConfig
+        excluded_params = [] # Don't filter out any existing params in HHConfig
+        excluded_vars = []   # Don't filter out any existing macro variables
 
     elif refresh_mode == 'replace':
         # Here we (re)create prestine cfg files based on kconfig settings
         pass
 
     elif refresh_mode == 'merge':
-        # Experimental. Here we selectively ignore simple PARAM_ parameter settings
-        # so that the Kconfig value "wins" in these cases
-        filtered_params = [
+        # Experimental. Here we selectively ignore simple PARAM_ and VAR_ parameter
+        # settings so that the Kconfig value "wins" in these cases
+
+        excluded_params = [
             k.lower()[6:]
             for k in kcfg.as_dict()
             if k.lower().startswith("param_")
         ]
-        logging.debug("The following parameters are being filtered: %s" % ", ".join(filtered_params))
+        #logging.debug("The following parameters are being filtered: %s" % ", ".join(excluded_params))
+
+        excluded_vars = []
+        for k in kcfg.as_dict():
+            key = k.lower()
+
+            for prefix, section in VAR_SECTION_MAP.items():
+                if key.startswith(prefix):
+                    name = key[len(prefix):]
+                    excluded_vars.append((section, f"variable_{name}"))
+                    break
+        #logging.debug("The following macro variables are being filtered: %s", excluded_vars)
 
     else:
         logging.error("Invalid F_CFG_UPGRADE_MODE '%s'" % refresh_mode)
         exit(1)
 
     if refresh_mode != 'replace':
-        # 7.Update the builder Config from the existing master HHConfig to ensure user edits are preserved
-        hhcfg.update_builder(builder, filtered_params, origin=os.path.basename(dest_file))
+        # 7.Update the builder Config from the existing master HHConfig (existing .cfg's)
+        #   to ensure user edits are preserved. The 'excluded_params' is a list that is
+        #   excluded from consideration (i.e. ignored from existing .cfg's)
+        hhcfg.update_builder(builder, excluded_params, excluded_vars, origin=os.path.basename(dest_file))
 
         # 8.Report on deprecated/unused options
         first = True

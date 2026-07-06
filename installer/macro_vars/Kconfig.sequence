@@ -53,15 +53,6 @@ menu "Sequence macros (_MMU_SEQUENCE)"
 
       Use -999,-999 for no XY move. Use 0 for no Z-hop.
 
-  config VAR_SEQUENCE_PARK_COMPLETE
-    string "Complete park position  "
-    default "50,   50,   10, 0, 5"
-    help
-      Parking movement and location for print complete operation.
-      x, y, z-hop, z_hop_ramp, retract
-
-      Use -999,-999 for no XY move. Use 0 for no Z-hop.
-
   config VAR_SEQUENCE_PARK_PAUSE
     string "Pause park position     "
     default "50,   50,   5,  0, 2"
@@ -77,6 +68,15 @@ menu "Sequence macros (_MMU_SEQUENCE)"
     default "-999, -999, 10, 0, 5"
     help
       Parking movement and location for print cancel operation.
+      x, y, z-hop, z_hop_ramp, retract
+
+      Use -999,-999 for no XY move. Use 0 for no Z-hop.
+
+  config VAR_SEQUENCE_PARK_COMPLETE
+    string "Complete park position  "
+    default "50,   50,   10, 0, 5"
+    help
+      Parking movement and location for print complete operation.
       x, y, z-hop, z_hop_ramp, retract
 
       Use -999,-999 for no XY move. Use 0 for no Z-hop.
@@ -143,7 +143,7 @@ menu "Sequence macros (_MMU_SEQUENCE)"
 
   config VAR_SEQUENCE_RESTORE_XY_POS
     string
-    default "'next" if CHOICE_SEQUENCE_RESTORE_XY_POS_NEXT
+    default "'next'" if CHOICE_SEQUENCE_RESTORE_XY_POS_NEXT
     default "'none'" if CHOICE_SEQUENCE_RESTORE_XY_POS_NONE
     default "'last'"
 
@@ -212,6 +212,12 @@ menu "Sequence macros (_MMU_SEQUENCE)"
     default ""
     help
       Executed after default logic but before restoring toolhead position.
+
+  config VAR_SEQUENCE_USER_POST_PRELOAD_EXTENSION
+    string "Post-preload extension macro "
+    default ""
+    help
+      Executed after successful filament preload
 
   comment "_"
   comment "_Misc"

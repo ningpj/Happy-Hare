@@ -94,7 +94,7 @@ if !MMU_HAS_PER_GATE_MCU
       endif
     endchoice
 
-    config PARAM_MMU_CANBUS_UUID_$(gate)
+    config PARAM_MMU_CANBUS_UUID
       string
       @repeat var=i min=1 max=10@
       default "$(canbus_uuid,$(i))" if $(mmu_canbus_config,$(i))

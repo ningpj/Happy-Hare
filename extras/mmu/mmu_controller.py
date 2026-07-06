@@ -440,10 +440,19 @@ class MmuController(MmuFilamentMovement):
         self.mmu_macro_event(MACRO_EVENT_RESTART)
 
 
-    # Blobifier requires initialization so do it when it is set as the purging macro
+    # Blobifier requires initialization, so do it when it is the selected purge macro.
     def init_macros(self):
         if self.p.purge_macro.upper() == MACRO_BLOBIFIER:
-            self.wrap_gcode_command("BLOBIFIER_INIT", exception=None)
+            blobifier_vars = self.printer.lookup_object("gcode_macro _BLOBIFIER_VARS", None)
+            if blobifier_vars:
+                self.wrap_gcode_command("BLOBIFIER_INIT", exception=None)
+            else:
+                self.log_error(
+                    "Blobifier is not correctly installed. "
+                    "Re-run './install.sh -i' and enable Blobifier "
+                    "or turn off as the 'purge_macro' in mmu.cfg"
+                )
+                self.p.purge_macro = ""
 
 
     # Wrap execution of gcode command to allow for control over:
@@ -639,160 +648,33 @@ class MmuController(MmuFilamentMovement):
     # Fun visual display of current filament position
     def _display_visual_state(self):
         if self.p.log_visual and not self.calibrating:
-            visual_str = self.get_filament_position_string(color=True)
+            visual_str = self.get_filament_position_string()
             self.log_always(visual_str, color=True)
-
-
-#PAUL older logic
-#    def _state_to_string(self, direction=None):
-#        arrow = "<" if self.filament_direction == DIRECTION_UNLOAD else ">"
-#        space = "."
-#        home = "|"
-#
-#        gs = "(g)"
-#        es = "(e)"
-#        ts = "(t)"
-#
-#        def past(pos):
-#            return arrow if self.filament_pos >= pos else space
-#
-#        def homed(pos, sensor):
-#            if self.filament_pos > pos:
-#                return " ", arrow, sensor
-#            if self.filament_pos == pos:
-#                return home, space, sensor
-#            return " ", space, sensor
-#
-#        def trig(name, sensor):
-#            if self.sensor_manager.check_sensor(sensor):
-#                return re.sub(r"[a-zA-Z]", "*", name)
-#            return name
-#
-#        gate_endstop = self.mmu_unit().p.gate_homing_endstop
-#        require_bowden = self.mmu_unit().require_bowden_move
-#
-#        t_str = (
-#            f"[T{self.tool_selected}] "
-#            if self.tool_selected >= 0
-#            else "BYPASS "
-#            if self.tool_selected == TOOL_GATE_BYPASS
-#            else "[T?] "
-#        )
-#
-#        g_str = f"{past(FILAMENT_POS_UNLOADED)}"
-#
-#        lg_str = (
-#            "{0}{0}".format(past(FILAMENT_POS_HOMED_GATE))
-#            if not require_bowden
-#            else ""
-#        )
-#
-#        gs_str = (
-#            "{0}{2} {1}{1}".format(
-#                *homed(FILAMENT_POS_HOMED_GATE, trig(gs, gate_endstop))
-#            )
-#            if gate_endstop in [
-#                SENSOR_SHARED_EXIT,
-#                SENSOR_EXIT_PREFIX,
-#                SENSOR_EXTRUDER_ENTRY,
-#            ]
-#            else ""
-#        )
-#
-#        en_pos = (
-#            FILAMENT_POS_IN_BOWDEN
-#            if gate_endstop in [
-#                SENSOR_SHARED_EXIT,
-#                SENSOR_EXIT_PREFIX,
-#                SENSOR_EXTRUDER_ENTRY,
-#            ]
-#            else FILAMENT_POS_START_BOWDEN
-#        )
-#        en_str = f" En {past(en_pos)}" if self.has_encoder() else ""
-#
-#        bowden1 = (
-#            "{0}{0}{0}{0}".format(past(FILAMENT_POS_IN_BOWDEN))
-#            if require_bowden
-#            else ""
-#        )
-#        bowden2 = (
-#            "{0}{0}{0}{0}".format(past(FILAMENT_POS_END_BOWDEN))
-#            if require_bowden
-#            else ""
-#        )
-#
-#        es_str = (
-#            "{0}{2} {1}{1}".format(
-#                *homed(FILAMENT_POS_HOMED_ENTRY, trig(es, SENSOR_EXTRUDER_ENTRY))
-#            )
-#            if self.sensor_manager.has_sensor(SENSOR_EXTRUDER_ENTRY) and require_bowden
-#            else ""
-#        )
-#
-#        ex_str = "{0}[{2} {1}{1}".format(
-#            *homed(FILAMENT_POS_HOMED_EXTRUDER, "Ex")
-#        )
-#
-#        ts_str = (
-#            "{0}{2} {1}".format(
-#                *homed(FILAMENT_POS_HOMED_TS, trig(ts, SENSOR_TOOLHEAD))
-#            )
-#            if self.sensor_manager.has_sensor(SENSOR_TOOLHEAD)
-#            else ""
-#        )
-#
-#        nz_str = f"{past(FILAMENT_POS_LOADED)} Nz]"
-#
-#        summary = (
-#            " {5}{4}LOADED{0}{6}"
-#            if self.filament_pos == FILAMENT_POS_LOADED
-#            else " {5}{4}UNLOADED{0}{6}"
-#            if self.filament_pos == FILAMENT_POS_UNLOADED
-#            else " {5}{2}UNKNOWN{0}{6}"
-#            if self.filament_pos == FILAMENT_POS_UNKNOWN
-#            else ""
-#        )
-#
-#        encoder_str = (
-#            " {1}(e:%.1fmm){0}" % self.get_encoder_distance(dwell=None)
-#            if self.has_encoder() and self.mmu_unit().p.encoder_move_validation
-#            else ""
-#        )
-#        counter = " {5}%.1fmm{6}%s" % (self.drive().get_filament_position(), encoder_str)
-#
-#        return "".join(
-#            (
-#                t_str,
-#                g_str,
-#                lg_str,
-#                gs_str,
-#                en_str,
-#                bowden1,
-#                bowden2,
-#                es_str,
-#                ex_str,
-#                ts_str,
-#                nz_str,
-#                summary,
-#                counter,
-#            )
-#        )
 
 
     # Fun visual display of current filament position. This closely
     # matches the display in KlipperScreen
-    def get_filament_position_string(self, color=False, bold=False):
+    def get_filament_position_string(self):
+        bold = self.p.console_show_bold_filament
+        color = self.p.console_show_filament_color
+
         tool = self.tool_selected
         gate = self.gate_selected
         pos = self.filament_pos
         direction = self.filament_direction
-        gate_color = MmuColorUtils.color_to_rgb_hex(self.gate_color[gate], "FFFFFF")
         gate_homing_endstop = self.mmu_unit().p.gate_homing_endstop
 
-        space = UI_DOTTED_LINE
-        gate_mark = UI_GATE_MARK
-        empty_sensor = UI_SENSOR_EMPTY
-        trig_sensor = UI_SENSOR_TRIGGERED
+        status = self.get_status(0)
+        if status['filament_remaining']:
+            residual_filament_color = status['filament_remaining_color']
+        else:
+            residual_filament_color = ""
+
+        space         = UI_DOTTED_LINE
+        gate_mark     = UI_GATE_MARK
+        empty_sensor  = UI_SENSOR_EMPTY
+        trig_sensor   = UI_SENSOR_TRIGGERED
+        residual_line = UI_LINE_LIGHT_DOUBLE
 
         if bold:
             home, line, arrow = (
@@ -840,12 +722,14 @@ class MmuController(MmuFilamentMovement):
         def nozzle_segment():
             if pos >= FILAMENT_POS_LOADED:
                 return arrow + home + "Nz" + arrow * 2
+            if residual_filament_color:
+                return residual_line + gate_mark + "Nz"
             return space + gate_mark + "Nz"
 
         def buffer_segment():
             t_sensor = self.sensor_manager.check_sensor(SENSOR_TENSION)
             c_sensor = self.sensor_manager.check_sensor(SENSOR_COMPRESSION)
-            sf_status = self.mmu_unit().sync_feedback.get_status(0)
+            sf_status = self.get_status(0)
             sf_state = sf_status['sync_feedback_state']
             sf_value = sf_status['sync_feedback_bias_modelled']
 
@@ -857,10 +741,10 @@ class MmuController(MmuFilamentMovement):
             if sf_state == "compressed":
                 sf_char = "C"
             if sf_state == "tension":
-                return "T"
+                sf_char = "T"
             if sf_state == "neutral":
-                if self.has_sensor(SENSOR_PROPORTIONAL) and sf_value is not None:
-                    return f"[{f'{value:.1f}'.center(5)}]"
+                if self.sensor_manager.has_sensor(SENSOR_PROPORTIONAL) and sf_value is not None:
+                    return f"[{f'{sf_value:.1f}'.center(5)}]"
                 sf_char = "N"
 
             if c_sensor:
@@ -869,14 +753,13 @@ class MmuController(MmuFilamentMovement):
                 return f" [{UI_ARROW_HOLLOW_LEFT}{sf_char}{UI_ARROW_HOLLOW_RIGHT}] "
             return f" [ {sf_char} ] "
 
-        def _color_filament(text, *chars):
+        def _color_filament(text, rgb_hex, *chars):
             if not self.gate_color[gate]:
                 return text
 
             chars = set(chars)
             result = []
             in_markup = False
-            rgb_hex = MmuColorUtils.color_to_rgb_hex(self.gate_color[gate], "FFFFFF")
             rgb_start = '{{%s}}' % rgb_hex
             rgb_end   = '{{}}'
 
@@ -975,8 +858,20 @@ class MmuController(MmuFilamentMovement):
         if last_arrow != -1 and (last_home == -1 or not bold):
             visual = visual[:last_arrow] + arrow + visual[last_arrow + 1:]
 
+        # Post process filament color
         if color and gate >= 0:
-            visual = _color_filament(visual, line)
+            if residual_filament_color:
+                rgb_hex = MmuColorUtils.color_to_rgb_hex(residual_filament_color)
+                visual = _color_filament(visual, rgb_hex, residual_line)
+            else:
+                # No special color treatment
+                visual = visual.replace(residual_line, line)
+
+            rgb_hex = MmuColorUtils.color_to_rgb_hex(self.gate_color[gate], "FFFFFF")
+            visual = _color_filament(visual, rgb_hex, line)
+
+            # Get rid of special residual filament character
+            visual = visual.replace(residual_line, line)
 
         return visual
 
@@ -1023,7 +918,7 @@ class MmuController(MmuFilamentMovement):
         """
         show_letter = (
             show_letter and
-            self.mmu_unit(gate).p.has_filament_buffer and
+            self.mmu_unit(gate).has_filament_buffer() and
             not self.has_espooler(gate)
         )
         gate_status = self.gate_status[gate]
@@ -2340,7 +2235,7 @@ class MmuController(MmuFilamentMovement):
         self.gate_maps.ensure_ttg_match()
         if not quiet:
             msg = self._mmu_visual_to_string()
-            msg += "\n%s" % self.get_filament_position_string(color=True)
+            msg += "\n%s" % self.get_filament_position_string()
             self.log_info(msg, color=True)
 
 

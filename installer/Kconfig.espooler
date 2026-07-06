@@ -49,8 +49,6 @@ if MMU_HAS_ESPOOLER
           prompt "eSpooler trigger $(i) pin"
       endif
     @endrepeat@
+
   endmenu
-
-  comment "_"
-
 endif

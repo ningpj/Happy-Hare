@@ -1,10 +1,10 @@
 # Speed settings for gear stepper, selector stepper and extruder movement
 #
 # Responsible for setting:
+#   PARAM_GEAR_LOAD_SPEED
+#   PARAM_GEAR_LOAD_ACCEL
 #   PARAM_GEAR_FROM_FILAMENT_BUFFER_SPEED
 #   PARAM_GEAR_FROM_FILAMENT_BUFFER_ACCEL
-#   PARAM_GEAR_FROM_SPOOL_SPEED
-#   PARAM_GEAR_FROM_SPOOL_ACCEL
 #   PARAM_GEAR_UNLOAD_SPEED
 #   PARAM_GEAR_UNLOAD_ACCEL
 #   PARAM_GEAR_HOMING_SPEED
@@ -35,29 +35,32 @@ menu "Speeds"
 
     comment "_Bowden movement speeds (mm/s)"
 
-    config PARAM_GEAR_FROM_FILAMENT_BUFFER_SPEED
+    config PARAM_GEAR_LOAD_SPEED
       float "Normal bowden load speed        "
-      default 150
-      help
-        Speed for normal filament loading (or from filament buffer if fitted)
-
-    config PARAM_GEAR_FROM_FILAMENT_BUFFER_ACCEL
-      float "Normal bowden load acceleration "
-      default 400
-
-    config PARAM_GEAR_FROM_SPOOL_SPEED
-      float "Loading from spool speed        "
-      default 80
-      depends on MMU_HAS_FILAMENT_BUFFER
-      help
-        Fast speed when loading filament from the spool and the filament is not yet buffered
-        (first time load). This can be helpful in allowing a slower than normal speed to overcome
-        friction without the stepper loosing steps
-
-    config PARAM_GEAR_FROM_SPOOL_ACCEL
-      float "Loading from spool acceleration "
-      depends on MMU_HAS_FILAMENT_BUFFER
       default 100
+      help
+        This is the default bowden load speed for long movements.
+        On systems with buffer that catches loose filament this can be used to
+        set a lower speed (for first time load) to overcome friction without
+        the stepper loosing steps
+
+    config PARAM_GEAR_LOAD_ACCEL
+      float "Normal load acceleration        "
+      default 100
+      help
+        Default bowden load accelaration for long movements.
+
+    if MMU_HAS_FILAMENT_BUFFER
+      config PARAM_GEAR_FROM_FILAMENT_BUFFER_SPEED
+        float "From filament buffer load speed "
+        default 150
+        help
+          High speed for normal filament loading (or from filament buffer if fitted)
+
+      config PARAM_GEAR_FROM_FILAMENT_BUFFER_ACCEL
+        float "From buffer load accelaration   "
+        default 400
+    endif
 
     config PARAM_GEAR_UNLOAD_SPEED
       float "Normal bowden unload speed      "

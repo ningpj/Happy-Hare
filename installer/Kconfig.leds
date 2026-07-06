@@ -57,59 +57,72 @@ if MMU_HAS_LEDS
       default "True" if BOOL_ENABLE_LEDS_ANIMATION
       default "False"
 
-    config PARAM_CHAIN_COUNT
-      int "Chain count     "
-      default PARAM_NUM_GATES
-
-    config PARAM_COLOR_ORDER
-      string "Color order     "
-      default "GRBW"
-
     config PARAM_EXIT_LEDS
       string
-
-    config PARAM_EXIT_LEDS
-      string "Exit leds       "
-      generated_default "neopixel:$(UNIT_NAME)_gate{iter}_leds (1-%d)" "PARAM_NUM_GATES" "; " 0 PARAM_NUM_GATES if MMU_HAS_PER_GATE_MCU
-      generated_default "neopixel:$(UNIT_NAME)_leds (1-%d)" "PARAM_NUM_GATES"
+      default ""
 
     config PARAM_ENTRY_LEDS
-      string "Entry leds      "
+      string
       default ""
 
     config PARAM_STATUS_LEDS
-      string "Status leds     "
+      string
       default ""
 
     config PARAM_LOGO_LEDS
-      string "Logo leds       "
+      string
       default ""
 
-    config PIN_NEOPIXEL
-      prompt "Neopixel pin    " if MMU_HAS_LEDS && !MMU_HAS_PER_GATE_MCU
+    if !CUSTOM_LED_SETUP
 
-    menu "Neopixel per-gate pins" 
-      depends on MMU_HAS_LEDS && MMU_HAS_PER_GATE_MCU
+      config PARAM_CHAIN_COUNT
+        int "Chain count     "
+        default PARAM_NUM_GATES
 
-      @repeat var=i min=0 max=11@
-        config PIN_NEOPIXEL_$(i)
-          string
-          prompt "Neopixel gate $(i) pin" if PARAM_NUM_GATES > $(i)
-      @endrepeat@
-    endmenu
+      config PARAM_COLOR_ORDER
+        string "Color order     "
+        default "GRBW"
 
-    menu "Neopixel per-gate box pins" 
-      depends on MMU_HAS_LEDS && MMU_HAS_PER_GATE_MCU
+      config PARAM_EXIT_LEDS
+        prompt "Exit leds       "
+        generated_default "neopixel:$(UNIT_NAME)_gate{iter}_leds (1-%d)" "PARAM_NUM_GATES" "; " 0 PARAM_NUM_GATES if MMU_HAS_PER_GATE_MCU
+        generated_default "neopixel:$(UNIT_NAME)_leds (1-%d)" "PARAM_NUM_GATES"
 
-      @repeat var=i min=0 max=11@
-        config PIN_NEOPIXEL_BOX_$(i)
-          string
-          prompt "Neopixel box gate $(i) pin" if PARAM_NUM_GATES > $(i)
-      @endrepeat@
-    endmenu
+      config PARAM_ENTRY_LEDS
+        prompt "Entry leds      "
+
+      config PARAM_STATUS_LEDS
+        prompt "Status leds     "
+
+      config PARAM_LOGO_LEDS
+        prompt "Logo leds       "
+
+      config PIN_NEOPIXEL
+        prompt "Neopixel pin    " if MMU_HAS_LEDS && !MMU_HAS_PER_GATE_MCU
+
+      menu "Neopixel per-gate pins" 
+        depends on MMU_HAS_LEDS && MMU_HAS_PER_GATE_MCU
+
+        @repeat var=i min=0 max=11@
+          config PIN_NEOPIXEL_$(i)
+            string
+            prompt "Neopixel gate $(i) pin" if PARAM_NUM_GATES > $(i)
+        @endrepeat@
+      endmenu
+
+      # Hack to special case SLB v1 board wiring with EMU
+      menu "Neopixel per-gate box pins" 
+        depends on MMU_HAS_LEDS && MMU_HAS_PER_GATE_MCU && PARAM_VENDOR = "EMU" && PARAM_BOARD_TYPE = "SLB v1"
+
+        @repeat var=i min=0 max=11@
+          config PIN_NEOPIXEL_BOX_$(i)
+            string
+            prompt "Neopixel box gate $(i) pin" if PARAM_NUM_GATES > $(i)
+        @endrepeat@
+      endmenu
+
+    endif
+
   endmenu
-
-  comment "_"
-
 endif
 

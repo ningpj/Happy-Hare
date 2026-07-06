@@ -291,14 +291,14 @@ if [ -r "${KCONFIG_CONFIG}" ] && [ -n "${F_MENUCONFIG:-}" ]; then
     echo
     echo "${C_WARNING}2) Replace (select 2)${C_OFF}"
     echo "   This will OVERWRITE changes made directly to your .cfg files and create new default"
-    echo "   configuration based on choices made in menuconfig. It is useful if you get into"
-    echo "   trouble and want to reset your starting position. It is also great if you make ALL"
-    echo "   your configuration changes via menuconfig"
+    echo "   configuration based on choices made in menuconfig (which initializes to your previous config)."
+    echo "   This is RECOMMENDED if you make ALL your configuration changes via menuconfig. It is also"
+    echo "   useful if you get into trouble and want to reset your starting position or change MMU."
     echo
     echo "${C_WARNING}3) Merge (select 3)${C_OFF}"
-    echo "   This will MERGE simple parameter values set in menuconfig but will retain other changes"
-    echo "   made directly in your .cfg files. This is useful if you manage most parameters via menuconfig"
-    echo "   but don't want to, for example, overwrite your carefully tweaked hardware configuration"
+    echo "   This will MERGE simple parameter values set in menuconfig but will retain other changes made"
+    echo "   directly to your .cfg files. This is useful if you manage most parameters via menuconfig but"
+    echo "   don't want, for example, to accidentally overwrite your carefully tweaked hardware configuration"
     echo
     echo "(Note that in all cases a BACKUP of your existing .cfg files will be made for reference)"
     echo

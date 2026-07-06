@@ -95,12 +95,13 @@ class MmuUnit:
             require_bowden_move: bool = True         # Does design require "bowden move" (i.e. non zero length bowden)
             filament_always_gripped: bool = False    # Is filament always gripped by MMU (overrides gear/extruder syncing assumptions)
             show_bypass: bool = False                # Does design has selectable filament bypass (only type-A and type-C). Only one allowed per mmu_machine!
+            filament_buffer: bool = False            # Does design has buffer to catch loose filament on rewind (allows for faster loading speeds)
 
         DEF_PROFILE = MmuUnitProfile()
 
         VENDOR_PROFILES = {
-            VENDOR_ERCF:         replace(DEF_PROFILE, selector_type=SELECTOR_LINEAR_SERVO, show_bypass=True),
-            VENDOR_TRADRACK:     replace(DEF_PROFILE, selector_type=SELECTOR_LINEAR_SERVO, variable_rotation_distances=False),
+            VENDOR_ERCF:         replace(DEF_PROFILE, selector_type=SELECTOR_LINEAR_SERVO, show_bypass=True, filament_buffer=True),
+            VENDOR_TRADRACK:     replace(DEF_PROFILE, selector_type=SELECTOR_LINEAR_SERVO, variable_rotation_distances=False, filament_buffer=True),
             VENDOR_ANGRY_BEAVER: replace(DEF_PROFILE, require_bowden_move=False, filament_always_gripped=True),
             VENDOR_BOX_TURTLE:   replace(DEF_PROFILE, filament_always_gripped=True),
             VENDOR_NIGHT_OWL:    replace(DEF_PROFILE, filament_always_gripped=True),
@@ -128,6 +129,7 @@ class MmuUnit:
         self.require_bowden_move =         bool(config.getint('require_bowden_move', profile.require_bowden_move))
         self.filament_always_gripped =     bool(config.getint('filament_always_gripped', profile.filament_always_gripped))
         self.show_bypass =                 bool(config.getint('show_bypass', profile.show_bypass))
+        self.filament_buffer =             bool(config.getint('filament_buffer', profile.filament_buffer))
 
         # Can selector mechanism allow selection of other gates on unit when filament is loaded
         self.can_crossload = self.selector_type in [SELECTOR_VIRTUAL, SELECTOR_SERVO, SELECTOR_INDEXED, SELECTOR_MACRO, SELECTOR_ROTARY]
@@ -613,6 +615,9 @@ class MmuUnit:
     def has_bypass(self):
         return self.show_bypass
 
+    def has_filament_buffer(self):
+        return self.filament_buffer
+
     def motors_onoff(self, on=False, motor="all"):
         if motor in ["all", "gear", "gears"]:
             drives = self.drives if motor == "gears" else [self.drives[0]]
@@ -869,6 +874,7 @@ class MmuUnit:
             'has_bypass': self.show_bypass,
             'can_crossload': self.can_crossload,
             'multi_gear': self.multigear,
+            'filament_buffer': self.filament_buffer,
         }
 
         if self.environment_sensor or self.filament_heater:

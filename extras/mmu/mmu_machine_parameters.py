@@ -74,7 +74,8 @@ class MmuMachineParameters(TunableParametersBase):
         ParamSpec('post_form_tip_macro',           'str',   '_MMU_POST_FORM_TIP',      section="MACROS"),
         ParamSpec('post_unload_macro',             'str',   '_MMU_POST_UNLOAD',        section="MACROS"),
         ParamSpec('pre_load_macro',                'str',   '_MMU_PRE_LOAD',           section="MACROS"),
-        ParamSpec('post_load_macro',               'str',   '_MMU_POST_LOAD_MACRO',    section="MACROS"),
+        ParamSpec('post_load_macro',               'str',   '_MMU_POST_LOAD',           section="MACROS"),
+        ParamSpec('post_preload_macro',            'str',   '_MMU_POST_PRELOAD',        section="MACROS"),
         ParamSpec('unload_sequence_macro',         'str',   '_MMU_UNLOAD_SEQUENCE',    section="MACROS", hidden=True),
         ParamSpec('load_sequence_macro',           'str',   '_MMU_LOAD_SEQUENCE',      section="MACROS", hidden=True),
 
@@ -140,8 +141,9 @@ class MmuMachineParameters(TunableParametersBase):
         ParamSpec('console_always_output_full',    'int',      1, section="CONSOLE", limits=dict(minval=0, maxval=1)),
 
         # Turn off splash bling for boring people
-        ParamSpec('console_show_colored_text',     'int',      1, section="CONSOLE", limits=dict(minval=0, maxval=1), hidden=True),
-        ParamSpec('console_show_filament_color',   'int',      1, section="CONSOLE", limits=dict(minval=0, maxval=1), hidden=True),
+        ParamSpec('console_show_colored_text',     'int',      1, section="CONSOLE", limits=dict(minval=0, maxval=1)),
+        ParamSpec('console_show_filament_color',   'int',      1, section="CONSOLE", limits=dict(minval=0, maxval=1)),
+        ParamSpec('console_show_bold_filament',    'int',      1, section="CONSOLE", limits=dict(minval=0, maxval=1)),
 
         # Build tuples of drying temp / drying time indexed by filament type
         # Stored as a string in config and parsed into a dict in _post_load_fixups()

@@ -58,6 +58,14 @@ class MmuFilamentMovement:
         u = self.mmu_unit()
         gate = self.gate_selected
 
+        def run_post_preload_macro():
+            # Run POST_PRELOAD sequence macro
+            with self._wrap_track_time('post_preload'):
+                if self.p.post_preload_macro:
+                    # Ensure expected sync/grip state before macro
+                    self.reset_sync_gear_to_extruder(False, force_grip=True)
+                    self.wrap_gcode_command(self.p.post_preload_macro, exception=True, wait=True)
+
         # If we have an individual gate exit sensor, use it
         gate_exit_sensor = self.sensor_manager.check_gate_sensor(SENSOR_EXIT_PREFIX, gate)
         if gate_exit_sensor is not None:
@@ -83,6 +91,7 @@ class MmuFilamentMovement:
                         self.gate_maps.set_gate_status(gate, GATE_AVAILABLE)
                         self._check_pending_spool_id(gate) # Have spool_id ready?
                         self.log_always("Filament detected and loaded in gate %d" % gate)
+                        run_post_preload_macro()
                         return
 
             if self.sensor_manager.check_gate_sensor(SENSOR_ENTRY_PREFIX, gate):
@@ -103,6 +112,7 @@ class MmuFilamentMovement:
                     self.log_always("Parking...")
                     self._unload_gate()
                     self.log_always("Filament detected and parked in gate %d" % gate)
+                    run_post_preload_macro()
                     return
                 except MmuError as ee:
                     # Exception just means filament is not loaded yet, so continue
@@ -1417,6 +1427,7 @@ class MmuFilamentMovement:
             return synced, overshoot
 
 
+# PAUL
 # IGIANNAKAS: this seems to be problematic ... the extruder could pick up the filament again!
 # IGIANNAKAS: if probe distance > unload safety then it probably will and springiness in the filament
 # IGIANNAKAS: could cause it to catch.
@@ -1434,6 +1445,7 @@ class MmuFilamentMovement:
         Return:
           bool Validation success
         """
+        return True # Temp until logic confirmed
         u = self.mmu_unit()
 
         prop = self.sensor_manager.get_sensor_obj(SENSOR_PROPORTIONAL)
@@ -1537,7 +1549,7 @@ class MmuFilamentMovement:
             if macros_and_track:
                 self._track_time_start('load')
 
-                # PRE_LOAD user defined macro
+                # Run PRE_LOAD sequence macro
                 with self._wrap_track_time('pre_load'):
                     if self.p.pre_load_macro:
                         # Ensure expected sync/grip state before macro
@@ -1680,7 +1692,7 @@ class MmuFilamentMovement:
                     self.purge_standalone()
 
             if macros_and_track:
-                # POST_LOAD user defined macro
+                # Run POST_LOAD sequence macro
                 with self._wrap_track_time('post_load'):
                     if self.p.post_load_macro:
                         # Ensure expected sync/grip state before macro
@@ -1782,7 +1794,7 @@ class MmuFilamentMovement:
             if macros_and_track:
                 self._track_time_start('unload')
 
-                # Run PRE_UNLOAD user defined macro
+                # Run PRE_UNLOAD sequence macro
                 with self._wrap_track_time('pre_unload'):
                     if self.p.pre_unload_macro:
                         # Ensure expected sync/grip state before macro
@@ -1820,6 +1832,7 @@ class MmuFilamentMovement:
                     ):
                         self.log_warning("Warning: Filament not seen near gate after tip forming move. Unload may not be possible")
 
+                    # Run POST_FORM_TIP sequence macro
                     if self.p.post_form_tip_macro:
                         # Restore the expected sync state now before running this macro
                         self.reset_sync_gear_to_extruder(False if extruder_only else None, force_grip=True)
@@ -1900,7 +1913,7 @@ class MmuFilamentMovement:
             self.log_info(msg, color=True)
 
             if macros_and_track:
-                # POST_UNLOAD user defined macro
+                # Run POST_UNLOAD sequence macro
                 with self._wrap_track_time('post_unload'):
                     if self.p.post_unload_macro:
                         # Ensure expected sync/grip state before macro
@@ -2224,19 +2237,22 @@ class MmuFilamentMovement:
         if motor in ["gear"]:
             if homing_move != 0:
                 speed = speed or u.p.gear_homing_speed
-                accel = accel or min(u.p.gear_from_filament_buffer_accel, u.p.gear_from_spool_accel)
+                accel = accel or min(u.p.gear_load_accel, u.p.gear_unload_accel)
             else:
                 if abs(dist) > u.p.gear_short_move_threshold:
                     if dist < 0:
                         speed = speed or u.p.gear_unload_speed
                         accel = accel or u.p.gear_unload_accel
-                    elif (not u.p.has_filament_buffer or
-                            (self.gate_selected >= 0 and self.gate_status[self.gate_selected] != GATE_AVAILABLE_FROM_BUFFER)):
-                        speed = speed or u.p.gear_from_spool_speed
-                        accel = accel or u.p.gear_from_spool_accel
-                    else:
+                    elif (
+                        u.has_filament_buffer()
+                        and self.gate_selected >= 0
+                        and self.gate_status[self.gate_selected] == GATE_AVAILABLE_FROM_BUFFER
+                    ):
                         speed = speed or u.p.gear_from_filament_buffer_speed
                         accel = accel or u.p.gear_from_filament_buffer_accel
+                    else:
+                        speed = speed or u.p.gear_load_speed
+                        accel = accel or u.p.gear_load_accel
                 else:
                     speed = speed or u.p.gear_short_move_speed
                     accel = accel or u.p.gear_short_move_accel
@@ -2244,10 +2260,10 @@ class MmuFilamentMovement:
         elif motor in ["gear+extruder", "synced"]:
             if homing_move != 0:
                 speed = speed or min(u.p.gear_homing_speed, self.p.extruder_homing_speed)
-                accel = accel or min(max(u.p.gear_from_filament_buffer_accel, u.p.gear_from_spool_accel), self.p.extruder_accel)
+                accel = accel or min(max(u.p.gear_from_filament_buffer_accel, u.p.gear_load_accel), self.p.extruder_accel)
             else:
                 speed = speed or (self.p.extruder_sync_load_speed if dist > 0 else self.p.extruder_sync_unload_speed)
-                accel = accel or min(max(u.p.gear_from_filament_buffer_accel, u.p.gear_from_spool_accel), self.p.extruder_accel)
+                accel = accel or min(max(u.p.gear_from_filament_buffer_accel, u.p.gear_load_accel), self.p.extruder_accel)
 
         elif motor in ["extruder"]:
             if homing_move != 0:

@@ -81,28 +81,19 @@ class MmuEndlessSpoolCommand(BaseCommand):
                 mmu.var_manager.set(VARS_MMU_ENABLE_ENDLESS_SPOOL, enabled, write=True)
 
         if groups is not None:
-            raw_groups = [group.strip() for group in groups.split(",")]
-
-            if len(raw_groups) != mmu.num_gates:
-                mmu.log_error(
-                    f"The number of group values ({len(raw_groups)}) does not match "
-                    f"the number of gates ({mmu.num_gates})"
-                )
-                return
-
             try:
-                parsed_groups = [int(group) for group in raw_groups]
+                parsed_groups = [int(g.strip()) for g in groups.split(",")]
             except ValueError:
-                mmu.log_error(
-                    f"Invalid GROUPS value: {groups!r}. "
-                    "Expected comma-separated integers."
-                )
-                return
+                parsed_groups = None
 
-            if any(group < 0 for group in parsed_groups):
+            if (
+                parsed_groups is None
+                or len(parsed_groups) != mmu.num_gates
+                or any(g < 0 for g in parsed_groups)
+            ):
                 mmu.log_error(
                     f"Invalid GROUPS value: {groups!r}. "
-                    "Group values must be non-negative integers."
+                    f"Expected {mmu.num_gates} comma-separated non-negative integers."
                 )
                 return
 
