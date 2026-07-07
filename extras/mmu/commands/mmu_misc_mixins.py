@@ -196,9 +196,9 @@ class MoveMixin:
             mmu.log_debug("Homing '%s' motor to '%s' endstop, up to %.1fmm..." % (motor, endstop_name, move))
             return mmu.move_filament(trace_str, move, speed=speed, accel=accel, motor=motor, homing_move=stop_on_endstop, endstop_name=endstop_name)
 
-       finally:
-           if compound_endstop is not None:
-               drive_stepper.rail.remove_compound_endstop(endstop_name)
+        finally:
+            if compound_endstop is not None:
+                drive_stepper.rail.remove_compound_endstop(endstop_name)
 
 
 class LedMixin:

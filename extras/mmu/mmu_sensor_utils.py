@@ -411,7 +411,8 @@ class MmuVirtualEndstopSensor(MmuSensor):
 
 
     def add_stepper(self, stepper):
-        self._steppers.append(stepper)
+        if stepper not in self._steppers:
+            self._steppers.append(stepper)
 
 
     def get_steppers(self):
@@ -501,9 +502,8 @@ class MmuCompoundEndstop:
 
 
     def add_stepper(self, stepper):
-        self._steppers.append(stepper)
-        for es in self.endstops:
-            es.add_stepper(stepper)
+        if stepper not in self._steppers:
+            self._steppers.append(stepper)
 
 
     def get_steppers(self):

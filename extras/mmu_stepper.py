@@ -315,13 +315,10 @@ class MmuGenericRail:
 
             MmuGenericRail.record_mcu_endstop(mcu_endstop, name)
 
-        logging.info(f"PAUL: HERE, mcu_endstop={mcu_endstop}")
         if (mcu_endstop, name) not in self.extra_endstops:
-            logging.info(f"PAUL: HERE, extra_endstops.append({mcu_endstop}, {name})")
             self.extra_endstops.append((mcu_endstop, name))
 
         if bind_steppers:
-            logging.info(f"PAUL: binding stepers")
             self.bind_stepper(mcu_endstop, name)
 
         if register:
