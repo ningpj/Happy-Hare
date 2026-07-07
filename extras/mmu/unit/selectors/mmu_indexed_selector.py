@@ -211,7 +211,7 @@ class IndexedSelector(PhysicalSelector):
         if not endstop:
             raise MmuError(f"Extra endstop {name} not defined on the selector stepper")
 
-        mcu_endstop = endstop[0][0]
+        mcu_endstop = endstop[0]
         return mcu_endstop.query_endstop(self.mmu.toolhead.get_last_move_time())
 
 
@@ -300,7 +300,7 @@ class IndexedSelector(PhysicalSelector):
 
         if homing_move != 0:
             # Check for valid endstop
-            endstops = self.selector_stepper.rail.get_endstops() if endstop_name is None else self.selector_stepper.rail.get_extra_endstop(endstop_name)
+            endstops = self.selector_stepper.rail.get_endstops() if endstop_name is None else [self.selector_stepper.rail.get_extra_endstop(endstop_name)]
             if endstops is None:
                 self.mmu.log_error("Endstop '%s' not found" % endstop_name)
                 return pos, False

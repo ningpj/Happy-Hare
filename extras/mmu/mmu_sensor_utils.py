@@ -195,6 +195,9 @@ class MmuRunoutHelper:
 
 
     def _process_state_change(self, eventtime, is_filament_present):
+        if not self.gcodes:
+            return # No actions to take
+
         # Determine "printing" status
         print_stats = self.printer.lookup_object("print_stats", None)
         if print_stats is not None:
@@ -435,4 +438,139 @@ class MmuVirtualEndstopSensor(MmuSensor):
         if self._last_trigger_time is None:
             raise self.printer.command_error("No trigger on %s after full movement" % self.name)
 
+        return self._last_trigger_time
+
+
+
+# -----------------------------------------------------------------------------------------------------------
+# Compound endstop wrapper. Allows homing against multiple virtual endstops and an optional
+# MCU endstop, triggering on the first to activate while recording the source of the trigger.
+# Presents a standard Klipper endstop interface for transparent use during homing.
+# -----------------------------------------------------------------------------------------------------------
+
+class MmuCompoundEndstop:
+    def __init__(self, printer, name, endstops):
+        self._printer = printer
+        self.name = name
+
+        self.endstops = []
+        self.endstop_names = {}
+        self.virtual_endstops = []
+        self.mcu_endstop = None
+
+        if not endstops:
+            raise self._printer.command_error(
+                "No endstops specified for %s" % self.name
+            )
+
+        for endstop_tuple in endstops:
+            endstop, endstop_name = endstop_tuple
+
+            self.endstops.append(endstop)
+            self.endstop_names[endstop] = endstop_name
+
+            if endstop.__class__.__name__ == "MCU_endstop":
+                if self.mcu_endstop is not None:
+                    raise self._printer.command_error(
+                        "Only one MCU endstop may be specified for %s" % self.name
+                    )
+                self.mcu_endstop = endstop
+            else:
+                self.virtual_endstops.append(endstop)
+
+        self._steppers = []
+        self._trigger_completion = None
+        self._triggered_endstop = None
+        self._last_trigger_time = None
+        self._homing = False
+
+
+    def get_triggered_endstop_name(self):
+        if self._triggered_endstop is None:
+            return None
+        return self.endstop_names.get(self._triggered_endstop)
+
+
+    # Interface required to implement an endstop ----------------------------------
+
+    def setup_pin(self, pin_type, pin_name):
+        # Important: real MCU endstops need Klipper's normal setup path.
+        if self.mcu_endstop is not None:
+            self.mcu_endstop.setup_pin(pin_type, pin_name)
+        return self
+
+
+    def add_stepper(self, stepper):
+        self._steppers.append(stepper)
+        for es in self.endstops:
+            es.add_stepper(stepper)
+
+
+    def get_steppers(self):
+        if self.mcu_endstop is not None:
+            return self.mcu_endstop.get_steppers()
+        return list(self._steppers)
+
+
+    def query_endstop(self, print_time):
+        return any(es.query_endstop(print_time) for es in self.endstops)
+
+
+    def home_start(self, print_time, sample_time, sample_count, rest_time, triggered):
+        reactor = self._printer.get_reactor()
+
+        self._trigger_completion = reactor.completion()
+        self._triggered_endstop = None
+        self._last_trigger_time = None
+        self._homing = True
+
+        for es in self.endstops:
+            child_completion = es.home_start(
+                print_time, sample_time, sample_count, rest_time, triggered
+            )
+            reactor.register_callback(
+                lambda eventtime, es=es, c=child_completion:
+                    self._wait_for_child_endstop(es, c)
+            )
+
+        return self._trigger_completion
+
+
+    def _wait_for_child_endstop(self, endstop, child_completion):
+        try:
+            child_completion.wait()
+        except Exception:
+            return
+
+        if not self._homing:
+            return
+
+        if self._triggered_endstop is None:
+            self._triggered_endstop = endstop
+            self._trigger_completion.complete(True)
+
+
+    def home_wait(self, home_end_time):
+        self._homing = False
+        self._trigger_completion = None
+
+        trigger_time = None
+        trigger_error = None
+
+        for es in self.endstops:
+            try:
+                es_trigger_time = es.home_wait(home_end_time)
+            except Exception as e:
+                trigger_error = e
+                continue
+
+            if es is self._triggered_endstop:
+                trigger_time = es_trigger_time
+
+        if self._triggered_endstop is None:
+            if trigger_error is not None:
+                raise trigger_error
+            raise self._printer.command_error("No trigger on %s after full movement" % self.name)
+
+        self._last_trigger_time = trigger_time or home_end_time
         return self._last_trigger_time

@@ -146,6 +146,9 @@ class MmuDrive():
 
 
     def get_endstop(self, endstop_name):
+        """
+        Returns just the endstop obj. Not (endstop, name) tuple
+        """
         endstop, _ = self._driving_stepper.rail.get_homing_endstops(endstop_name)[0]
         return endstop
 

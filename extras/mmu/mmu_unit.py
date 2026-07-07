@@ -453,6 +453,7 @@ class MmuUnit:
                     [self.sensors.shared_exit_sensor],
                     [self.buffer.compression_sensor] if self.buffer else [],
                     [self.buffer.tension_sensor] if self.buffer else [],
+                    [self.encoder.endstop_sensor] if self.encoder else [],
                     (self.toolhead_wrapper.sensors or {}).values(),
                 )
 
@@ -521,7 +522,7 @@ class MmuUnit:
                     mcu_endstop = add_sensor_endstop(sensor, [ext])
                 else:
                     # Already exists
-                    mcu_endstop = es[0][0]
+                    mcu_endstop = es[0]
 
                 # Now just bind gear steppers to same endstop
                 for s in steppers:

@@ -315,16 +315,40 @@ class MmuGenericRail:
 
             MmuGenericRail.record_mcu_endstop(mcu_endstop, name)
 
+        logging.info(f"PAUL: HERE, mcu_endstop={mcu_endstop}")
         if (mcu_endstop, name) not in self.extra_endstops:
+            logging.info(f"PAUL: HERE, extra_endstops.append({mcu_endstop}, {name})")
             self.extra_endstops.append((mcu_endstop, name))
 
         if bind_steppers:
+            logging.info(f"PAUL: binding stepers")
             self.bind_stepper(mcu_endstop, name)
 
         if register:
             self.query_endstops.register_endstop(mcu_endstop, name)
 
         return mcu_endstop
+
+
+    def add_compound_endstop(self, name, c_endstop):
+        """
+        Special use case to combine endstops (only one can be an MCU_endstop)
+        for creative homing moves like homing to RFID sensor or home switch sensor
+        at the same time
+        """
+        self.extra_endstops.append((c_endstop, name))
+        c_endstop.add_stepper(self.stepper)
+
+
+    def remove_compound_endstop(self, name):
+        """
+        Clean up temporary named compound endstop
+        """
+        for i, (_, endstop_name) in enumerate(self.extra_endstops):
+            if endstop_name == name:
+                del self.extra_endstops[i]
+                return True
+        return False
 
 
     def bind_stepper(self, mcu_endstop, name):
@@ -347,9 +371,12 @@ class MmuGenericRail:
 
 
     def get_extra_endstop(self, name):
+        """
+        Returns tuple (endstop, name)
+        """
         for x in self.extra_endstops:
             if x[1] == name:
-                return [x]
+                return x
         return None
 
 
@@ -358,6 +385,9 @@ class MmuGenericRail:
 
 
     def get_homing_endstops(self, endstop_name=None):
+        """
+        Returns list of tuples [(endstop, name), (endstop, name), ...]
+        """
         if endstop_name in (None, "", "default"):
             if self.default_mcu_endstop is None:
                 raise self.printer.command_error("No default endstop configured for rail '%s'" % (self.get_name(short=True),))
@@ -365,7 +395,7 @@ class MmuGenericRail:
 
         extra = self.get_extra_endstop(endstop_name)
         if extra is not None:
-            return extra
+            return [extra]
 
         valid = self.get_extra_endstop_names()
         if self.default_mcu_endstop is not None:
@@ -1234,7 +1264,7 @@ class MmuStepper(ExtruderStepper):
                     for name in names:
                         is_virtual = self.rail.is_endstop_virtual(name)
                         estop = self.rail.get_extra_endstop(name)
-                        estop_obj = estop[0][0] if estop else None
+                        estop_obj = estop[0] if estop else None
                         if estop_obj:
                             estop_type = estop_obj.__class__.__name__
                             estop_pin = getattr(estop_obj, "_pin", "unknown")
