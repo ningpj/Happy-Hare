@@ -33,6 +33,7 @@ class MmuTestHomingMoveCommand(MoveMixin, BaseCommand):
         + "ALLOW_BYPASS = [0|1]  Ignore bypass check\n"
         + "MOVE         = mm     Specify the move distance (default 100)\n"
         + "ENDSTOP      = _endstop_name_\n"
+        + "ENDSTOPS     = Comma separated list of endstops (only physical switch endstop possible)\n"
         + "STOP_ON_ENDSTOP = [-1|0|1] 1 for extrude, -1 for retract, 0 for don't stop\n"
         + "SPEED        = mm/s   Optionally override the default speed\n"
         + "ACCEL        = mm/s^2 Optionally override the default accelarateion\n"
@@ -66,9 +67,13 @@ class MmuTestHomingMoveCommand(MoveMixin, BaseCommand):
         with mmu.wrap_sync_gear_to_extruder():
             debug = bool(gcmd.get_int('DEBUG', 0, minval=0, maxval=1))  # Hidden option
             with DebugStepperMovement(mmu, debug):
-                actual, homed, measured, _ = self._homing_move_cmd(gcmd, "Test homing move", allow_bypass=allow_bypass) # From Mixin
+                actual, homed, measured, _, trigger = self._homing_move_cmd(gcmd, "Test homing move", allow_bypass=allow_bypass) # From Mixin
 
-            home_str = "Homed" if homed else "Did not home"
+                home_str = (
+                    f"Homed on '{trigger}'"
+                    if homed and trigger
+                    else ("Homed" if homed else "Did not home")
+                )
             measured_str = f" (measured {measured:.1f}mm)" if mmu.can_use_encoder() else ""
             mmu.log_always(f"{home_str} after {actual:.2f}mm{measured_str}")
 

@@ -194,7 +194,19 @@ class MoveMixin:
                 endstop_name = endstops[0]
             
             mmu.log_debug("Homing '%s' motor to '%s' endstop, up to %.1fmm..." % (motor, endstop_name, move))
-            return mmu.move_filament(trace_str, move, speed=speed, accel=accel, motor=motor, homing_move=stop_on_endstop, endstop_name=endstop_name)
+            result = mmu.move_filament(trace_str, move, speed=speed, accel=accel, motor=motor, homing_move=stop_on_endstop, endstop_name=endstop_name)
+
+            # Add triggered endstop to return tuple
+            moved, homed, actual, delta = result
+            if homed:
+                if compound_endstop is not None:
+                    triggered_name = compound_endstop.get_triggered_endstop_name()
+                else:
+                    triggered_name = endstop_name
+            else:
+                triggered_name = None
+
+            return moved, homed, actual, delta, triggered_name
 
         finally:
             if compound_endstop is not None:
