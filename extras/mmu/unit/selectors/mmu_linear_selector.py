@@ -617,7 +617,7 @@ class LinearSelector(PhysicalSelector):
 
         if homing_move != 0:
             # Check for valid endstop
-            endstops = self.selector_stepper.rail.get_endstops() if endstop_name is None else self.selector_stepper.rail.get_extra_endstop(endstop_name)
+            endstops = self.selector_stepper.rail.get_endstops() if endstop_name is None else [self.selector_stepper.rail.get_extra_endstop(endstop_name)]
             if endstops is None:
                 self.mmu.log_error("Endstop '%s' not found" % endstop_name)
                 return self.selector_stepper.commanded_pos, False

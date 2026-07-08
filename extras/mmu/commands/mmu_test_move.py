@@ -76,6 +76,6 @@ class MmuTestMoveCommand(MoveMixin, BaseCommand):
                 actual, _, measured, _ = self._move_cmd(gcmd, "Test move", allow_bypass=allow_bypass) # From Mixin
 
             measured_str = f" (measured {measured:.1f}mm)" if mmu.can_use_encoder() else ""
-            mmu.log_always(f"Moved {actual:.1f}mm{measured_str}")
+            mmu.log_always(f"Moved {actual:.2f}mm{measured_str}")
 
         mmu.log_always(f"Filament position: {mmu.drive().get_filament_position():.2f}")

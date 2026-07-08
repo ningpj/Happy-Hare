@@ -17,7 +17,8 @@ import logging
 from ... import pulse_counter
 
 # Happy Hare imports
-from ..mmu_constants import *
+from ..mmu_constants    import *
+from ..mmu_sensor_utils import MmuVirtualEndstopSensor
 
 CHECK_MOVEMENT_TIMEOUT = 0.250
 
@@ -38,12 +39,17 @@ class MmuEncoder:
         encoder_pin = config.get('encoder_pin')
 
         # For measurement/counter functionality...
-        sample_time = config.getfloat('sample_time', 0.1, above=0.)
-        poll_time = config.getfloat('poll_time', 0.001, above=0.)
-        encoder_resolution = config.getfloat('encoder_resolution', 1., above=0.) # Expect to be calibrated by user in Happy Hare
+        sample_time = config.getfloat('sample_time', 0.1, above=0.)  # How often Klippy receives accumulated counts
+        poll_time = config.getfloat('poll_time', 0.001, above=0.)    # How often the MCU samples the GPIO for edge changes
+        encoder_resolution = config.getfloat('encoder_resolution', 1., above=0.)        # Expect to be calibrated by user in Happy Hare
+        register_as_sensor = config.getint('register_as_sensor', 1, minval=0, maxval=1) # Make visible as filament switch sensor?
+        self.no_movement_samples = config.getint('no_movement_samples', 10, minval=1)   # How many no-movement samples to un-trigger sensor
+        self.no_movement_count = 0
+        self.sensor_triggered = False
         self.set_resolution(encoder_resolution)
-        self._last_time = None                 # Last time counts were received from MCU
+        self._last_count_time = None          # Last time counts were received from MCU
         self._counts = self._last_count = 0
+        self._movement = False
         counter = pulse_counter.MCU_counter(self.printer, encoder_pin, sample_time, poll_time)
         counter.setup_callback(self._counter_callback)
 
@@ -51,7 +57,6 @@ class MmuEncoder:
         self.active = True                    # Active when in a print
         self._flowguard_enabled = False       # FlowGuard Runout/Clog/Tangle functionality
 
-        self._movement = False
         # The runout headroom that MMU will attempt to maintain (closest MMU comes to triggering runout)
         self.desired_headroom = config.getfloat('desired_headroom', 6., above=0.)
         # The "damping" effect of last measurement. Higher value means clog_length will be reduced more slowly
@@ -77,6 +82,10 @@ class MmuEncoder:
         self.extrusion_flowrate = 0.
         self.samples = []
         self.flowrate_samples = config.getint('flowrate_samples', 20, minval=5)
+
+        # Create virtual endstop (for giggles and experimental use)
+        endstop_sensor_name = f"{self.name}:{SENSOR_ENCODER}"
+        self.endstop_sensor = MmuVirtualEndstopSensor(config, endstop_sensor_name, None, register=register_as_sensor)
 
         # Register event handlers
         self.printer.register_event_handler('klippy:connect', self.handle_connect)
@@ -374,15 +383,44 @@ class MmuEncoder:
 
     # Callback for MCU_counter
     def _counter_callback(self, print_time, count, count_time):
-        if self._last_time is None:  # First sample
-            self._last_time = print_time
-        elif count_time > self._last_time:
-            self._last_time = count_time
+        if self._last_count_time is None:
+            self._last_count_time = print_time
+            self._last_count = count
+            self._movement = False
+            self._endstop_triggered = False
+            self._no_movement_count = 0
+            self.endstop_sensor.trigger_handler(print_time, False)
+            return
+
+        delta_time = count_time - self._last_count_time
+
+        if delta_time > 0:
+            self._last_count_time = count_time
+
             new_counts = count - self._last_count
             self._counts += new_counts
             self._movement = new_counts > 0
-        else:  # No counts since last sample
-            self._last_time = print_time
+
+            if self._movement:
+                self._no_movement_count = 0
+
+                if not self._endstop_triggered:
+                    self._endstop_triggered = True
+                    self.endstop_sensor.trigger_handler(print_time, True)
+
+            else:
+                self._no_movement_count += 1
+
+        else:
+            # No counts since last sample
+            self._last_count_time = print_time
+            self._movement = False
+            self._no_movement_count += 1
+
+        if (self._endstop_triggered and self._no_movement_count >= self.no_movement_samples):
+            self._endstop_triggered = False
+            self.endstop_sensor.trigger_handler(print_time, False)
+
         self._last_count = count
 
 

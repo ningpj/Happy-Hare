@@ -2367,7 +2367,7 @@ class MmuFilamentMovement:
             accel: Requested acceleration. When omitted, a context-appropriate default is chosen.
             motor: Motor mode to use for the move, such as gear, extruder, or synced movement.
             homing_move: Non-zero to perform a homing move; the sign indicates the expected trigger direction.
-            endstop_name: Endstop to use for homing moves.
+            endstop_name: Endstop to use for homing moves
             track: Whether the move should update per-gate tracking statistics.
             wait: Whether to wait for motion queues to drain after the move.
             encoder_dwell: Whether to add dwell time when sampling encoder position.
@@ -2454,7 +2454,7 @@ class MmuFilamentMovement:
                             f"max dist={dist:.1f}, "
                             f"speed={speed:.1f}, "
                             f"accel={accel:.1f}, "
-                            f"endstop_name={endstop_name}, "
+                            f"endstop_name={endstop_name}->{qual_endstop_name}, "
                             f"wait={wait}"
                         )
                     else:
