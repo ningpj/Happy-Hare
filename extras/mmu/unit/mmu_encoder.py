@@ -406,7 +406,6 @@ class MmuEncoder:
 
                 if not self._endstop_triggered:
                     self._endstop_triggered = True
-                    logging.info(f"PAUL: encoder triggered")
                     self.endstop_sensor.trigger_handler(print_time, True)
 
             else:
@@ -420,7 +419,6 @@ class MmuEncoder:
 
         if (self._endstop_triggered and self._no_movement_count >= self.no_movement_samples):
             self._endstop_triggered = False
-            logging.info(f"PAUL: encoder reset")
             self.endstop_sensor.trigger_handler(print_time, False)
 
         self._last_count = count
