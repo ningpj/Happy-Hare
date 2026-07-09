@@ -17,7 +17,6 @@ menu "MMU/Extruder sync"
   if MMU_HAS_SYNC_FEEDBACK_BUFFER
     config BOOL_ENABLE_SYNC_FEEDBACK
       bool "Enable dynamic sync feedback?"
-      depends on !BOOL_FILAMENT_ALWAYS_GRIPPED
       default y
       help
         Sync feedback from the buffer will be used to dynamically adjust the

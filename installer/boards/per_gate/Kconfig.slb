@@ -37,7 +37,7 @@ if BOARD_TYPE_SLB_1_0
       default "^(MCU_NAME):PA0"
 
     config PIN_EJECT_BUTTON_0
-      default "^$(MCU_NAME):PB2"
+      default "^!$(MCU_NAME):PB2"
 
     config PIN_NEOPIXEL
       default "$(MCU_NAME):PA4"

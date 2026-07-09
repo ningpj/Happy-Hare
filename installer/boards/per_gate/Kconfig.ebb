@@ -37,7 +37,7 @@ if BOARD_TYPE_EBB_1_0
       default "^(MCU_NAME):PB5"
 
     config PIN_EJECT_BUTTON_0
-      default "^$(MCU_NAME):PB6"
+      default "^!$(MCU_NAME):PB6"
 
     config PIN_NEOPIXEL
       default "$(MCU_NAME):PD3"

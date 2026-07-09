@@ -75,8 +75,14 @@ if MMU_HAS_LEDS
 
     if !CUSTOM_LED_SETUP
 
+      config BOOL_EMU_SLB_HACK
+        bool
+        default y if MMU_HAS_PER_GATE_MCU && PARAM_VENDOR = "EMU" && PARAM_BOARD_TYPE = "SLB v1"
+
       config PARAM_CHAIN_COUNT
         int "Chain count     "
+        default 4 if BOOL_EMU_SLB_HACK
+        default 1 if MMU_HAS_PER_GATE_MCU
         default PARAM_NUM_GATES
 
       config PARAM_COLOR_ORDER
@@ -112,13 +118,18 @@ if MMU_HAS_LEDS
 
       # Hack to special case SLB v1 board wiring with EMU
       menu "Neopixel per-gate box pins" 
-        depends on MMU_HAS_LEDS && MMU_HAS_PER_GATE_MCU && PARAM_VENDOR = "EMU" && PARAM_BOARD_TYPE = "SLB v1"
+        depends on BOOL_EMU_SLB_HACK
 
         @repeat var=i min=0 max=11@
           config PIN_NEOPIXEL_BOX_$(i)
             string
             prompt "Neopixel box gate $(i) pin" if PARAM_NUM_GATES > $(i)
         @endrepeat@
+
+        config PARAM_CHAIN_COUNT
+          int "Chain count     "
+          default PARAM_NUM_GATES
+
       endmenu
 
     endif
