@@ -176,7 +176,6 @@ class ServoSelector(PhysicalSelector):
 
 
     def filament_drive(self):
-        self.mmu.log_warning("PAUL: FILAMENT DRIVE")
         gate = self.mmu.gate_selected
         if self.mmu_unit.manages_gate(gate) and gate >= 0:
             lgate = self.mmu_unit.local_gate(gate)
@@ -184,7 +183,6 @@ class ServoSelector(PhysicalSelector):
 
 
     def filament_release(self, measure=False):
-        self.mmu.log_warning("PAUL: FILAMENT RELEASE")
         gate = self.mmu.gate_selected
         if self.mmu_unit.manages_gate(gate) and gate >= 0:
             lgate = self.mmu_unit.local_gate(gate)
@@ -255,7 +253,6 @@ class ServoSelector(PhysicalSelector):
         sets the gate grip angle or a computed/explicit release angle, updating
         the cached servo state accordingly.
         """
-        self.mmu.log_warning(f"PAUL: _GRIP(lgate={lgate}, release={release}")
         if lgate == TOOL_GATE_BYPASS:
             angle = self.servo_bypass_angle
             state = FILAMENT_UNKNOWN_STATE
@@ -300,7 +297,6 @@ class ServoSelector(PhysicalSelector):
         duration, then dwells for at least the configured dwell/duration.
         """
         if angle >= 0 and angle != self.servo_angle:
-            self.mmu.log_warning(f"PAUL: _set_servo_angle({angle})")
             self.mmu.movequeue_wait()
             self.servo.set_position(angle=angle, duration=None if self.p.servo_always_active else self.p.servo_duration)
             self.servo_angle = angle

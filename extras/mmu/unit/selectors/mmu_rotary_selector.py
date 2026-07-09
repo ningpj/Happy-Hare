@@ -40,14 +40,20 @@ from .mmu_base_selectors    import PhysicalSelector
 
 class RotarySelectorParameters(TunableParametersBase):
 
+    def _validate_gate_list_length(self, value):
+        expected = self._selector.mmu_unit.num_gates
+        if len(value) != expected:
+            raise ValueError(f"Expected {expected} gate values, got {len(value)}")
+
+
     _SPECS: Sequence[ParamSpec] = (
         ParamSpec('selector_move_speed',     'float',  200.0, section="SELECTOR", limits=dict(minval=1.0)),
         ParamSpec('selector_homing_speed',   'float',  100.0, section="SELECTOR", limits=dict(minval=1.0)),
         ParamSpec('selector_accel',          'float', 1200.0, section="SELECTOR", limits=dict(above=1.0)),
 
         # Gate direction and "release" position if 'filament_always_gripped: 0'
-        ParamSpec('selector_gate_directions','intlist', [1, 1, 0, 0], section="SELECTOR", hidden=True),
-        ParamSpec('selector_release_gates',  'intlist', [2, 3, 0, 1], section="SELECTOR", hidden=True),
+        ParamSpec('selector_gate_directions','intlist', [1, 1, 0, 0], section="SELECTOR", hidden=True, validator=lambda self, v: self._validate_gate_list_length(v)),
+        ParamSpec('selector_release_gates',  'intlist', [2, 3, 0, 1], section="SELECTOR", hidden=True, validator=lambda self, v: self._validate_gate_list_length(v)),
 
         ParamSpec('cad_gate0_pos',           'float',   4.0,  section="CAD", limits=dict(minval=0.0), hidden=True),
         ParamSpec('cad_gate_width',          'float',   25.0, section="CAD", limits=dict(above=0.0),  hidden=True),
@@ -182,12 +188,10 @@ class RotarySelector(PhysicalSelector):
 
 
     def filament_drive(self):
-# PAUL FIXME ..  called frequently
         self._grip(self.local_gate(self.mmu.gate_selected))
 
 
     def filament_release(self, measure=False):
-# PAUL FIXME ..  called frequently
         if not self.mmu_unit.filament_always_gripped:
             self._grip(self.local_gate(self.mmu.gate_selected), release=True)
         return 0. # Fake encoder movement
@@ -275,17 +279,10 @@ class RotarySelector(PhysicalSelector):
 
     # Internal Implementation --------------------------------------------------
 
-    def _get_max_selector_movement(self, gate=-1):
-        n = gate if gate >= 0 else self.mmu_unit.num_gates - 1
-
+    def _get_max_selector_movement(self, lgate=TOOL_GATE_UNKNOWN):
+        n = lgate if lgate >= 0 else self.mmu_unit.num_gates - 1
         max_movement = self.p.cad_gate0_pos + (n * self.p.cad_gate_width)
-        max_movement += self.p.cad_last_gate_offset if gate in [TOOL_GATE_UNKNOWN] else 0.
         max_movement += self.p.cad_selector_tolerance
-        return max_movement
-
-
-    def _get_max_selector_movement(self):
-        max_movement = self.mmu.num_gates * self.p.cad_gate_width * self.p.cad_max_rotations
         return max_movement
 
 
@@ -298,8 +295,11 @@ class RotarySelector(PhysicalSelector):
         saving, either extrapolates offsets across all gates or writes only the
         requested gate depending on extrapolate/SINGLE.
         """
-        max_movement = self._get_max_selector_movement(gate)
-        self.mmu.log_always("Measuring the selector position for gate %d..." % gate)
+        lgate = self.mmu_unit.local_gate(gate)
+        gate_str = lambda gate : ("gate %d" % gate) if gate >= 0 else "bypass"
+
+        max_movement = self._get_max_selector_movement(lgate)
+        self.mmu.log_always("Measuring the selector position for %s..." % gate_str(gate))
         traveled, found_home = self.measure_to_home()
 
         # Test we actually homed
@@ -309,30 +309,54 @@ class RotarySelector(PhysicalSelector):
 
         # Warn and don't save if the measurement is unexpected
         if traveled > max_movement:
-            self.mmu.log_always("Selector move measured %.1fmm. More than the anticipated maximum of %.1fmm. Save disabled\nIt is likely that your basic MMU dimensions are incorrect in mmu_parameters.cfg. Check vendor/version and optional 'cad_*' parameters" % (traveled, max_movement))
+            self.mmu.log_always(
+                f"Selector move measured {traveled:.1f}mm. "
+                f"More than the anticipated maximum of {max_movement:.1f}mm. "
+                f"Save disabled\n"
+                f"It is likely that your basic MMU dimensions are incorrect in "
+                f"mmu_parameters.cfg. Check vendor/version and optional 'cad_*' parameters"
+            )
             save = 0
         else:
             self.mmu.log_always("Selector move measured %.1fmm" % traveled)
 
         if save:
-            self.selector_offsets[gate] = round(traveled, 1)
-            if extrapolate and gate == self.mmu_unit.num_gates - 1 and self.selector_offsets[0] > 0:
+            self.selector_offsets[lgate] = round(traveled, 1)
+
+            if (
+                extrapolate
+                and self.mmu_unit.num_gates > 1
+                and (
+                    (lgate == self.mmu_unit.num_gates - 1 and self.selector_offsets[0] > 0)
+                    or
+                    (lgate == 0 and self.selector_offsets[-1] > 0)
+                )
+            ):
                 # Distribute selector spacing based on measurements of first and last gate
                 spacing = (self.selector_offsets[-1] - self.selector_offsets[0]) / (self.mmu_unit.num_gates - 1)
                 self.selector_offsets = [round(self.selector_offsets[0] + i * spacing, 1) for i in range(self.mmu_unit.num_gates)]
-            elif extrapolate:
+
+            elif extrapolate and lgate == 0 and self.selector_offsets[-1] == -1:
                 # Distribute using cad spacing
-                self.selector_offsets = [round(self.selector_offsets[0] + i * self.p.cad_gate_width, 1) for i in range(self.mmu_unit.num_gates)]
+                self.selector_offsets = [
+                    round(self.selector_offsets[0] + i * self.p.cad_gate_width, 1)
+                    for i in range(self.mmu_unit.num_gates)
+                ]
             else:
                 extrapolate = False
+
             self.var_manager.set(VARS_MMU_SELECTOR_OFFSETS, self.selector_offsets, write=True, namespace=self.mmu_unit.name)
 
             if extrapolate:
-                self.mmu.log_always("All selector offsets have been extrapolated and saved:\n%s" % self.selector_offsets)
+                self.mmu.log_always(f"All selector offsets have been extrapolated and saved:\n{self.selector_offsets}")
             else:
-                self.mmu.log_always("Selector offset (%.1fmm) for gate %d has been saved" % (traveled, gate))
+                self.mmu.log_always(f"Selector offset ({traveled:.1f}mm) for {gate_str(gate)} has been saved")
                 if gate == 0:
-                    self.mmu.log_always("Run MMU_CALIBRATE_SELECTOR again with GATE=%d to extrapolate all gate positions. Use SINGLE=1 to force calibration of only one gate" % (self.mmu_unit.num_gates - 1))
+                    self.mmu.log_always(
+                        f"Run MMU_CALIBRATE_SELECTOR again with GATE={self.mmu_unit.num_gates - 1} "
+                        "to extrapolate all gate positions. Use SINGLE=1 to force calibration "
+                        "of only one gate"
+                    )
         return True
 
 
@@ -361,7 +385,7 @@ class RotarySelector(PhysicalSelector):
     def _home_hard_endstop(self):
         self.mmu.log_always("Forcing selector homing to hard endstop. Excuse the noise!\n(Configure stallguard endstop on selector stepper to avoid)")
         self._restore_position(self._get_max_selector_movement()) # Worst case position to allow full movement
-        self.move("Forceably homing to hard endstop", new_pos=0, speed=self.p.selector_homing_speed)
+        self.move("Forcibly homing to hard endstop", new_pos=0, speed=self.p.selector_homing_speed)
         self._restore_position(0) # Reset pos
 
 
@@ -393,7 +417,6 @@ class RotarySelector(PhysicalSelector):
         speed = speed or self.p.selector_move_speed
         accel = accel or self.p.selector_accel
 
-        pos = self.selector_stepper.commanded_pos
         self.selector_stepper.do_move(new_pos, speed, accel)
         self.mmu.log_stepper(
             f"SELECTOR MOVE: requested position={new_pos:.1f}, "
@@ -433,6 +456,7 @@ class RotarySelector(PhysicalSelector):
         return abs(traveled), homed
 
 
+
 # -----------------------------------------------------------------------------------------------------------
 # MMU_CALIBRATE_ROTARY_SELECTOR command
 #  This "registered command" will be conditionally registered, then instantiated later by the main
@@ -445,7 +469,7 @@ class MmuCalibrateRotarySelectorCommand(BaseCommand):
 
     CMD = "MMU_CALIBRATE_ROTARY_SELECTOR"
 
-    HELP_BRIEF = "Calibration of the selector positions or postion of specified gate"
+    HELP_BRIEF = "Calibration of the selector positions or position of specified gate"
     HELP_PARAMS = (
         "%s: %s\n" % (CMD, HELP_BRIEF)
         + "UNIT   = #(int) Optional if only one unit fitted to printer\n"
@@ -498,7 +522,7 @@ class MmuCalibrateRotarySelectorCommand(BaseCommand):
             if selector.has_endstop and not quick:
                 successful = selector._calibrate_selector(gate, extrapolate=not single, save=save)
             else:
-                mmu.log_always("%s - will calculate gate offsets from cad_gate0_offset and cad_gate_width" % ("Quick method" if quick else "No endstop configured"))
+                mmu.log_always("%s - will calculate gate offsets from cad_gate0_pos and cad_gate_width" % ("Quick method" if quick else "No endstop configured"))
                 selector.selector_offsets = [round(selector.p.cad_gate0_pos + i * selector.p.cad_gate_width, 1) for i in range(mmu_unit.num_gates)]
                 mmu_unit.calibrator.var_manager.set(VARS_MMU_SELECTOR_OFFSETS, selector.selector_offsets, write=True, namespace=mmu_unit.name)
                 successful = True
