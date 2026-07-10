@@ -37,10 +37,16 @@ from .mmu_base_selectors    import PhysicalSelector
 
 class ServoSelectorParameters(TunableParametersBase):
 
-    def _validate_gate_list_length(self, value):
+    def _validate_int_list(self, value, *, minval=None, maxval=None):
         expected = self._selector.mmu_unit.num_gates
         if len(value) != expected:
             raise ValueError(f"Expected {expected} gate values, got {len(value)}")
+
+        for i, v in enumerate(value):
+            if minval is not None and v < minval:
+                raise ValueError(f"Gate {i}: value {v} is less than minimum {minval}")
+            if maxval is not None and v > maxval:
+                raise ValueError(f"Gate {i}: value {v} is greater than maximum {maxval}")
 
 
     _SPECS: Sequence[ParamSpec] = (
@@ -48,7 +54,8 @@ class ServoSelectorParameters(TunableParametersBase):
         ParamSpec('servo_max_angle',         'int',     90, section="SERVO", limits=dict(minval=0), hidden=True),
         ParamSpec('servo_release_angle',     'int',     -1, section="SERVO", limits=dict(minval=-1, maxval=lambda self: self.servo_max_angle)),
         ParamSpec('servo_bypass_angle',      'int',     -1, section="SERVO", limits=dict(minval=-1, maxval=lambda self: self.servo_max_angle)),
-        ParamSpec('servo_gate_angles',       'intlist', [], section="SERVO",                        hidden=True, validator=lambda self, v: self._validate_gate_list_length(v)),
+        ParamSpec('servo_gate_angles',       'intlist', [], section="SERVO",                        hidden=True,
+            validator=lambda self, v: self._validate_int_list(v, minval=self.servo_min_angle, maxval=self.servo_max_angle)),
         ParamSpec('servo_dwell',             'float',  0.6, section="SERVO", limits=dict(minval=0.1)),
         ParamSpec('servo_duration',          'float',  0.5, section="SERVO", limits=dict(minval=0.1)),
         ParamSpec('servo_always_active',     'int',      0, section="SERVO", limits=dict(minval=0,  maxval=1)),
@@ -114,6 +121,10 @@ class ServoSelector(PhysicalSelector):
             pass # Already registered
 
         self._reinit()
+
+
+    def _reinit(self):
+        self.grip_state = FILAMENT_UNKNOWN_STATE
 
 
     # Selector "Interface" methods ---------------------------------------------
@@ -195,7 +206,11 @@ class ServoSelector(PhysicalSelector):
 
 
     def get_filament_grip_state(self):
-        return self.servo_state
+        return self.grip_state
+
+
+    def disable_motors(self):
+        self._servo_off()
 
 
     def buzz_motor(self, motor):
@@ -230,15 +245,15 @@ class ServoSelector(PhysicalSelector):
     def get_status(self, eventtime):
         status = super().get_status(eventtime)
         status.update({
-            'grip': "Gripped" if self.servo_state == FILAMENT_DRIVE_STATE else "Released",
+            'grip': "Gripped" if self.grip_state == FILAMENT_DRIVE_STATE else "Released",
         })
         return status
 
 
     def get_mmu_status_config(self):
         msg = super().get_mmu_status_config()
-        msg += " Servo in %s position." % ("GRIP" if self.servo_state == FILAMENT_DRIVE_STATE else \
-                "RELEASE" if self.servo_state == FILAMENT_RELEASE_STATE else "unknown")
+        msg += " Servo in %s position." % ("GRIP" if self.grip_state == FILAMENT_DRIVE_STATE else \
+                "RELEASE" if self.grip_state == FILAMENT_RELEASE_STATE else "unknown")
         return msg
 
 
@@ -251,10 +266,6 @@ class ServoSelector(PhysicalSelector):
 
 
     # Internal Implementation --------------------------------------------------
-
-    def _reinit(self):
-        self.servo_state = FILAMENT_UNKNOWN_STATE
-
 
     # Common logic for servo manipulation
     def _grip_release(self, lgate, release=False):
@@ -293,12 +304,12 @@ class ServoSelector(PhysicalSelector):
                     return
 
         else:
-            self.servo_state = FILAMENT_UNKNOWN_STATE
+            self.grip_state = FILAMENT_UNKNOWN_STATE
             return
 
         self.mmu.log_trace("Setting servo to %s position at angle: %.1f" % (action, angle))
         self._set_servo_angle(angle)
-        self.servo_state = state
+        self.grip_state = state
 
 
     def _set_servo_angle(self, angle):
@@ -313,6 +324,12 @@ class ServoSelector(PhysicalSelector):
             self.servo.set_position(angle=angle, duration=None if self.p.servo_always_active else self.p.servo_duration)
             self.servo_angle = angle
             self.mmu.movequeue_dwell(max(self.p.servo_dwell, self.p.servo_duration, 0))
+
+
+    # De-energize servo if 'servo_always_active' is being used
+    def _servo_off(self):
+        self.servo.set_position(width=0, duration=None)
+        self._reinit()
 
 
     def _get_best_release_angle(self):
@@ -504,7 +521,7 @@ class MmuCalibrateServoSelectorCommand(BaseCommand):
         if angle is not None:
             mmu.log_debug("Setting selector servo to angle: %d" % angle)
             selector._set_servo_angle(angle)
-            selector.servo_state = FILAMENT_UNKNOWN_STATE
+            selector.grip_state = FILAMENT_UNKNOWN_STATE
 
         # Gate can be logic or local
         if gate is not None and not mmu_unit.manages_gate(gate):
