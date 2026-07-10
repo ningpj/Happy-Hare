@@ -65,7 +65,7 @@ class LinearSelectorParameters(TunableParametersBase):
         return self._get_cad_defaults()[name]
 
     def _get_cad_defaults(self):
-        # Historically to simplfy config CAD related parameters defaults are set based on vendor and version setting
+        # Historically to simplify config CAD related parameters defaults are set based on vendor and version setting
         #
         # The initial defaults are for ERCFv1.1 - the first MMU supported by Happy Hare
         #  cad_gate0_pos          - approximate distance from endstop to first gate
@@ -340,7 +340,7 @@ class LinearSelector(PhysicalSelector):
         """
         n = lgate if lgate >= 0 else self.mmu_unit.num_gates - 1
 
-        if self.mmu_unit.mmu_vendor == VENDOR_ERCF:
+        if self.mmu_unit.mmu_vendor.lower() == VENDOR_ERCF.lower():
             # ERCF Designs
             if self.mmu_unit.mmu_version >= 2.0 or "t" in self.mmu_unit.mmu_version_string:
                 max_movement = self.p.cad_gate0_pos + (n * self.p.cad_gate_width)
@@ -387,14 +387,21 @@ class LinearSelector(PhysicalSelector):
             if lgate >= 0:
                 self.selector_offsets[lgate] = round(traveled, 1)
                 if (
-                    extrapolate and lgate == self.mmu_unit.num_gates - 1  and self.selector_offsets[0] > 0 or
-                    extrapolate and lgate == 0 and self.selector_offsets[-1] > 0
+                    extrapolate
+                    and self.mmu_unit.num_gates > 1
+                    and (
+                        (lgate == self.mmu_unit.num_gates - 1 and self.selector_offsets[0] > 0)
+                        or
+                        (lgate == 0 and self.selector_offsets[-1] > 0)
+                    )
                 ):
                     # Distribute selector spacing
                     spacing = (self.selector_offsets[-1] - self.selector_offsets[0]) / (self.mmu_unit.num_gates - 1)
                     self.selector_offsets = [round(self.selector_offsets[0] + i * spacing, 1) for i in range(self.mmu_unit.num_gates)]
+
                 else:
                     extrapolate = False
+
                 self.var_manager.set(VARS_MMU_SELECTOR_OFFSETS, self.selector_offsets, write=True, namespace=self.mmu_unit.name)
             else:
                 self.bypass_offset = round(traveled, 1)
@@ -404,7 +411,7 @@ class LinearSelector(PhysicalSelector):
             if extrapolate:
                 self.mmu.log_always("All selector offsets have been extrapolated and saved:\n%s" % self.selector_offsets)
             else:
-                self.mmu.log_always("Selector offset (%.1fmm) for %s has been saved" % (traveled, gate_str(gate)))
+                self.mmu.log_always(f"Selector offset ({traveled:.1f}mm) for {gate_str(gate)} has been saved")
                 if gate == 0:
                     self.mmu.log_always("Run MMU_CALIBRATE_SELECTOR again with GATE=%d EXTRAPOLATE=1 to extrapolate all gate positions or just GATE=x to calibrate one gate at a time" % (self.mmu_unit.num_gates - 1))
         return True
@@ -440,7 +447,7 @@ class LinearSelector(PhysicalSelector):
         else:
             # This might not sound good!
             self.move("Ensure we are clear off the physical endstop", self.p.cad_gate0_pos)
-            self.move("Forceably detecting end of selector movement", max_movement, speed=self.p.selector_homing_speed)
+            self.move("Forcibly detecting end of selector movement", max_movement, speed=self.p.selector_homing_speed)
             found_home = True
         if not found_home:
             msg = "Didn't detect the end of the selector"
@@ -477,7 +484,8 @@ class LinearSelector(PhysicalSelector):
 
         if self.mmu_unit.mmu_vendor.lower() == VENDOR_ERCF.lower() and self.mmu_unit.mmu_version == 1.1:
             # ERCF v1.1 special case
-            num_gates = adj_gate_width = int(round(length / (self.p.cad_gate_width + self.p.cad_block_width / 3))) + 1
+            num_gates = int(round(length / (self.p.cad_gate_width + self.p.cad_block_width / 3))) + 1
+            adj_gate_width = self.p.cad_gate_width
             num_blocks = (num_gates - 1) // 3
             bypass_offset = -1
             if num_gates > 1:
@@ -487,7 +495,7 @@ class LinearSelector(PhysicalSelector):
                     adj_gate_width = (length - num_blocks * self.p.cad_block_width) / (num_gates - 1)
             self.mmu.log_debug("Adjusted gate width: %.1f" % adj_gate_width)
             for i in range(num_gates):
-                bypass_adj = (self.p.cad_bypass_block_width - self.p.cad_block_width) if (i // 3) >= v1_bypass_block else 0.
+                bypass_adj = (self.p.cad_bypass_block_width - self.p.cad_block_width) if v1_bypass_block >= 0 and (i // 3) >= v1_bypass_block else 0.
                 selector_offsets.append(round(gate0_pos + (i * adj_gate_width) + (i // 3) * self.p.cad_block_width + bypass_adj, 1))
                 if ((i + 1) / 3) == v1_bypass_block:
                     bypass_offset = selector_offsets[i] + self.p.cad_bypass_block_delta
@@ -608,7 +616,7 @@ class LinearSelector(PhysicalSelector):
 
         # Set appropriate speeds and accel if not supplied
         if homing_move != 0:
-            speed = speed or (self.p.selector_touch_speed if self.p.selector_touch_enabled or endstop_name == SENSOR_SELECTOR_TOUCH else self.p.selector_homing_speed)
+            speed = speed or (self.p.selector_touch_speed if endstop_name == SENSOR_SELECTOR_TOUCH else self.p.selector_homing_speed)
         else:
             speed = speed or self.p.selector_move_speed
         accel = accel or self.p.selector_accel
@@ -617,10 +625,14 @@ class LinearSelector(PhysicalSelector):
 
         if homing_move != 0:
             # Check for valid endstop
-            endstops = self.selector_stepper.rail.get_endstops() if endstop_name is None else [self.selector_stepper.rail.get_extra_endstop(endstop_name)]
-            if endstops is None:
-                self.mmu.log_error("Endstop '%s' not found" % endstop_name)
-                return self.selector_stepper.commanded_pos, False
+            if endstop_name is None:
+                if self.selector_stepper.rail.get_endstops() is None:
+                    self.mmu.log_error("No selector endstops configured")
+                    return self.selector_stepper.commanded_pos, False
+            else:
+                if self.selector_stepper.rail.get_extra_endstop(endstop_name) is None:
+                    self.mmu.log_error(f"Endstop '{endstop_name}' not found")
+                    return self.selector_stepper.commanded_pos, False
 
             home_result = {
                 'halt_pos': pos,

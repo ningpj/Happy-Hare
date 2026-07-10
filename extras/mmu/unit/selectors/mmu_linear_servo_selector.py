@@ -181,9 +181,11 @@ class LinearSelectorServo:
 
         self._reinit()
 
+
     def _reinit(self):
         self.servo_state = SERVO_UNKNOWN_STATE
         self.servo_angle = SERVO_UNKNOWN_STATE
+
 
     def handle_connect(self):
         """
@@ -203,10 +205,12 @@ class LinearSelectorServo:
         except Exception as e:
             raise self.config.error("Exception whilst parsing servo angles from 'mmu_vars.cfg': %s" % str(e))
 
+
     def _set_servo_angle(self, angle):
         self.servo.set_position(angle=angle, duration=None if self.p.servo_always_active else self.p.servo_duration)
         self.servo_angle = angle
         self.servo_state = SERVO_UNKNOWN_STATE
+
 
     def _servo_save_pos(self, pos):
         if self.servo_angle != SERVO_UNKNOWN_STATE:
@@ -215,6 +219,7 @@ class LinearSelectorServo:
             self.mmu.log_info("Servo angle '%d' for position '%s' has been saved" % (self.servo_angle, pos))
         else:
             self.mmu.log_info("Servo angle unknown")
+
 
     def servo_down(self, buzz_gear=True):
         """
@@ -247,6 +252,7 @@ class LinearSelectorServo:
         self.mmu.set_encoder_distance(initial_encoder_position)
         self.mmu.mmu_macro_event(MACRO_EVENT_FILAMENT_GRIPPED)
 
+
     def servo_move(self): # Position servo for selector movement
         if self.mmu._is_running_test: return # Save servo while testing
         if self.servo_state == SERVO_MOVE_STATE: return
@@ -257,6 +263,7 @@ class LinearSelectorServo:
             self.mmu.movequeue_dwell(max(self.p.servo_dwell, self.p.servo_duration, 0))
             self.servo_angle = self.servo_angles['move']
             self.servo_state = SERVO_MOVE_STATE
+
 
     def servo_up(self, measure=False):
         """
@@ -285,19 +292,24 @@ class LinearSelectorServo:
         self.servo_state = SERVO_UP_STATE
         return delta
 
+
     # De-energize servo if 'servo_always_active' or 'servo_active_down' are being used
     def servo_off(self):
         self.servo.set_position(width=0, duration=None)
 
+
     def get_filament_grip_state(self):
         return self.servo_state
+
 
     def disable_motors(self):
         self.servo_off()
         self._reinit() # Reset state
 
+
     def enable_motors(self):
         self.servo_move()
+
 
     def buzz_motor(self):
         self.mmu.movequeue_wait()
@@ -323,10 +335,12 @@ class LinearSelectorServo:
         else:
             self.servo_up()
 
+
     def get_mmu_status_config(self):
         msg = " Servo in %s position." % ("RELEASE" if self.servo_state == SERVO_UP_STATE else \
                 "GRIP" if self.servo_state == SERVO_DOWN_STATE else "MOVE" if self.servo_state == SERVO_MOVE_STATE else "unknown")
         return msg
+
 
     def get_status(self, eventtime):
         return {
