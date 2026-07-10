@@ -130,8 +130,10 @@ class MmuPrintStateMachine:
         if call_macro:
             self.mmu.led_manager.print_state_changed(print_state, prev_print_state)
 
-            if self.mmu.printer.lookup_object("gcode_macro %s" % self.mmu.p.print_state_changed_macro, None) is not None:
-                self.mmu.wrap_gcode_command("%s STATE='%s' OLD_STATE='%s'" % (self.mmu.p.print_state_changed_macro, print_state, prev_print_state))
+            self.mmu.call_macro_if_defined(
+                self.mmu.p.print_state_changed_macro,
+                "STATE='%s' OLD_STATE='%s'" % (print_state, prev_print_state)
+            )
 
         self.print_state = print_state
 

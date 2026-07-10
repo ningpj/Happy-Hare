@@ -186,8 +186,7 @@ class MmuGateMaps:
                 self.mmu._spoolman_update_filaments(gate_ids)
 
         self.mmu.led_manager.gate_map_changed(None) # Force full LED update
-        if self.printer.lookup_object("gcode_macro %s" % self.p.mmu_event_macro, None) is not None:
-            self.mmu.mmu_macro_event(MACRO_EVENT_GATE_MAP_CHANGED, "GATE=-1")
+        self.mmu.mmu_macro_event(MACRO_EVENT_GATE_MAP_CHANGED, "GATE=-1")
 
 
 # -----------------------------------------------------------------------------------------------------------
