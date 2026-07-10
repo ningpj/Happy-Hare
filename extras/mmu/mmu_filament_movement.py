@@ -2056,11 +2056,6 @@ class MmuFilamentMovement:
                 if gcode_macro is None:
                     raise MmuError("Filament tip forming macro '%s' not found" % self.p.form_tip_macro)
 
-                gcode_macro = self.printer.lookup_object(
-                    f"gcode_macro {self.p.form_tip_macro}",
-                    "_MMU_FORM_TIP",
-                )
-
                 self.log_info("Forming tip...")
 
                 self.wrap_gcode_command(
