@@ -20,6 +20,9 @@
 #
 import logging, time
 
+# Klipper imports
+import mcu
+
 # Happy Hare imports
 from .mmu_constants import *
 
@@ -120,7 +123,7 @@ class MmuRunoutHelper:
         self.event_delay = event_delay # Time between generated events
         self.filament_present = False
         self.sensor_enabled = True
-        self.runout_suspended = None
+        self.runout_suspended = False
         self.button_handler_suspended = False
 
         self.printer.register_event_handler("klippy:ready", self._handle_ready)
@@ -470,11 +473,9 @@ class MmuCompoundEndstop:
             self.endstops.append(endstop)
             self.endstop_names[endstop] = endstop_name
 
-            if endstop.__class__.__name__ == "MCU_endstop":
+            if isinstance(endstop, mcu.MCU_endstop):
                 if self.mcu_endstop is not None:
-                    raise self._printer.command_error(
-                        "Only one MCU endstop may be specified for %s" % self.name
-                    )
+                    raise self._printer.command_error("Only one MCU endstop may be specified for %s" % self.name)
                 self.mcu_endstop = endstop
             else:
                 self.virtual_endstops.append(endstop)
@@ -484,6 +485,7 @@ class MmuCompoundEndstop:
         self._triggered_endstop = None
         self._last_trigger_time = None
         self._homing = False
+        self._pending = 0 # Number of children not yet resolved
 
 
     def get_triggered_endstop_name(self):
@@ -524,6 +526,7 @@ class MmuCompoundEndstop:
         self._last_trigger_time = None
         self._homing = True
 
+        self._pending = len(self.endstops)
         for es in self.endstops:
             child_completion = es.home_start(
                 print_time, sample_time, sample_count, rest_time, triggered
@@ -539,15 +542,21 @@ class MmuCompoundEndstop:
     def _wait_for_child_endstop(self, endstop, child_completion):
         try:
             child_completion.wait()
+            triggered = True
         except Exception:
-            return
+            triggered = False
 
         if not self._homing:
             return
 
-        if self._triggered_endstop is None:
+        self._pending -= 1
+        if triggered and self._triggered_endstop is None:
             self._triggered_endstop = endstop
             self._trigger_completion.complete(True)
+        elif self._pending == 0 and self._triggered_endstop is None:
+            # Every child failed/timed out without triggering — resolve so home_wait()'s
+            # existing "no trigger" error path can fire instead of hanging forever
+            self._trigger_completion.complete(False)
 
 
     def home_wait(self, home_end_time):

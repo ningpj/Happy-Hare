@@ -13,7 +13,7 @@
 # This file may be distributed under the terms of the GNU GPLv3 license.
 #
 
-import logging
+import logging, unicodedata
 
 # Happy Hare imports
 from .mmu_constants import *
@@ -79,7 +79,7 @@ class MmuGateMaps:
         self.ttg_map = list(self.p.default_ttg_map)
 
         # Slicer tool map is populated only at start of print
-        self.slicer_tool_map = None
+        self._reset_slicer_tool_map()
 
 
 # -----------------------------------------------------------------------------------------------------------
@@ -383,11 +383,15 @@ class MmuGateMaps:
 
 
     def clear_slicer_tool_map(self):
-        skip = self.slicer_tool_map.get('skip_automap', False) if self.slicer_tool_map else False
-        self.slicer_tool_map = {'tools': {}, 'referenced_tools': [], 'initial_tool': None, 'purge_volumes': [], 'total_toolchanges': None}
+        skip = self.slicer_tool_map.get('skip_automap', False)
+        self._reset_slicer_tool_map()
         self.restore_automap_option(skip)
         self.slicer_color_rgb = [(0.,0.,0.)] * self.num_gates
         self.update_t_macros() # Clear 'color' on Tx macros if displaying slicer colors
+
+
+    def _reset_slicer_tool_map(self):
+        self.slicer_tool_map = {'tools': {}, 'referenced_tools': [], 'initial_tool': None, 'purge_volumes': [], 'total_toolchanges': None}
             
 
 # -----------------------------------------------------------------------------------------------------------
