@@ -491,7 +491,7 @@ class MmuLedManager:
                             return mmu_unit.leds.white_light
                         if rgb == (0, 0, 0):
                             return mmu_unit.leds.black_light
-                        return rgb
+                        return MmuLeds.apply_intensity(rgb, mmu_unit.leds.filament_color_intensity)
 
                     if gate is not None:
                         rgb = _resolve_filament_rgb(gate)
@@ -509,7 +509,7 @@ class MmuLedManager:
                             return mmu_unit.leds.empty_light
                         if rgb == (0, 0, 0):
                             return mmu_unit.leds.black_light
-                        return rgb
+                        return MmuLeds.apply_intensity(rgb, mmu_unit.leds.filament_color_intensity)
 
                     if gate is not None:
                         rgb = _resolve_slicer_rgb(gate)
