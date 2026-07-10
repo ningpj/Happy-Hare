@@ -2051,6 +2051,11 @@ class MmuFilamentMovement:
             initial_encoder_position = self.get_encoder_distance()
 
             with self._wrap_pressure_advance(0.0, "for tip forming"):
+                macro_name = self._macro_name(self.p.form_tip_macro)
+                gcode_macro = self.printer.lookup_object(f"gcode_macro {macro_name}", None)
+                if gcode_macro is None:
+                    raise MmuError("Filament tip forming macro '%s' not found" % self.p.form_tip_macro)
+
                 gcode_macro = self.printer.lookup_object(
                     f"gcode_macro {self.p.form_tip_macro}",
                     "_MMU_FORM_TIP",
@@ -2186,7 +2191,8 @@ class MmuFilamentMovement:
         if not self.p.purge_macro:
             return
 
-        gcode_macro = self.printer.lookup_object(f"gcode_macro {self.p.purge_macro}", None)
+        macro_name = self._macro_name(self.p.purge_macro)
+        gcode_macro = self.printer.lookup_object(f"gcode_macro {macro_name}", None)
         if gcode_macro is None:
             self.log_warning(f"Purge macro '{self.p.purge_macro}' not found")
             return
