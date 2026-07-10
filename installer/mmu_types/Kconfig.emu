@@ -49,7 +49,6 @@ if MMU_TYPE_EMU_1_0
 
     config PARAM_BUFFER_RANGE
       default 16
-
     config PARAM_BUFFER_MAXRANGE
       default 16
   endif

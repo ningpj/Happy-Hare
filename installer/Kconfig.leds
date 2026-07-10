@@ -135,5 +135,6 @@ if MMU_HAS_LEDS
     endif
 
   endmenu
+  comment "_"
 endif
 

@@ -179,8 +179,11 @@ if MMU_HAS_SYNC_FEEDBACK_BUFFER
       config PIN_BUFFER_TENSION
         prompt "Sync feedback tension pin    " if MMU_HAS_SENSOR_BUFFER_TENSION
  
+      config UNSELECT_MMU_HAS_SENSOR_BUFFER_PROPORTIONAL
+          bool
       config MMU_HAS_SENSOR_BUFFER_PROPORTIONAL
         bool "Sync-Feedback Analog proportional position sensor?"
+        depends on !UNSELECT_MMU_HAS_SENSOR_BUFFER_PROPORTIONAL
         default n
         help
           A sync-feedback sensor (often referred to as a "buffer") is a sensor that can detect filament
@@ -258,4 +261,5 @@ if MMU_HAS_SYNC_FEEDBACK_BUFFER
     endif
 
   endmenu
+  comment "_"
 endif

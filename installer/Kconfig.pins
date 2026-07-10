@@ -246,7 +246,14 @@ menu "Pins / TMC"
     string
   config PIN_BUFFER_ANALOG
     string
+  config PIN_BUFFER_NEOPIXEL
+    string
 
+  @repeat var=i min=0 max=3@
+    config PIN_BUFFER_SENSOR_$(i)
+      string
+  @endrepeat@
+ 
   menu "Sync-feedback Buffer"
     depends on MMU_HAS_SYNC_FEEDBACK_BUFFER && !MMU_SHARED_SYNC_FEEDBACK_BUFFER
 
@@ -256,6 +263,8 @@ menu "Pins / TMC"
       prompt "Sync feedback compression pin" if MMU_HAS_SENSOR_BUFFER_COMPRESSION
     config PIN_BUFFER_ANALOG
       prompt "Proportional (analog) pin    " if MMU_HAS_SENSOR_BUFFER_PROPORTIONAL
+    config PIN_BUFFER_NEOPIXEL
+      prompt "Neopixel pin                 " if MMU_HAS_LEDS && !CUSTOM_LED_SETUP
   endmenu
 
 # -------------------------------------
