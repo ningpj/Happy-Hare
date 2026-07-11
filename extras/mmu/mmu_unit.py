@@ -161,8 +161,9 @@ class MmuUnit:
             )
 
         self.environment_sensor = config.get('environment_sensor', '')
-        self.filament_heater    = config.get('filament_heater', '')
         self.environment_sensors = list(config.getlist('environment_sensors', []))
+
+        self.filament_heater    = config.get('filament_heater', '')
         self.filament_heaters = list(config.getlist('filament_heaters', []))
         self.max_concurrent_heaters = config.getint('max_concurrent_heaters', self.num_gates)
 
@@ -190,6 +191,28 @@ class MmuUnit:
         self.environment_sensors = [
             resolve_object_name(config, name, "temperature_sensor ", "environment sensor")
             for name in self.environment_sensors
+        ]
+
+
+        # ---------------------------------------------------------------------------------------------------
+        # Optional nfc readers for spool rfid tags
+        # ---------------------------------------------------------------------------------------------------
+
+        self.nfc_reader  = config.get('nfc_reader', '')
+        self.nfc_readers = list(config.getlist('nfc_readers', []))
+
+        if len(self.nfc_readers) not in [0, self.num_gates]:
+            raise config.error("'nfc_readers' must be empty or a comma separated list of 'num_gates' elements")
+
+        if self.nfc_reader and self.nfc_readers:
+            raise config.error("Can't configure both single and per-gate 'nfc_reader'/'nfc_readers'")
+
+        self.nfc_reader = resolve_object_name(
+            config, self.nfc_reader, "mmu_nfc_reader ", "nfc reader"
+        )
+        self.nfc_readers = [
+            resolve_object_name(config, name, "mmu_nfc_reader ", "nfc reader")
+            for name in self.nfc_readers
         ]
 
 
@@ -887,5 +910,13 @@ class MmuUnit:
             # Per-gate heater/sensors
             unit_info['environment_sensors'] = self.environment_sensors
             unit_info['filament_heaters'] = self.filament_heaters
+
+        if self.nfc_reader:
+            # Single NFC reader
+            unit_info['nfc_reader'] = self.nfc_reader
+
+        elif self.nfcs_readers:
+            # Per-gate NFC reader
+            unit_info['nfc_readers'] = self.nfc_readers
 
         return unit_info
