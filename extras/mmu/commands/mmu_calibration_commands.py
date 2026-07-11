@@ -531,10 +531,11 @@ class MmuCalibrateToolheadCommand(CalibrationMixin, BaseCommand):
             return
 
         if cut:
-            gcode_macro = self.printer.lookup_object("gcode_macro %s" % mmu.p.form_tip_macro, None)
+            macro_name = mmu._macro_name(mmu.p.form_tip_macro)
+            gcode_macro = self.printer.lookup_object("gcode_macro %s" % macro_name, None)
             if gcode_macro is None:
                 raise gcmd.error("Filament tip forming macro '%s' not found" % mmu.p.form_tip_macro)
-            gcode_vars = self.printer.lookup_object("gcode_macro %s_VARS" % mmu.p.form_tip_macro, gcode_macro)
+            gcode_vars = self.printer.lookup_object("gcode_macro %s_VARS" % macro_name, gcode_macro)
             if not ('blade_pos' in gcode_vars.variables and 'retract_length' in gcode_vars.variables):
                 raise gcmd.error("Filament tip forming macro '%s' does not look like a cutting macro!" % mmu.p.form_tip_macro)
 

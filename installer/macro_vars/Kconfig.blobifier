@@ -102,20 +102,68 @@ menu "Blobifier (_BLOBIFIER)"
     float "Tray top                       "
     default 0.7
 
+  # Hidden tray actuator type
+  config VAR_BLOBIFIER_TYPE
+    string
+    default "servo"   if CHOICE_BLOBIFIER_TYPE_SERVO
+    default "stepper" if CHOICE_BLOBIFIER_TYPE_STEPPER
+
   config VAR_BLOBIFIER_TRAY_ANGLE_OUT
-    int "Tray angle out                 "
+    int
     default 0
 
   config VAR_BLOBIFIER_TRAY_ANGLE_IN
-    int "Tray angle in                  "
+    int
     default 180
+
+  config VAR_BLOBIFIER_DWELL_TIME
+    int
+    default 200
+
+  # Only ask if we have a servo
+  if CHOICE_BLOBIFIER_TYPE_SERVO
+    comment "_"
+    comment "_Servo based tray"
+
+    config VAR_BLOBIFIER_TRAY_ANGLE_OUT
+      prompt "Tray angle out                 "
+
+    config VAR_BLOBIFIER_TRAY_ANGLE_IN
+      prompt "Tray angle in                  "
+
+    config VAR_BLOBIFIER_DWELL_TIME
+      prompt "Dwell time                     "
+  endif
+
+  config VAR_BLOBIFIER_TRAY_POS_OUT
+    float
+    default 21
+
+  config VAR_BLOBIFIER_TRAY_POS_IN
+    float
+    default 0
+
+  config VAR_BLOBIFIER_TRAY_STEPPER_SPEED
+    float
+    default 110
+
+  # Only ask if we have a stepper
+  if CHOICE_BLOBIFIER_TYPE_STEPPER
+    comment "_"
+    comment "_Stepper based tray"
+
+    config VAR_BLOBIFIER_TRAY_POS_OUT
+      prompt "Stepper tray extended pos (mm) "
+
+    config VAR_BLOBIFIER_TRAY_POS_IN
+      prompt "Stepper tray retracted pos (mm)"
+
+    config VAR_BLOBIFIER_TRAY_STEPPER_SPEED
+      prompt "Stepper tray speed (mm/s)      "
+  endif
 
   comment "_"
   comment "_Blob Tuning"
-
-  config VAR_BLOBIFIER_DWELL_TIME
-    int "Dwell time                     "
-    default 200
 
   config VAR_BLOBIFIER_PURGE_START
     float "Purge start height             "
@@ -219,23 +267,6 @@ menu "Blobifier (_BLOBIFIER)"
   config VAR_BLOBIFIER_SHAKER_ARM_Z
     float "Shaker arm Z                   "
     default 2
-
-  if CHOICE_BLOBIFIER_TYPE_STEPPER
-    comment "_"
-    comment "_Stepper based tray"
-
-    config VAR_BLOBIFIER_TRAY_POS_OUT
-      float "Stepper tray extended pos (mm) "
-      default 21
-
-    config VAR_BLOBIFIER_TRAY_POS_IN
-      float "Stepper tray retracted pos (mm)"
-      default 0
-
-    config VAR_BLOBIFIER_TRAY_STEPPER_SPEED
-      float "Stepper tray speed (mm/s)      "
-      default 110
-  endif
 
   comment "_"
   comment "_Retraction tuning"

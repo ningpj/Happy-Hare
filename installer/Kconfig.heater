@@ -123,4 +123,5 @@ if MMU_HAS_HEATER && !CUSTOM_HEATER_SETUP
         Interval in minutes to rotate filament (requires eSpooler and filament end attached to spool)
 
   endmenu
+  comment "_"
 endif

@@ -135,4 +135,5 @@ if MMU_HAS_FANS
       default "2" if VAR_FAN_FORCED_MODE_AUTO
 
   endmenu
+  comment "_"
 endif

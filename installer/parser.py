@@ -818,26 +818,27 @@ class ConfigBuilder(object):
         except KeyError:
             return False
 
-    def add_section(self, section_name, comment=None, at_top=False, extra_newline=True):
+    def add_section(self, section_name, comment=None, at_top=False):
         if self.has_section(section_name):
             return
 
-        if comment:
-            section_body = [
-                CommentNode([CommentEntryNode("# " + comment)]),
-                WhitespaceNode("\n" if extra_newline else ""),
-            ]
-        else:
-            section_body = [WhitespaceNode("\n" if extra_newline else "")]
+        section_body = []
+        document_body = []
 
-        document_body = [
-            WhitespaceNode("\n"),
-            SectionNode(section_name, section_body),
-        ]
+        if comment:
+            document_body.extend([
+                CommentNode([CommentEntryNode("# " + comment)]),
+                WhitespaceNode("\n"),
+            ])
+
+        document_body.append(SectionNode(section_name, section_body))
+
         if at_top:
+            document_body.append(WhitespaceNode("\n"))
             self.document.body[0:0] = document_body
         else:
-            self.document.body += document_body
+            self.document.body.append(WhitespaceNode("\n"))
+            self.document.body.extend(document_body)
 
     def remove_section(self, section_name):
         self.parser.filter_tree(

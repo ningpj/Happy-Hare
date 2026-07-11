@@ -562,28 +562,47 @@ def install_includes(dest_file, kconfig):
     kcfg = load_parsed_kconfig(kconfig)
     builder = ConfigBuilder(dest_file)
 
-    def check_include(builder, param, include):
+    def check_include(builder, param, include, comment="", at_top=True):
         include = "include " + include
         if kcfg.is_enabled(param):
             if not builder.has_section(include):
                 logging.debug(" > Adding include [{}]".format(include))
-                builder.add_section(include, at_top=True, extra_newline=False)
+                builder.add_section(include, comment=comment, at_top=at_top)
         else:
             if builder.has_section(include):
                 logging.debug(" > Removing include [{}]".format(include))
                 builder.remove_section(include)
 
-    # Optional macros
-    check_include(builder, "INSTALL_12864_MENU", "mmu/optional/mmu_menu.cfg")
-    check_include(builder, "INSTALL_CLIENT_MACROS", "mmu/optional/client_macros.cfg")
+    # Optional macros --------
+    check_include(
+        builder,
+        "INSTALL_12864_MENU",
+        "mmu/optional/mmu_menu.cfg",
+        at_top=True
+    )
+    check_include(
+        builder,
+        "INSTALL_CLIENT_MACROS",
+        "mmu/optional/client_macros.cfg",
+        comment="Happy Hare Client macros (should be near the bottom of file)",
+        at_top=False
+    )
 
+    # Required --------
     if not builder.has_section("include mmu/macros/*.cfg"):
         logging.debug(" > Adding include [include mmu/macros/*.cfg]")
-        builder.add_section("include mmu/macros/*.cfg", at_top=True, extra_newline=False)
+        builder.add_section(
+            "include mmu/macros/*.cfg",
+            at_top=True
+        )
 
     if not builder.has_section("include mmu/base/*.cfg"):
         logging.debug(" > Adding include [include mmu/base/*.cfg]")
-        builder.add_section("include mmu/base/*.cfg", at_top=True, extra_newline=False)
+        builder.add_section(
+            "include mmu/base/*.cfg",
+            comment="Happy Hare MMU includes (should be near top of file)",
+            at_top=True
+        )
 
     with open(dest_file, "w") as f:
         f.write(builder.write())

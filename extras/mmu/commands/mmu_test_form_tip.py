@@ -61,10 +61,11 @@ class MmuTestFormTipCommand(BaseCommand):
         show = bool(gcmd.get_int('SHOW', 0, minval=0, maxval=1))
         run = bool(gcmd.get_int('RUN', 1, minval=0, maxval=1))
 
-        gcode_macro = mmu.printer.lookup_object("gcode_macro %s" % mmu.p.form_tip_macro, None)
+        macro_name = mmu._macro_name(mmu.p.form_tip_macro)
+        gcode_macro = mmu.printer.lookup_object("gcode_macro %s" % macro_name, None)
         if gcode_macro is None:
             raise gcmd.error("Filament tip forming macro '%s' not found" % mmu.p.form_tip_macro)
-        gcode_vars = mmu.printer.lookup_object("gcode_macro %s_VARS" % mmu.p.form_tip_macro, gcode_macro)
+        gcode_vars = mmu.printer.lookup_object("gcode_macro %s_VARS" % macro_name, gcode_macro)
 
         if reset:
             if mmu.form_tip_vars is not None:
