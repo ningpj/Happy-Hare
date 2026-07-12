@@ -19,7 +19,7 @@
 # Per-gate:
 #   as above with _<gate_index> extension
 #
-# SUPPORTED SENSOR TYPES (keep in sync with mmu_hardware.cfg template):
+# SUPPORTED SENSOR TYPES
 #   - AHT1X     (humidity/temperature, requires patched aht1x driver)
 #   - AHT2X     (humidity/temperature, requires patched aht1x driver)
 #   - AHT3X     (humidity/temperature, requires patched aht1x driver)
