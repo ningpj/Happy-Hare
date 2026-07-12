@@ -45,8 +45,8 @@
 
 import logging
 
-from .rfid_drivers import reader_factory
-from .rfid_drivers import pn532_driver
+from .nfc import reader_factory
+from .nfc import pn532_driver
 
 # Tracks which printer object owns _instances, mirroring the reset-on-RESTART
 # pattern from the source project: a new Printer is created on every Klipper
