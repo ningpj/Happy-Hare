@@ -2053,8 +2053,8 @@ def _multiline_input_dialog(title, initial_text, separator):
 
         elif c == "\x04":  # Ctrl-D
             _safe_curs_set(0)
-            # Happy Hare: Rejoin edited lines using the configured separator
-            return separator.join(line.strip() for line in lines if line.strip())
+            # Happy Hare: Rejoin edited lines using the configured separator (allow blank lines)
+            return separator.join(line.strip() for line in lines)
 
         elif c == "\x1B":  # \x1B = ESC
             _safe_curs_set(0)
@@ -3554,6 +3554,30 @@ def _check_valid(sym, s):
         if "\\" in s:
             _error("Backquote character '\\' is not allowed in strings")
             return False  # Happy Hare: Can easily message up klipper config
+
+        # Happy Hare: If this is an array_editor STRING with a size
+        # reference, validate the number of elements against the
+        # referenced symbol's current value
+        size_sym = getattr(sym, "array_size_sym", None)
+        if sym.orig_type == STRING and getattr(sym, "array_editor", None) \
+           and size_sym is not None:
+            base = 16 if size_sym.orig_type == HEX else 10
+            try:
+                expected = int(size_sym.str_value, base)
+            except ValueError:
+                # Referenced symbol doesn't have a sane value (yet) --
+                # nothing sensible to check against, so let it through
+                expected = None
+
+            if expected is not None:
+                n = len(s.split(sym.array_editor))
+                if n != expected:
+                    _error("Expected {} value(s) separated by '{}' "
+                           "(per {} = {}), got {}"
+                           .format(expected, sym.array_editor, size_sym.name,
+                                   expected, n))
+                    return False
+
         return True  # Anything goes for string symbols
 
     base = 10 if sym.orig_type == INT else 16

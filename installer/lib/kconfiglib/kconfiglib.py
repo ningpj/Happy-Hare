@@ -3487,10 +3487,44 @@ class Kconfig(object):
                 if node.item.__class__ is not Symbol:
                     self._parse_error("array_editor is only valid for symbols")
 
-                node.item.array_editor = self._expect_str_and_eol()
+                sep_token = self._tokens[self._tokens_i]
+                self._tokens_i += 1
 
-                if not node.item.array_editor:
+                if sep_token.__class__ is not str:
+                    self._parse_error("expected string")
+
+                if not sep_token:
                     self._parse_error("array_editor separator cannot be empty")
+
+                node.item.array_editor = sep_token
+
+                # Happy Hare: Optional second argument -- an unquoted
+                # reference to an INT/HEX symbol whose value gives the
+                # required number of elements in the array, e.g.
+                #
+                #   array_editor ";" MMU_NUM_GATES
+                #
+                # Note: this must be unquoted. A quoted string here would be
+                # parsed as a constant string rather than a symbol reference.
+                size_token = self._tokens[self._tokens_i]
+
+                if size_token is None:
+                    node.item.array_size_sym = None
+                else:
+                    self._tokens_i += 1
+
+                    if size_token.__class__ is not Symbol or \
+                       size_token.is_constant:
+                        self._parse_error(
+                            "expected an unquoted symbol reference for the "
+                            "array_editor size argument (quoting it turns it "
+                            "into a literal string instead of a symbol "
+                            "reference)")
+
+                    node.item.array_size_sym = size_token
+
+                    if self._tokens[self._tokens_i] is not None:
+                        self._trailing_tokens_error()
 
             elif t0 is None:
                 # Blank line
@@ -4654,6 +4688,19 @@ class Symbol(object):
       present a multi-line/array editor for the symbol's string value instead
       of a single-line text entry, and which separator to split/join lines on.
 
+    array_size_sym:
+      Happy Hare: Added. None for symbols without an optional second
+      'array_editor' argument. Otherwise, the (possibly not-yet-defined) INT
+      or HEX Symbol referenced as the second argument to 'array_editor',
+      e.g. MMU_NUM_GATES for
+
+        array_editor ";" MMU_NUM_GATES
+
+      Intended for use by UI front ends to validate that the number of
+      elements entered for the array matches the referenced symbol's current
+      value. Must be given unquoted in the Kconfig file -- a quoted string
+      there is parsed as a constant rather than a symbol reference.
+
     is_allnoconfig_y:
       True if the symbol has 'option allnoconfig_y' set on it. This has no
       effect internally (except when printing symbols), but can be checked by
@@ -4677,6 +4724,7 @@ class Symbol(object):
         "_was_default", # Happy Hare: Added
         "_write_to_conf",
         "array_editor", # Happy Hare: Added
+        "array_size_sym", # Happy Hare: Added
         "choice",
         "defaults",
         "generated_defaults", # Happy Hare: Added
@@ -5249,6 +5297,7 @@ class Symbol(object):
         self.choice = \
         self.env_var = \
         self.array_editor = \
+        self.array_size_sym = \
         self._cached_str_val = self._cached_tri_val = self._cached_vis = \
         self._cached_assignable = None
 

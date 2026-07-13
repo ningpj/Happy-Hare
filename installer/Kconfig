@@ -43,7 +43,8 @@
 #      @endrepeat@
 # 6. help added to menus
 # 7. "if XX" construct is allowed on comment lines
-# 8. Added 'array_editor <separator>' option for strings that represent lists
+# 8. Added 'array_editor <separator> [size]' option for strings that represent lists
+#    E.g. `array_editor ";" PARAM_NUM_GATES
 #
 # Menuconfig:
 # 1. 'r' to reset value to default
