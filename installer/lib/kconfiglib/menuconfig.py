@@ -1776,11 +1776,12 @@ def _change_node(node):
         s = sc.str_value
 
         while True:
-            # Happy Hare: Use multi-line editor for semicolon-separated strings
-            if sc.orig_type == STRING and "; " in s:
+            # Happy Hare: Use multi-line/array editor when the symbol declares
+            # an 'array_editor' separator in the Kconfig file
+            if sc.orig_type == STRING and getattr(sc, "array_editor", None):
                 s = _multiline_input_dialog(
-                    "{} ({})".format(node.prompt[0], TYPE_TO_STR[sc.orig_type]),
-                    s)
+                    "{} ({} array)".format(node.prompt[0], TYPE_TO_STR[sc.orig_type]),
+                    s, sc.array_editor)
             else:
                 s = _input_dialog(
                     "{} ({})".format(node.prompt[0], TYPE_TO_STR[sc.orig_type]),
@@ -2009,9 +2010,12 @@ def _draw_input_dialog(win, title, info_lines, s, i, hscroll):
     win.noutrefresh()
 
 
-# Happy Hare: Added multi-line editor for semicolon-separated STRING values
-def _multiline_input_dialog(title, initial_text):
-    # Pops up a dialog that edits a semicolon-separated string as multiple lines
+# Happy Hare: Added multi-line/array editor for STRING values with a
+# configurable separator (set via the 'array_editor' Kconfig property)
+def _multiline_input_dialog(title, initial_text, separator):
+    # Pops up a dialog that edits a separator-delimited string as multiple
+    # lines. 'separator' is the exact substring used to split/join lines,
+    # taken from the symbol's 'array_editor' Kconfig property.
 
     win = _styled_win("body")
     win.keypad(True)
@@ -2021,8 +2025,8 @@ def _multiline_input_dialog(title, initial_text):
         "[Enter] New line  [Backspace/Delete] Remove"
     ]
 
-    # Happy Hare: Split semicolon-separated strings into editor lines
-    lines = [line.strip() for line in initial_text.split("; ")] or [""]
+    # Happy Hare: Split the string into editor lines using the configured separator
+    lines = [line.strip() for line in initial_text.split(separator)] or [""]
 
     row = 0
     col = len(lines[row])
@@ -2049,8 +2053,8 @@ def _multiline_input_dialog(title, initial_text):
 
         elif c == "\x04":  # Ctrl-D
             _safe_curs_set(0)
-            # Happy Hare: Rejoin edited lines as the original semicolon-separated format
-            return "; ".join(line.strip() for line in lines if line.strip())
+            # Happy Hare: Rejoin edited lines using the configured separator
+            return separator.join(line.strip() for line in lines if line.strip())
 
         elif c == "\x1B":  # \x1B = ESC
             _safe_curs_set(0)
@@ -2912,7 +2916,11 @@ def _info_str(node):
         return (
             _name_info(sym) +
             _prompt_info(sym) +
-            "Type: {}\n".format(TYPE_TO_STR[sym.type]) +
+            "Type: {}\n".format(
+                TYPE_TO_STR[sym.type] + " array"
+                if sym.orig_type == STRING and getattr(sym, "array_editor", None)
+                else TYPE_TO_STR[sym.type]
+            ) +
             _value_info(sym) +
             _help_info(sym)
             #_direct_dep_info(sym) +
