@@ -5,7 +5,6 @@
 #
 # Heater parameter tokens which must be inside if MMU_HAS_HEATER clause in cfg templates:
 #   PARAM_FILAMENT_HEATER
-#   PARAM_FILAMENT_HEATERS (if MMU_HAS_PER_GATE_ENV_SENSORS)
 #   PARAM_HEATER_MAX_TEMP
 #   PARAM_HEATER_DEFAULT_DRY_TEMP
 #   PARAM_HEATER_DEFAULT_DRY_TIME
@@ -14,19 +13,28 @@
 #   PARAM_HEATER_VENT_INTERVAL
 #   PARAM_HEATER_ROTATE_INTERVAL (if MMU_HAS_ESPOOLER)
 #
+# Per-gate:
+#   PARAM_FILAMENT_HEATERS
+#
 # Can be disabled and forced off with:
 #   select UNSELECT_MMU_HAS_HEATER
 
 
 config UNSELECT_MMU_HAS_HEATER
   def_bool n
-config MMU_HAS_HEATER
-  prompt "Has enclosure heater(s)?"
-  depends on !UNSELECT_MMU_HAS_HEATER
-  forceshow
-  default n
-  help
-      Select if the MMU has a heater in the filament storate enclosure
+
+if !UNSELECT_MMU_HAS_HEATER
+  comment "_"
+  comment "_Heater"
+
+  config MMU_HAS_HEATER
+    prompt "Has enclosure heater(s)?"
+    depends on !UNSELECT_MMU_HAS_HEATER
+    forceshow
+    default n
+    help
+        Select if the MMU has a heater in the filament storate enclosure
+endif
 
 
 # -------------------------------------
@@ -42,34 +50,50 @@ if MMU_HAS_HEATER && !CUSTOM_HEATER_SETUP
       help
         Most designs will only have a single heater but some, like EMU have a per-gate heater
 
-   config PARAM_FILAMENT_HEATER
-     string "Enclosure heater name     "
-     depends on !MMU_HAS_PER_GATE_HEATERS
-     default ""
-     help
-       Enter the fullname of heater used to heat the filament enclosure.
 
-       E.g. If you have a section like this: [heater_generic MMU_heater], then enter
-            without the square brackets:
-         "heater_generic MMU_heater" or just "MMU_heater"
+    # ------------------------------------
+    # Single heater
+    # ------------------------------------
 
-   if MMU_HAS_PER_GATE_HEATERS
-     config PARAM_FILAMENT_HEATERS
-       string "List of enclosure heaters "
-       default ""
-       help
-         Enter a command separated list of fullnames for heaters used to heat individual compartments
-         of the enclosure.
+    if !MMU_HAS_PER_GATE_HEATERS
 
-         E.g. If you have a section like this: [heater_generic MMU_heater], then enter
-              without the square brackets:
-           "heater_generic MMU_heater, ..." or just "MMU_heater, MMU_heater2, ..."
-
-      config PARAM_MAX_CONCURRENT_HEATERS
-        int "Maximum concurrent heaters"
-        default 1
+      config PARAM_FILAMENT_HEATER
+        string "Enclosure heater name     "
+        depends on !MMU_HAS_PER_GATE_HEATERS
+        default ""
         help
-          Limit the number of simultaneously active heaters (power/PSU protection)
+          Enter the fullname of heater used to heat the filament enclosure.
+
+          E.g. If you have a section like this: [heater_generic MMU_heater], then enter
+               without the square brackets: "MMU_heater"
+
+    endif
+
+
+    # ------------------------------------
+    # Multiple heaters
+    # ------------------------------------
+
+    if MMU_HAS_PER_GATE_HEATERS
+
+      # Currently we don't create heater objects so just assemble arbitary names
+
+      config PARAM_FILAMENT_HEATERS
+        string "List of enclosure heaters "
+        default ""
+        help
+          Enter a command separated list of fullnames for heaters used to heat individual compartments
+          of the enclosure.
+
+          E.g. If you have a section like this: [heater_generic MMU_heater0], then enter
+               without the square brackets: "MMU_heater0, MMU_heater1, ..."
+
+       config PARAM_MAX_CONCURRENT_HEATERS
+         int "Maximum concurrent heaters"
+         default 1
+         help
+           Limit the number of simultaneously active heaters (power/PSU protection)
+
     endif
 
 
@@ -123,5 +147,4 @@ if MMU_HAS_HEATER && !CUSTOM_HEATER_SETUP
         Interval in minutes to rotate filament (requires eSpooler and filament end attached to spool)
 
   endmenu
-  comment "_"
 endif

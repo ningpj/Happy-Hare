@@ -20,5 +20,6 @@ menu "MMU Features / Additions"
   source "Kconfig.encoder"
   source "Kconfig.filament_buffer"
   comment "_"
+  comment "_Sensors"
   source "sensors/Kconfig"
 endmenu

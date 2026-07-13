@@ -3445,7 +3445,8 @@ def _node_str(node):
     # entered. Print "----" if the menu is empty. We don't allow those to be
     # entered.
     if node.is_menuconfig:
-        s += "  --->" if _shown_nodes(node) else "  ----"
+        # Happy Hare s += "  --->" if _shown_nodes(node) else "  ----"
+        s += "  --->" if _shown_nodes(node) else ""
 
     return s
 

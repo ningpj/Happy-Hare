@@ -19,13 +19,19 @@
 
 config UNSELECT_MMU_HAS_LEDS
   def_bool n
-config MMU_HAS_LEDS
-  prompt "Has Leds?"
-  depends on !UNSELECT_MMU_HAS_LEDS
-  forceshow
-  default n
-  help
-    Select if your MMU has LEDs.
+
+if !UNSELECT_MMU_HAS_LEDS
+  #comment "_"
+  comment "_Leds"
+
+  config MMU_HAS_LEDS
+    prompt "Has Leds?"
+    depends on !UNSELECT_MMU_HAS_LEDS
+    forceshow
+    default n
+    help
+      Select if your MMU has LEDs.
+endif
 
 
 # -------------------------------------
@@ -135,6 +141,5 @@ if MMU_HAS_LEDS
     endif
 
   endmenu
-  comment "_"
 endif
 
