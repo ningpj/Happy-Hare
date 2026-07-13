@@ -98,6 +98,27 @@ if MMU_TYPE_EMU_1_0
   config PARAM_GEAR_MICROSTEPS
     default 4
 
+  config PARAM_GEAR_LOAD_SPEED
+    default 250
+  config PARAM_GEAR_LOAD_ACCEL
+    default 120
+  config PARAM_GEAR_FROM_FILAMENT_BUFFER_SPEED
+    default 250
+  config PARAM_GEAR_FROM_FILAMENT_BUFFER_ACCEL
+    default 120
+  config PARAM_GEAR_UNLOAD_SPEED
+    default 250
+  config PARAM_GEAR_UNLOAD_ACCEL
+    default 120
+  config PARAM_GEAR_SHORT_MOVE_SPEED
+    default 80
+  config PARAM_GEAR_SHORT_MOVE_ACCEL
+    default 80
+  config PARAM_GEAR_SHORT_MOVE_THRESHOLD
+    default 100
+  config PARAM_GEAR_HOMING_SPEED
+    default 80
+
   config PARAM_SYNC_GEAR_CURRENT
     default 52
 
