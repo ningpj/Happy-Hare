@@ -3483,6 +3483,15 @@ class Kconfig(object):
 
                 node.forceshow = True
 
+            elif t0 is _T_ARRAY_EDITOR: # Happy Hare: Added multi-line/array editor for STRING symbols
+                if node.item.__class__ is not Symbol:
+                    self._parse_error("array_editor is only valid for symbols")
+
+                node.item.array_editor = self._expect_str_and_eol()
+
+                if not node.item.array_editor:
+                    self._parse_error("array_editor separator cannot be empty")
+
             elif t0 is None:
                 # Blank line
                 continue
@@ -4631,6 +4640,20 @@ class Symbol(object):
       they are visible. env_var corresponds to a flag called SYMBOL_AUTO in the
       C implementation.
 
+    array_editor:
+      Happy Hare: Added. None for symbols without an 'array_editor' property.
+      Otherwise, the separator string given to 'array_editor' on this STRING
+      symbol, e.g. "," for
+
+        config FOO
+            string "Enter a comma separated string"
+            default ""
+            array_editor ","
+
+      Intended for use by UI front ends (e.g. menuconfig) to decide whether to
+      present a multi-line/array editor for the symbol's string value instead
+      of a single-line text entry, and which separator to split/join lines on.
+
     is_allnoconfig_y:
       True if the symbol has 'option allnoconfig_y' set on it. This has no
       effect internally (except when printing symbols), but can be checked by
@@ -4653,6 +4676,7 @@ class Symbol(object):
         "_was_set",
         "_was_default", # Happy Hare: Added
         "_write_to_conf",
+        "array_editor", # Happy Hare: Added
         "choice",
         "defaults",
         "generated_defaults", # Happy Hare: Added
@@ -5224,6 +5248,7 @@ class Symbol(object):
         self.user_value = \
         self.choice = \
         self.env_var = \
+        self.array_editor = \
         self._cached_str_val = self._cached_tri_val = self._cached_vis = \
         self._cached_assignable = None
 
@@ -7360,6 +7385,7 @@ except AttributeError:
 (
     _T_ALLNOCONFIG_Y,
     _T_AND,
+    _T_ARRAY_EDITOR, # Happy Hare: Added
     _T_BOOL,
     _T_CHOICE,
     _T_CLOSE_PAREN,
@@ -7412,13 +7438,14 @@ except AttributeError:
     _T_TRISTATE,
     _T_UNEQUAL,
     _T_VISIBLE,
-) = range(1, 55) # Happy Hare: 51->55
+) = range(1, 56) # Happy Hare: 51->56
 
 # Keyword to token map, with the get() method assigned directly as a small
 # optimization
 _get_keyword = {
     "---help---":     _T_HELP,
     "allnoconfig_y":  _T_ALLNOCONFIG_Y,
+    "array_editor":   _T_ARRAY_EDITOR, # Happy Hare: Added
     "bool":           _T_BOOL,
     "boolean":        _T_BOOL,
     "choice":         _T_CHOICE,
@@ -7542,6 +7569,7 @@ _DEF_TOKEN_TO_TYPE = {
 # these tokens. _T_CHOICE is included to avoid symbols being registered for
 # named choices.
 _STRING_LEX = frozenset({
+    _T_ARRAY_EDITOR, # Happy Hare: Added
     _T_BOOL,
     _T_CHOICE,
     _T_COMMENT,

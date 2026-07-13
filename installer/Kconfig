@@ -43,12 +43,14 @@
 #      @endrepeat@
 # 6. help added to menus
 # 7. "if XX" construct is allowed on comment lines
+# 8. Added 'array_editor <separator>' option for strings that represent lists
 #
 # Menuconfig:
 # 1. 'r' to reset value to default
 # 2. Flexible comment lines and section separator using "_" and "_comment"
 # 3. Lots of formatting changes and style options
 # 4. Variable input dialogs with better parsing
+# 5. Added array editor - used on "," or ";" separated strings
 #
 #
 # Capability parmams:
@@ -208,6 +210,7 @@ osource "/tmp/.Kconfig.generated"
 if MULTI_UNIT_ENTRY_POINT
   config MMU_UNITS
     prompt "MMU unit names"
+    array_editor ","
     help
       Comma-separated list of unit names. Careful: Use only alphanumeric characters.
       If this is the first time configuring mulit-unit from previous single-unit install

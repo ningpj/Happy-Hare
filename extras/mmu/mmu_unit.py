@@ -486,7 +486,7 @@ class MmuUnit:
                 if sensor is not None
             )
 
-        def add_sensor_endstop(sensor, steppers):
+        def add_sensor_endstop(sensor, steppers, shared=False):
             sensor_name = sensor.name
 
             mcu_endstop = None
@@ -497,7 +497,10 @@ class MmuUnit:
                 ppins.allow_multi_use_pin(share_name)
 
                 for s in steppers:
-                    mcu_endstop = s.rail.add_extra_endstop(sensor_pin, sensor_name)
+                    if shared and mcu_endstop is not None:
+                        s.rail.add_extra_endstop("", sensor_name, register=False, mcu_endstop=mcu_endstop)
+                    else:
+                        mcu_endstop = s.rail.add_extra_endstop(sensor_pin, sensor_name)
 
                 e_type = "digital endstop"
 
@@ -505,7 +508,10 @@ class MmuUnit:
                 # We assume a virtual sensor that implement "software" endstop interface
                 for s in steppers:
                     # The sensor here must implement the necessary endstop homing methods!
-                    mcu_endstop = s.rail.add_extra_endstop(None, sensor_name, mcu_endstop=sensor)
+                    if shared and mcu_endstop is not None:
+                        s.rail.add_extra_endstop("", sensor_name, register=False, mcu_endstop=mcu_endstop)
+                    else:
+                        mcu_endstop = s.rail.add_extra_endstop(None, sensor_name, mcu_endstop=sensor)
 
                 e_type = "analog endstop"
 
@@ -554,8 +560,8 @@ class MmuUnit:
                 logging.info(f"MMU: Shared {sensor_name} endstop with stepper {stepper_names} for {self.name}")
 
             else:
-                # Create just for the gear steppers
-                add_sensor_endstop(sensor, steppers)
+                # Create one endstop for the first gear stepper, then bind the rest to it
+                add_sensor_endstop(sensor, steppers, shared=True)
 
         # Event handlers
         self.printer.register_event_handler('klippy:connect', self.handle_connect)
@@ -915,7 +921,7 @@ class MmuUnit:
             # Single NFC reader
             unit_info['nfc_reader'] = self.nfc_reader
 
-        elif self.nfcs_readers:
+        elif self.nfc_readers:
             # Per-gate NFC reader
             unit_info['nfc_readers'] = self.nfc_readers
 
