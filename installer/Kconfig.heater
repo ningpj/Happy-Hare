@@ -41,58 +41,58 @@ endif
 # Heater config
 # -------------------------------------
 
-if MMU_HAS_HEATER && !CUSTOM_HEATER_SETUP
+if MMU_HAS_HEATER
   menu "Heater config"
 
-    config MMU_HAS_PER_GATE_HEATERS
-      bool "Per-gate Heaters?"
-      default n
-      help
-        Most designs will only have a single heater but some, like EMU have a per-gate heater
+    if !CUSTOM_HEATER_SETUP
 
-
-    # ------------------------------------
-    # Single heater
-    # ------------------------------------
-
-    if !MMU_HAS_PER_GATE_HEATERS
-
-      config PARAM_FILAMENT_HEATER
-        string "Enclosure heater name     "
-        depends on !MMU_HAS_PER_GATE_HEATERS
-        default ""
+      config MMU_HAS_PER_GATE_HEATERS
+        bool "Per-gate Heaters?"
+        default n
         help
-          Enter the fullname of heater used to heat the filament enclosure.
-
-          E.g. If you have a section like this: [heater_generic MMU_heater], then enter
-               without the square brackets: "MMU_heater"
-
-    endif
+          Most designs will only have a single heater but some, like EMU have a per-gate heater
 
 
-    # ------------------------------------
-    # Multiple heaters
-    # ------------------------------------
+      # ------------------------------------
+      # Single heater
+      # ------------------------------------
 
-    if MMU_HAS_PER_GATE_HEATERS
+      if !MMU_HAS_PER_GATE_HEATERS
+        config PARAM_FILAMENT_HEATER
+          string "Enclosure heater name     "
+          depends on !MMU_HAS_PER_GATE_HEATERS
+          default ""
+          help
+            Enter the fullname of heater used to heat the filament enclosure.
 
-      # Currently we don't create heater objects so just assemble arbitary names
+            E.g. If you have a section like this: [heater_generic MMU_heater], then enter
+                 without the square brackets: "MMU_heater"
+      endif
 
-      config PARAM_FILAMENT_HEATERS
-        string "List of enclosure heaters "
-        default ""
-        help
-          Enter a command separated list of fullnames for heaters used to heat individual compartments
-          of the enclosure.
 
-          E.g. If you have a section like this: [heater_generic MMU_heater0], then enter
-               without the square brackets: "MMU_heater0, MMU_heater1, ..."
+      # ------------------------------------
+      # Multiple heaters
+      # ------------------------------------
 
-       config PARAM_MAX_CONCURRENT_HEATERS
-         int "Maximum concurrent heaters"
-         default 1
-         help
-           Limit the number of simultaneously active heaters (power/PSU protection)
+      if MMU_HAS_PER_GATE_HEATERS
+        # Currently we don't create heater objects so just assemble arbitary names
+
+        config PARAM_FILAMENT_HEATERS
+          string "List of enclosure heaters "
+          default ""
+          help
+            Enter a command separated list of fullnames for heaters used to heat individual compartments
+            of the enclosure.
+
+            E.g. If you have a section like this: [heater_generic MMU_heater0], then enter
+                 without the square brackets: "MMU_heater0, MMU_heater1, ..."
+
+           config PARAM_MAX_CONCURRENT_HEATERS
+           int "Maximum concurrent heaters"
+           default 1
+           help
+             Limit the number of simultaneously active heaters (power/PSU protection)
+      endif
 
     endif
 

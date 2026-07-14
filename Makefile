@@ -99,7 +99,7 @@ restart_klipper = 0
 .SECONDEXPANSION:
 .DEFAULT_GOAL := build
 .PRECIOUS: $(KCONFIG_CONFIG) $(KCONFIG_CONFIG)_%
-.PHONY: menuconfig install uninstall check_version diff test build clean variables python_deps fix_links gen_kconfig kconfig_needs_update olddefconfig
+.PHONY: menuconfig install uninstall check_version diff test build clean variables python_deps fix_links gen_kconfig kconfig_needs_update olddefconfig verify_pickle
 .SECONDARY: \
 	$(call backup_name,$(KLIPPER_CONFIG_HOME)/mmu) \
 	$(call backup_name,$(KLIPPER_CONFIG_HOME)/$(MOONRAKER_CONFIG_FILE)) \
@@ -432,6 +432,22 @@ variables:
 	@echo "$(C_NOTICE)IN                             =$(C_INFO) $(IN)$(C_OFF)"
 	@echo "$(C_NOTICE)KCONFIG_CONFIG                 =$(C_INFO) $(KCONFIG_CONFIG)$(C_OFF)"
 	@echo "========================="
+
+
+# Verify that every explicit CONFIG_* assignment in each raw Kconfig value file survived
+# correctly into its pickle. Catches silent value-dropping or mis-typing bugs in KConfig.as_dict()
+# (see installer/lib/kconfiglib/test_kconfig_pickle_consistency.py for why this
+# check exists and how it works).
+kconfig_pickles := $(addprefix $(OUT)/,$(addsuffix .pickle,$(notdir $(kconfig_files))))
+verify_pickle: $(kconfig_pickles) | python_deps
+	$(Q)status=0; \
+	for f in $(kconfig_files); do \
+		echo "$(C_INFO)Verifying pickle consistency for $$f$(C_OFF)"; \
+		$(PY) "$(SRC)/installer/lib/kconfiglib/test_kconfig_pickle_consistency.py" \
+			"$$f" "$(OUT)/$$(basename "$$f").pickle" || status=1; \
+	done; \
+	rm -rf $(OUT); \
+	exit $$status
 
 
 
