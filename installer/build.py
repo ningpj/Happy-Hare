@@ -622,8 +622,8 @@ def install_includes(dest_file, kconfig):
         builder,
         "INSTALL_CLIENT_MACROS",
         "mmu/optional/client_macros.cfg",
-        comment="Happy Hare Client macros (should be near the bottom of file)",
-        at_top=False
+        comment="Happy Hare Client macros (should be near the bottom of file before SAVE_CONFIG section)",
+        at_top=True
     )
 
     # Required --------
