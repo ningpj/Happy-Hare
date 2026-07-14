@@ -622,7 +622,7 @@ def install_includes(dest_file, kconfig):
         builder,
         "INSTALL_CLIENT_MACROS",
         "mmu/optional/client_macros.cfg",
-        comment="Happy Hare Client macros (should be near the bottom of file)",
+        comment="Happy Hare Client macros (should be after last include or other PAUSE/CANCEL macros)",
         at_top=False
     )
 

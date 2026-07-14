@@ -16,6 +16,18 @@ if [ -f ~/klippy-env/bin/activate ]; then
     . ~/klippy-env/bin/activate
 fi
 
+# Check for python 3.x
+if command -v python >/dev/null 2>&1; then
+    VER=$(python -c 'import sys; print(sys.version_info[0])')
+    if [ "${VER}" -lt 3 ]; then
+        echo "${C_ERROR}ERROR: Python 3 is required to run Happy-Hare 4.x.${C_OFF}" >&2
+        exit 1
+    fi
+else
+    echo "${C_ERROR}ERROR: Python not found. Please source environment to use for Happy-Hare 4.x.${C_OFF}" >&2
+    exit 1
+fi
+
 # Get current HH version from the mmu_constants.py file
 export HH_VERSION=$(sed -n 's/^VERSION = "\(.*\)".*/\1/p' "$SCRIPT_DIR/extras/mmu/mmu_constants.py")
 
@@ -152,7 +164,7 @@ while getopts "ehfiudzsb:nk:c:m:a:tqv" arg; do
     t) export TESTDIR=/tmp/mmu_test ;;
     q) export Q= ;;   # Developer: Disable quiet mode in Makefile
     v) export V=-v ;; # Developer: Enable verbose mode in builder and debug in Makefile
-    e) export F_PER_GATE_MCU=y ;; # Allows mutliple MCU selection but menuconfig startup time is increased
+    e) export F_PER_GATE_MCU=y ;; # Allows multiple MCU selection but menuconfig startup time is increased
     h) usage ;;
     *) usage ;;
     esac
@@ -211,6 +223,14 @@ fi
 if [ -n "${CONFIG_KLIPPER_HOME+x}" ] && [ ! -d "${CONFIG_KLIPPER_HOME}" ]; then
     echo "${C_ERROR}Klipper config directory not found: ${CONFIG_KLIPPER_HOME}${C_OFF}"
     exit 1
+fi
+
+# Check if kalico is installed (klippy/__init__.py contains APP_NAME = "Kalico"
+if [ -n "${CONFIG_KLIPPER_HOME:-}" ] && [ -f "${CONFIG_KLIPPER_HOME}/klippy/__init__.py" ]; then
+    if grep -q '^APP_NAME *= *"Kalico"' "${CONFIG_KLIPPER_HOME}/klippy/__init__.py" 2>/dev/null; then
+        echo "${C_ERROR}ERROR: Kalico detected. Happy-Hare is not currently compatible with Kalico until Klipper motion-subsystem enhancements have been ported.${C_OFF}" >&2
+        exit 1
+    fi
 fi
 
 if [ -n "${CONFIG_KLIPPER_CONFIG_HOME+x}" ] && [ ! -d "${CONFIG_KLIPPER_CONFIG_HOME}" ]; then
