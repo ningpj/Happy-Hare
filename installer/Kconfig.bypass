@@ -8,7 +8,7 @@ config UNSELECT_HAS_BYPASS
   def_bool n
 
 config BOOL_HAS_BYPASS
-  bool "Has/show filament bypass?"
+  bool "Associate bypass with this unit?"
   forceshow
   depends on !UNSELECT_HAS_BYPASS
   help
