@@ -22,6 +22,11 @@ import logging
 import re
 import copy
 
+# Check for python 3.x
+if sys.version_info[0] < 3:
+    sys.stderr.write("ERROR: Python 3 is required to run Happy-Hare 4.x\n")
+    sys.exit(1)
+
 # Notes:
 # {placeholder} style placeholders are no longer used with jinja templating
 # {template} is used to support advanced multi-line config lists/dicts like:
