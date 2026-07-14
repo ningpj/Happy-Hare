@@ -127,25 +127,68 @@ class KConfig(kconfiglib.Kconfig):
     def is_selected(self, choice, value):
         if isinstance(value, list):
             return any(self.is_selected(choice, v) for v in value)
-        return self.named_choices[choice].selection.name == value
+        # Choice.selection silently discards choice.user_selection
+        # if the selected member isn't currently visible (same trap as
+        # Symbol.str_value discarding Symbol.user_value -- see as_dict()).
+        # Prefer the raw user_selection so an explicit choice sticks even
+        # when the choice/members are invisible in this context.
+        ch = self.named_choices[choice]
+        selected = ch.user_selection or ch.selection
+        return selected is not None and selected.name == value
 
     def is_enabled(self, sym):
-        return kconfig_truthy(self.syms[sym].str_value) # Was: return self.syms[sym].user_value
+        s = self.syms[sym]
+        # Prefer the raw user_value (what was actually assigned
+        # in the loaded .config) over str_value, since kconfiglib only
+        # honors user_value when the symbol is currently visible. Fall back
+        # to str_value for anything that was never explicitly assigned, so
+        # a purely default-driven symbol is still resolved correctly.
+        raw = s.user_value if s.user_value is not None else s.str_value
+
+        # BOOL/TRISTATE user_value is an int tri-state (0/1/2), not
+        # "n"/"m"/"y" -- normalize it before handing it to kconfig_truthy()
+        if isinstance(raw, int):
+            raw = kconfiglib.TRI_TO_STR[raw]
+
+        return kconfig_truthy(raw)
 
     def getint(self, sym):
-        return int(self.syms[sym].user_value)
+        s = self.syms[sym]
+        # Same user_value/str_value fallback as is_enabled() --
+        # avoids int(None) blowing up for a symbol that's only ever been
+        # set via default
+        raw = s.user_value if s.user_value is not None else s.str_value
+        return int(raw)
 
     def get(self, sym):
         """Get the value of the symbol"""
         if sym not in self.syms:
             raise KeyError("Symbol '{}' not found in Kconfig".format(sym))
-        return self.syms[sym].user_value
+        s = self.syms[sym]
+        # Same user_value/str_value fallback as is_enabled()/
+        # getint() -- otherwise this silently returns None for anything
+        # relying purely on a default instead of an explicit assignment
+        return s.user_value if s.user_value is not None else s.str_value
 
     def as_dict(self):
         """
         Return the Kconfig as a dictionary, converting all variables that
-        end with "_<int>" into lists of the correct length of easy jinja
-        templating. Also "boolean" types are converted to python bool
+        end with "_<int>" into lists of the correct length for easy jinja
+        templating. Also converts "bool" types to Python bool.
+
+        Note: Prefers each symbol's raw user_value over the Kconfig-computed
+        str_value/tri_value, since kconfiglib only honors a user-assigned
+        value when the symbol is currently *visible*. Many symbols here are
+        intentionally invisible/promptless and rely entirely on defaults
+        (e.g. auto-detected settings) -- those still get their properly
+        computed default here whenever they have no explicit user_value.
+        Others (e.g. per-unit values like UNIT_NAME) are also invisible but
+        are still meant to be explicitly overridden via the loaded .config
+        file -- honoring user_value when present is what makes that work.
+
+        Caveat: for BOOL/TRISTATE symbols, user_value is stored internally
+        as an int tri-state (0/1/2), not as "n"/"m"/"y" -- it's normalized
+        here before use so it isn't silently mistaken for something falsy.
         """
         result = {}
         grouped = {}
@@ -160,18 +203,37 @@ class KConfig(kconfiglib.Kconfig):
             if sym_obj.type == kconfiglib.UNKNOWN:
                 continue
 
-            if sym_obj.type == kconfiglib.BOOL:
-                value = (sym_obj.str_value == "y")
-            elif sym_obj.type == kconfiglib.TRISTATE:
-                value = sym_obj.str_value
-            else:
-                value = sym_obj.str_value.replace("\\n", "\n")
+            raw = sym_obj.user_value if sym_obj.user_value is not None else sym_obj.str_value
 
+            # Normalize BOOL/TRISTATE user_value (an int tri-state)
+            # to the "n"/"m"/"y" form str_value would already give us
+            if sym_obj.type in (kconfiglib.BOOL, kconfiglib.TRISTATE) and isinstance(raw, int):
+                raw = kconfiglib.TRI_TO_STR[raw]
+
+            if sym_obj.type == kconfiglib.BOOL:
+                value = (raw == "y")
+            elif sym_obj.type == kconfiglib.TRISTATE:
+                value = raw
+            else:
+                value = raw.replace("\\n", "\n")
+
+            # Choice members: only include selected/enabled member. Checked before the
+            # array-grouping regex below (see that comment for why).
+            if sym_name in choice_member_names:
+                if value is True or value in ("y", "m"):
+                    result[sym_name] = value
+                continue
+
+            # Array-suffix grouping only makes sense for STRING/INT/HEX/FLOAT symbols
+            # (the array_editor use case, e.g. GATE_NAME_0, GATE_NAME_1). A BOOL/
+            # TRISTATE flag is never an array element, no matter what its name ends
+            # in -- and plenty legitimately end in version/revision digits (e.g.
+            # MMU_TYPE_ERCF_1_1, BOARD_TYPE_VVD_1_0), which would otherwise collide
+            # with this regex and get silently dropped from the result.
             m = re.match(r"^(.+_)(\d+)$", sym_name)
-            if m:
+            if m and sym_obj.type not in (kconfiglib.BOOL, kconfiglib.TRISTATE):
                 key = m.group(1)
                 nr = int(m.group(2))
-
                 if nr > 12:
                     logging.warning(
                         f"Symbol '{sym_name}' looks like an indexed array element (index={nr}) "
@@ -179,14 +241,7 @@ class KConfig(kconfiglib.Kconfig):
                     )
                     result[sym_name] = value
                     continue
-
                 grouped.setdefault(key, {})[nr] = value
-                continue
-
-            # Non-indexed choice members: only include selected/enabled member.
-            if sym_name in choice_member_names:
-                if value is True or value in ("y", "m"):
-                    result[sym_name] = value
                 continue
 
             result[sym_name] = value
@@ -622,8 +677,8 @@ def install_includes(dest_file, kconfig):
         builder,
         "INSTALL_CLIENT_MACROS",
         "mmu/optional/client_macros.cfg",
-        comment="Happy Hare Client macros (should be near the bottom of file)",
-        at_top=False
+        comment="Happy Hare Client macros (should be near the bottom of file before SAVE_CONFIG section)",
+        at_top=True
     )
 
     # Required --------
@@ -782,13 +837,20 @@ def pre_parse_kconfig(kconfig):
     tmp_file = pickle_file + ".tmp"
     try:
         kcfg = KConfig(kconfig)
+
         data = {
             "config_file": kconfig,
             "values": kcfg.as_dict(),
             "choices": {
-                name: choice.selection.name
+                # Choice.selection silently discards
+                # choice.user_selection if the selected member isn't
+                # currently visible (same trap as Symbol.str_value
+                # discarding Symbol.user_value -- see KConfig.as_dict()).
+                # Prefer the raw user_selection so an explicit choice
+                # sticks even when the choice/members are invisible.
+                name: (choice.user_selection or choice.selection).name
                 for name, choice in kcfg.named_choices.items()
-                if choice.selection
+                if choice.user_selection or choice.selection
             },
         }
         with open(tmp_file, "wb") as f:
@@ -813,6 +875,7 @@ def load_parsed_kconfig(kconfig):
     try:
         with open(pickle_file, "rb") as f:
             data = dill.load(f)
+
             return ParsedKConfig(
                 data["config_file"],
                 data["values"],
@@ -826,6 +889,7 @@ def load_parsed_kconfig(kconfig):
     except Exception as e:
         logging.error("Error unpickling '%s' (%s)" % (pickle_file, e))
         exit(1)
+
 
 
 # ----------------------------------------------------------------------------------------------

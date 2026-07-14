@@ -269,7 +269,7 @@ if !MULTI_UNIT_ENTRY_POINT
     source "Kconfig.purging"
     source "macro_vars/Kconfig"     # Variables for all macros
   endif
-  source "Kconfig.raw"              # Raw access to appropriate parameters
+  source "Kconfig.other"            # Raw access to other parameters
   if !MULTI_UNIT
     comment "_"
     source "Kconfig.paths_services" # Advanced install options
