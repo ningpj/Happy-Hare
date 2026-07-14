@@ -3,7 +3,7 @@
 # (Once user edits values here they are sticky and
 # will override defaults)
 
-menu "Raw Settings"
+menu "Other raw Settings"
   help
     Raw Settings
     Allows override of designer defaults. Change these settings if you know
@@ -23,7 +23,6 @@ menu "Raw Settings"
     source "Kconfig.selector_stepper"
     source "Kconfig.selector_servo"
     source "sensors/Kconfig"
-    source "Kconfig.endstops"
     source "Kconfig.gates"
     source "Kconfig.motor_sync"
     source "Kconfig.flowguard"

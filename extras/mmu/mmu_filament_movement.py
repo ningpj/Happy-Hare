@@ -525,18 +525,17 @@ class MmuFilamentMovement:
         length -= start_pos
 
         try:
-            # Do we need to reduce by buffer amount to ensure we don't overshoot homing sensor
+            # Do we need to reduce bowden move by buffer amount to ensure we don't overshoot homing sensor
             extruder_homing_buffer = 0.
             if full:
                 # We will need some buffer space if we are intending to home to extruder (or toolhead sensor)
                 if self._must_home_to_extruder() or self.sensor_manager.has_sensor(SENSOR_TOOLHEAD):
-                    # Determine how much to reduce the fast move portion to leave room for homing
                     extruder_homing_buffer = u.p.bowden_load_homing_buffer
 
+                if self._must_home_to_extruder() and u.p.extruder_homing_endstop == SENSOR_EXTRUDER_ENTRY:
                     # If homing to extruder entry sensor, Further reduce to compensate for distance from sensor to extruder gear
                     # (because the bowden length is always recorded as distance to extruder gear)
-                    if u.p.extruder_homing_endstop == SENSOR_EXTRUDER_ENTRY:
-                        extruder_homing_buffer -= u.toolhead_wrapper.p.toolhead_entry_to_extruder
+                    extruder_homing_buffer -= u.toolhead_wrapper.p.toolhead_entry_to_extruder
 
                 length -= extruder_homing_buffer # Reduce fast move distance
 
@@ -763,18 +762,33 @@ class MmuFilamentMovement:
 
     def _must_home_to_extruder(self):
         """
-        Determine whether a dedicated extruder homing step is required before loading.
+        Determine whether a dedicated extruder homing step should occur before loading.
+        The consequence of returning False is that the full bowden move will occur rather
+        than a shorter move to allow room for homing.
 
         Returns:
-            bool: True when a dedicated extruder homing move is required before final loading.
+            bool: True when a dedicated extruder homing move is required
         """
         u = self.mmu_unit()
 
-        has_extruder_endstop = u.p.extruder_homing_endstop != SENSOR_EXTRUDER_NONE
-        force_homing = u.p.extruder_force_homing
-        toolhead_sensor_missing = not self.sensor_manager.has_sensor(SENSOR_TOOLHEAD)
+        # Can't home if no endstop set
+        if u.p.extruder_homing_endstop == SENSOR_EXTRUDER_NONE:
+            return False
 
-        return has_extruder_endstop and (force_homing or toolhead_sensor_missing)
+        force_homing = u.p.extruder_force_homing
+
+        # Homing to extruder is not really necessary with toolhead sensor because we
+        # always home to that, however it can be forced.
+        if self.sensor_manager.has_sensor(SENSOR_TOOLHEAD):
+            return force_homing
+
+        # With good calibration it is often better just to move the full length, but give user the choice
+        has_inccurate_endstop = u.p.extruder_homing_endstop in (SENSOR_EXTRUDER_ENCODER, SENSOR_GEAR_TOUCH)
+        if has_inccurate_endstop:
+            return force_homing
+
+        # Default is up to the user
+        return force_homing
 
 
     def _home_to_extruder(self, extra_homing=0.):
@@ -850,10 +864,10 @@ class MmuFilamentMovement:
 
         if not homed:
             self.set_filament_pos_state(FILAMENT_POS_END_BOWDEN)
+            distance = f"{homing_movement:.1f}mm" if homing_movement is not None else "unknown distance"
             raise MmuError(
                 f"Failed to reach extruder '{u.p.extruder_homing_endstop}' "
-                f"endstop after moving "
-                f"{homing_movement:.1f}mm" if homing_movement is not None else "unknown distance"
+                f"endstop after moving {distance}"
             )
 
         if measured > (homing_max * 0.8):
@@ -1233,8 +1247,8 @@ class MmuFilamentMovement:
         """
         Extract filament past extruder gear (to end of bowden). Assume that tip has already been formed
         and we are parked somewhere in the extruder either by slicer or by stand alone tip creation
-        But be careful:
-          A poor tip forming routine or slicer could have popped the filament out of the extruder already
+        But be careful because a poor tip forming routine or the slicer could have popped the filament
+        out of the extruder already.
         Ending point is either the exit of the extruder or at the extruder (entry) endstop if fitted
 
         Args:
@@ -1256,6 +1270,7 @@ class MmuFilamentMovement:
 
             self._ensure_safe_extruder_temperature(wait=False)
 
+            # Starting assumption that reduces selector movement for type-a MMUs
             synced = self.selector().get_filament_grip_state() == FILAMENT_DRIVE_STATE and not extruder_only
             if synced:
                 speed = self.p.extruder_sync_unload_speed
@@ -1269,13 +1284,14 @@ class MmuFilamentMovement:
             if self.sensor_manager.has_sensor(SENSOR_EXTRUDER_ENTRY) and not extruder_only:
                 # -------------------------------------------------------------------------------
                 # BEST Strategy: Extruder exit movement leveraging extruder entry sensor.
-                # Must be synced
+                # Forces syncing
                 # -------------------------------------------------------------------------------
                 synced = True
                 speed = self.p.extruder_sync_unload_speed
                 motor = "gear+extruder"
+                actual = 0.0
 
-                if not self.sensor_manager.check_sensor(SENSOR_EXTRUDER_ENTRY):
+                if self.sensor_manager.check_sensor(SENSOR_EXTRUDER_ENTRY) is False:
                     if self.sensor_manager.check_sensor(SENSOR_TOOLHEAD):
                         raise MmuError(
                             "Toolhead or extruder sensor failure. Extruder sensor "
@@ -1288,6 +1304,7 @@ class MmuFilamentMovement:
                         "Will attempt to continue..."
                     )
                     fhomed = True  # Assumption
+
                 else:
                     hlength = (
                         u.toolhead_wrapper.p.toolhead_extruder_to_nozzle
@@ -1312,7 +1329,9 @@ class MmuFilamentMovement:
                 # We don't need to validate and know exactly where end of filament is so true up
                 validate = False
                 self.set_filament_pos_state(FILAMENT_POS_HOMED_ENTRY)
-                self.drive().set_filament_position(-(u.toolhead_wrapper.p.toolhead_extruder_to_nozzle + u.toolhead_wrapper.p.toolhead_entry_to_extruder))
+                self.drive().set_filament_position(
+                    -(u.toolhead_wrapper.p.toolhead_extruder_to_nozzle + u.toolhead_wrapper.p.toolhead_entry_to_extruder)
+                )
 
                 # Sanity check
                 if self.sensor_manager.check_sensor(SENSOR_TOOLHEAD):
@@ -1342,7 +1361,7 @@ class MmuFilamentMovement:
                             - u.toolhead_wrapper.p.toolhead_ooze_reduction
                             - self.toolchange_retract
                         )
-                        self.log_debug("Reverse homing up to %.1fmm off toolhead sensor%s" % (hlength, (" (synced)" if synced else "")))
+                        self.log_debug(f"Reverse homing up to {hlength:.1f}mm off toolhead sensor{' (synced)' if synced else ''}")
                         actual, fhomed, _, _ = self.move_filament(
                             "Reverse homing off toolhead sensor",
                             -hlength,
@@ -2394,22 +2413,6 @@ class MmuFilamentMovement:
             self.log_assertion("Invalid motor specification '%s'" % motor)
             return null_rtn
 
-        # Check endstop and determine speed
-        qual_endstop_name = ""
-        is_v_endstop = False
-
-        if homing_move != 0:
-            qual_endstop_name = self.sensor_manager.get_qualified_endstop_name(endstop_name)
-            # Check that endstop is valid
-            if not drive.has_endstop(qual_endstop_name):
-                self.log_error(f"Endstop '{endstop_name}' not found")
-                return null_rtn
-
-            endstop = drive.get_endstop(qual_endstop_name)
-            is_v_endstop = isinstance(endstop, MmuVirtualEndstopSensor)
-
-        speed, accel = self._resolve_filament_move_speed(dist, motor, homing_move, speed, accel, virtual_endstop=is_v_endstop, speed_override=speed_override)
-
         with self._wrap_espooler(motor, dist, speed, accel, homing_move):
             wait = wait or self._wait_for_espooler
 
@@ -2444,6 +2447,22 @@ class MmuFilamentMovement:
 
                 else:
                     raise self.printer.command_error("Invalid motor specification '%s'" % (motor))
+
+                # Check endstop and determine speed
+                qual_endstop_name = ""
+                is_v_endstop = False
+
+                if homing_move != 0:
+                    qual_endstop_name = self.sensor_manager.get_qualified_endstop_name(endstop_name)
+                    # Check that endstop is valid
+                    if not drive.has_endstop(qual_endstop_name):
+                        self.log_error(f"Endstop '{endstop_name}' not found")
+                        return null_rtn
+
+                    endstop = drive.get_endstop(qual_endstop_name)
+                    is_v_endstop = isinstance(endstop, MmuVirtualEndstopSensor)
+
+                speed, accel = self._resolve_filament_move_speed(dist, motor, homing_move, speed, accel, virtual_endstop=is_v_endstop, speed_override=speed_override)
 
                 start_pos = drive.get_filament_position()
 
