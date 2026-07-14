@@ -1,5 +1,5 @@
 # This aggregates configuration for MMU additions
-# (this overlaps with some of Kconfig.pins and Kconfig.raw)
+# (this overlaps with some of Kconfig.pins and Kconfig.other)
 
 menu "MMU Features / Additions"
   help

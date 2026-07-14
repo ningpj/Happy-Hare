@@ -3,9 +3,9 @@
 # (Once user edits values here they are sticky and
 # will override defaults)
 
-menu "Other raw Settings"
+menu "Other Settings"
   help
-    Raw Settings
+    Other Settings
     Allows override of designer defaults. Change these settings if you know
     what you are doing (or have MMU customizations). You can always change later
     by re-running "./install.sh -i" to run this editor (recommended) or by
