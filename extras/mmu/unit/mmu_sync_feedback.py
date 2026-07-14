@@ -147,9 +147,10 @@ class MmuSyncFeedback:
         if state is None:
             state = self._get_sensor_state()
         if (self.mmu.is_enabled and self.p.sync_feedback_enabled and self.active) or detail:
-            # Polarity varies slightly between modes on proportional sensor so ask controller
-            polarity = self.ctrl.polarity(state)
-            return 'compressed' if polarity > 0 else 'tension' if polarity < 0 else 'neutral'
+#            # Polarity varies slightly between modes on proportional sensor so ask controller
+#            polarity = self.ctrl.polarity(state)
+#            return 'compressed' if polarity > 0 else 'tension' if polarity < 0 else 'neutral'
+            return 'compressed' if state > 0 else 'tension' if state < 0 else 'neutral'
         elif self.mmu.is_enabled and self.p.sync_feedback_enabled:
             return "inactive"
         return "disabled"
