@@ -106,6 +106,10 @@ unhappy_hare = '\n(\\_/)\n( V,V)\n(")^(") {caption}\n'
 LEVEL_NOTICE = 25
 
 
+def kconfig_truthy(value):
+    return value is True or value in ("y", "m", 1)
+
+
 class KConfig(kconfiglib.Kconfig):
     """
     Enhanced representation of Kconfig file
@@ -126,7 +130,7 @@ class KConfig(kconfiglib.Kconfig):
         return self.named_choices[choice].selection.name == value
 
     def is_enabled(self, sym):
-        return self.syms[sym].user_value
+        return kconfig_truthy(self.syms[sym].str_value) # Was: return self.syms[sym].user_value
 
     def getint(self, sym):
         return int(self.syms[sym].user_value)
@@ -138,29 +142,63 @@ class KConfig(kconfiglib.Kconfig):
         return self.syms[sym].user_value
 
     def as_dict(self):
-        """Return the Kconfig as a dictionary"""
+        """
+        Return the Kconfig as a dictionary, converting all variables that
+        end with "_<int>" into lists of the correct length of easy jinja
+        templating. Also "boolean" types are converted to python bool
+        """
         result = {}
-        for sym in self.syms:
-            if self.syms[sym].user_value is None:
+        grouped = {}
+
+        choice_member_names = {
+            sym.name
+            for choice in self.named_choices.values()
+            for sym in choice.syms
+        }
+
+        for sym_name, sym_obj in self.syms.items():
+            if sym_obj.type == kconfiglib.UNKNOWN:
                 continue
 
-            # Convert
-            if self.syms[sym].type in [kconfiglib.BOOL, kconfiglib.TRISTATE]:
-                value = 1 if self.syms[sym].user_value else 0
+            if sym_obj.type == kconfiglib.BOOL:
+                value = (sym_obj.str_value == "y")
+            elif sym_obj.type == kconfiglib.TRISTATE:
+                value = sym_obj.str_value
             else:
-                value = self.syms[sym].user_value
-                value = value.replace("\\n", "\n")
+                value = sym_obj.str_value.replace("\\n", "\n")
 
-            if re.match(r".+\d+$", sym):
-                split = re.split(r"(\d+$)", sym)
-                key = split[0]
-                nr = int(split[1])
-                if key in result:
-                    result[key][nr] = value
-                else:
-                    result[key] = {nr: value}
-            else:
-                result[sym] = value
+            m = re.match(r"^(.+_)(\d+)$", sym_name)
+            if m:
+                key = m.group(1)
+                nr = int(m.group(2))
+
+                if nr > 12:
+                    logging.warning(
+                        f"Symbol '{sym_name}' looks like an indexed array element (index={nr}) "
+                        f"but the index exceeds the maximum supported value (12). Treating it as a normal symbol."
+                    )
+                    result[sym_name] = value
+                    continue
+
+                grouped.setdefault(key, {})[nr] = value
+                continue
+
+            # Non-indexed choice members: only include selected/enabled member.
+            if sym_name in choice_member_names:
+                if value is True or value in ("y", "m"):
+                    result[sym_name] = value
+                continue
+
+            result[sym_name] = value
+
+        for key, values in grouped.items():
+            max_index = max(values)
+            default = False if all(isinstance(v, bool) for v in values.values()) else ""
+            result[key] = [
+                values.get(i, default)
+                for i in range(max_index + 1)
+            ]
+
         return result
 
 
@@ -180,7 +218,7 @@ class ParsedKConfig:
         return self.choices.get(choice) == value
 
     def is_enabled(self, sym):
-        return bool(self.values.get(sym))
+        return kconfig_truthy(self.values.get(sym, False))
 
     def getint(self, sym):
         return int(self.values[sym])
@@ -562,28 +600,47 @@ def install_includes(dest_file, kconfig):
     kcfg = load_parsed_kconfig(kconfig)
     builder = ConfigBuilder(dest_file)
 
-    def check_include(builder, param, include):
+    def check_include(builder, param, include, comment="", at_top=True):
         include = "include " + include
         if kcfg.is_enabled(param):
             if not builder.has_section(include):
                 logging.debug(" > Adding include [{}]".format(include))
-                builder.add_section(include, at_top=True, extra_newline=False)
+                builder.add_section(include, comment=comment, at_top=at_top)
         else:
             if builder.has_section(include):
                 logging.debug(" > Removing include [{}]".format(include))
                 builder.remove_section(include)
 
-    # Optional macros
-    check_include(builder, "INSTALL_12864_MENU", "mmu/optional/mmu_menu.cfg")
-    check_include(builder, "INSTALL_CLIENT_MACROS", "mmu/optional/client_macros.cfg")
+    # Optional macros --------
+    check_include(
+        builder,
+        "INSTALL_12864_MENU",
+        "mmu/optional/mmu_menu.cfg",
+        at_top=True
+    )
+    check_include(
+        builder,
+        "INSTALL_CLIENT_MACROS",
+        "mmu/optional/client_macros.cfg",
+        comment="Happy Hare Client macros (should be near the bottom of file)",
+        at_top=False
+    )
 
+    # Required --------
     if not builder.has_section("include mmu/macros/*.cfg"):
         logging.debug(" > Adding include [include mmu/macros/*.cfg]")
-        builder.add_section("include mmu/macros/*.cfg", at_top=True, extra_newline=False)
+        builder.add_section(
+            "include mmu/macros/*.cfg",
+            at_top=True
+        )
 
     if not builder.has_section("include mmu/base/*.cfg"):
         logging.debug(" > Adding include [include mmu/base/*.cfg]")
-        builder.add_section("include mmu/base/*.cfg", at_top=True, extra_newline=False)
+        builder.add_section(
+            "include mmu/base/*.cfg",
+            comment="Happy Hare MMU includes (should be near top of file)",
+            at_top=True
+        )
 
     with open(dest_file, "w") as f:
         f.write(builder.write())

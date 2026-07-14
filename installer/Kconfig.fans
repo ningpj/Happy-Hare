@@ -23,14 +23,19 @@
 
 config UNSELECT_MMU_HAS_FANS
   def_bool n
-config MMU_HAS_FANS
-  bool "Has cooling fans?"
-  depends on !UNSELECT_MMU_HAS_FANS
-  forceshow
-  default n
-  help
-    Enable this if you have cooling fans installed in your MMU unit(s).
-    Fans will be defined as hidden [fan_generic] sections in the generated config.
+
+if !UNSELECT_MMU_HAS_FANS
+  comment "_"
+  comment "_Fans"
+
+  config MMU_HAS_FANS
+    bool "Has cooling fans?"
+    forceshow
+    default n
+    help
+      Enable this if you have cooling fans installed in your MMU unit(s).
+      Fans will be defined as hidden [fan_generic] sections in the generated config.
+endif
 
 
 # -------------------------------------

@@ -1974,7 +1974,8 @@ class MmuFilamentMovement:
             self.drive().set_filament_position(-u.toolhead_wrapper.p.toolhead_extruder_to_nozzle)
             return False
 
-        gcode_macro = self.printer.lookup_object("gcode_macro %s" % self.p.form_tip_macro, None)
+        macro_name = self._macro_name(self.p.form_tip_macro)
+        gcode_macro = self.printer.lookup_object("gcode_macro %s" % macro_name, None)
         if gcode_macro is None:
             raise MmuError("Filament tip forming macro '%s' not found" % self.p.form_tip_macro)
 
@@ -2050,10 +2051,10 @@ class MmuFilamentMovement:
             initial_encoder_position = self.get_encoder_distance()
 
             with self._wrap_pressure_advance(0.0, "for tip forming"):
-                gcode_macro = self.printer.lookup_object(
-                    f"gcode_macro {self.p.form_tip_macro}",
-                    "_MMU_FORM_TIP",
-                )
+                macro_name = self._macro_name(self.p.form_tip_macro)
+                gcode_macro = self.printer.lookup_object(f"gcode_macro {macro_name}", None)
+                if gcode_macro is None:
+                    raise MmuError("Filament tip forming macro '%s' not found" % self.p.form_tip_macro)
 
                 self.log_info("Forming tip...")
 
@@ -2185,7 +2186,8 @@ class MmuFilamentMovement:
         if not self.p.purge_macro:
             return
 
-        gcode_macro = self.printer.lookup_object(f"gcode_macro {self.p.purge_macro}", None)
+        macro_name = self._macro_name(self.p.purge_macro)
+        gcode_macro = self.printer.lookup_object(f"gcode_macro {macro_name}", None)
         if gcode_macro is None:
             self.log_warning(f"Purge macro '{self.p.purge_macro}' not found")
             return
@@ -2367,7 +2369,7 @@ class MmuFilamentMovement:
             accel: Requested acceleration. When omitted, a context-appropriate default is chosen.
             motor: Motor mode to use for the move, such as gear, extruder, or synced movement.
             homing_move: Non-zero to perform a homing move; the sign indicates the expected trigger direction.
-            endstop_name: Endstop to use for homing moves.
+            endstop_name: Endstop to use for homing moves
             track: Whether the move should update per-gate tracking statistics.
             wait: Whether to wait for motion queues to drain after the move.
             encoder_dwell: Whether to add dwell time when sampling encoder position.
@@ -2454,7 +2456,7 @@ class MmuFilamentMovement:
                             f"max dist={dist:.1f}, "
                             f"speed={speed:.1f}, "
                             f"accel={accel:.1f}, "
-                            f"endstop_name={endstop_name}, "
+                            f"endstop_name={endstop_name}->{qual_endstop_name}, "
                             f"wait={wait}"
                         )
                     else:

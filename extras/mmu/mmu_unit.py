@@ -161,8 +161,9 @@ class MmuUnit:
             )
 
         self.environment_sensor = config.get('environment_sensor', '')
-        self.filament_heater    = config.get('filament_heater', '')
         self.environment_sensors = list(config.getlist('environment_sensors', []))
+
+        self.filament_heater    = config.get('filament_heater', '')
         self.filament_heaters = list(config.getlist('filament_heaters', []))
         self.max_concurrent_heaters = config.getint('max_concurrent_heaters', self.num_gates)
 
@@ -190,6 +191,28 @@ class MmuUnit:
         self.environment_sensors = [
             resolve_object_name(config, name, "temperature_sensor ", "environment sensor")
             for name in self.environment_sensors
+        ]
+
+
+        # ---------------------------------------------------------------------------------------------------
+        # Optional nfc readers for spool rfid tags
+        # ---------------------------------------------------------------------------------------------------
+
+        self.nfc_reader  = config.get('nfc_reader', '')
+        self.nfc_readers = list(config.getlist('nfc_readers', []))
+
+        if len(self.nfc_readers) not in [0, self.num_gates]:
+            raise config.error("'nfc_readers' must be empty or a comma separated list of 'num_gates' elements")
+
+        if self.nfc_reader and self.nfc_readers:
+            raise config.error("Can't configure both single and per-gate 'nfc_reader'/'nfc_readers'")
+
+        self.nfc_reader = resolve_object_name(
+            config, self.nfc_reader, "mmu_nfc_reader ", "nfc reader"
+        )
+        self.nfc_readers = [
+            resolve_object_name(config, name, "mmu_nfc_reader ", "nfc reader")
+            for name in self.nfc_readers
         ]
 
 
@@ -453,6 +476,7 @@ class MmuUnit:
                     [self.sensors.shared_exit_sensor],
                     [self.buffer.compression_sensor] if self.buffer else [],
                     [self.buffer.tension_sensor] if self.buffer else [],
+                    [self.encoder.endstop_sensor] if self.encoder else [],
                     (self.toolhead_wrapper.sensors or {}).values(),
                 )
 
@@ -462,7 +486,7 @@ class MmuUnit:
                 if sensor is not None
             )
 
-        def add_sensor_endstop(sensor, steppers):
+        def add_sensor_endstop(sensor, steppers, shared=False):
             sensor_name = sensor.name
 
             mcu_endstop = None
@@ -473,7 +497,10 @@ class MmuUnit:
                 ppins.allow_multi_use_pin(share_name)
 
                 for s in steppers:
-                    mcu_endstop = s.rail.add_extra_endstop(sensor_pin, sensor_name)
+                    if shared and mcu_endstop is not None:
+                        s.rail.add_extra_endstop("", sensor_name, register=False, mcu_endstop=mcu_endstop)
+                    else:
+                        mcu_endstop = s.rail.add_extra_endstop(sensor_pin, sensor_name)
 
                 e_type = "digital endstop"
 
@@ -481,7 +508,10 @@ class MmuUnit:
                 # We assume a virtual sensor that implement "software" endstop interface
                 for s in steppers:
                     # The sensor here must implement the necessary endstop homing methods!
-                    mcu_endstop = s.rail.add_extra_endstop(None, sensor_name, mcu_endstop=sensor)
+                    if shared and mcu_endstop is not None:
+                        s.rail.add_extra_endstop("", sensor_name, register=False, mcu_endstop=mcu_endstop)
+                    else:
+                        mcu_endstop = s.rail.add_extra_endstop(None, sensor_name, mcu_endstop=sensor)
 
                 e_type = "analog endstop"
 
@@ -521,7 +551,7 @@ class MmuUnit:
                     mcu_endstop = add_sensor_endstop(sensor, [ext])
                 else:
                     # Already exists
-                    mcu_endstop = es[0][0]
+                    mcu_endstop = es[0]
 
                 # Now just bind gear steppers to same endstop
                 for s in steppers:
@@ -530,8 +560,8 @@ class MmuUnit:
                 logging.info(f"MMU: Shared {sensor_name} endstop with stepper {stepper_names} for {self.name}")
 
             else:
-                # Create just for the gear steppers
-                add_sensor_endstop(sensor, steppers)
+                # Create one endstop for the first gear stepper, then bind the rest to it
+                add_sensor_endstop(sensor, steppers, shared=True)
 
         # Event handlers
         self.printer.register_event_handler('klippy:connect', self.handle_connect)
@@ -886,5 +916,13 @@ class MmuUnit:
             # Per-gate heater/sensors
             unit_info['environment_sensors'] = self.environment_sensors
             unit_info['filament_heaters'] = self.filament_heaters
+
+        if self.nfc_reader:
+            # Single NFC reader
+            unit_info['nfc_reader'] = self.nfc_reader
+
+        elif self.nfc_readers:
+            # Per-gate NFC reader
+            unit_info['nfc_readers'] = self.nfc_readers
 
         return unit_info

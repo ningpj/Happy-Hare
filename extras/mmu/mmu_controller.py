@@ -13,8 +13,7 @@
 # This file may be distributed under the terms of the GNU GPLv3 license.
 #
 
-#import gc, sys, ast, random, logging, time, contextlib, math, os.path, re, unicodedata, traceback
-import logging, sys, ast, random, time, contextlib, math, re, unicodedata, traceback
+import logging, sys, ast, random, time, contextlib, math, re, traceback
 
 from itertools                  import repeat
 
@@ -455,22 +454,66 @@ class MmuController(MmuFilamentMovement):
                 self.p.purge_macro = ""
 
 
-    # Wrap execution of gcode command to allow for control over:
-    #  - error handling
-    #  - passing of additional variables
-    #  - waiting on completion
+    def _macro_name(self, command):
+        """
+        Extract the bare macro name (first token) from a gcode command/macro string
+        """
+        command = (command or "").replace("''", "").strip()
+        return command.split()[0] if command else ""
+
+
+    def call_macro_if_defined(self, macro_name, params="", **kwargs):
+        """
+        Run a gcode macro only if it is currently defined, otherwise no-op silently.
+    
+        Args:
+            macro_name: Bare macro name to check for and invoke (no parameters).
+            params: Optional gcode parameter string appended after macro_name,
+                e.g. "ACTION='x' OLD_ACTION='y'".
+            **kwargs: Forwarded to wrap_gcode_command() (exception, variables, wait).
+
+        Returns:
+            bool: True if the macro was defined and invoked, False if it was skipped
+            because the macro isn't configured/registered.
+        """
+        if not macro_name or self.printer.lookup_object("gcode_macro %s" % macro_name, None) is None:
+            return False
+
+        command = ("%s %s" % (macro_name, params)).strip()
+        self.wrap_gcode_command(command, **kwargs)
+        return True
+
+
     def wrap_gcode_command(self, command, exception=False, variables=None, wait=False):
+        """
+        Run a gcode command/macro with optional variable overrides, error handling, and blocking.
+
+        Args:
+            command: Gcode command/macro string to run. A blank or whitespace-only
+                command is treated as "no macro configured" and silently skipped.
+            exception: Controls error handling if `command` raises:
+                - True: wrap and re-raise as MmuError
+                - False (default): log the error and swallow it
+                - None: re-raise the original exception unchanged
+            variables: Optional dict of gcode_macro variable overrides to apply
+                before running the command.
+            wait: Whether to block until the move queue drains after running the command.
+
+        Returns:
+            None.
+        """
         try:
-            command = command.replace("''", "")
+            command = command.replace("''", "").strip()
+            if not command:
+                return
             macro = command.split()[0]
-            if not macro: return
 
             if variables:
                 gcode_macro = self.printer.lookup_object("gcode_macro %s" % macro, None)
                 if gcode_macro:
                     gcode_macro.variables.update(variables)
 
-            self.log_trace("Running macro: %s%s" % (command, " (with override variables)" if variables is not None else ""))
+            self.log_trace("Running macro: %s%s" % (command, " (with override variables)" if variables else ""))
 
             self.gcode.run_script_from_command(command)
             if wait:
@@ -479,7 +522,7 @@ class MmuController(MmuFilamentMovement):
         except Exception as e:
             if exception is not None:
                 if exception:
-                    raise MmuError("Error running %s: %s" % (macro, str(e)))
+                    raise MmuError("Error running %s: %s" % (macro, str(e))) from e
                 else:
                     self.log_error("Error running %s: %s" % (macro, str(e)))
             else:
@@ -487,8 +530,7 @@ class MmuController(MmuFilamentMovement):
 
 
     def mmu_macro_event(self, event_name, params=""):
-        if self.printer.lookup_object("gcode_macro %s" % self.p.mmu_event_macro, None) is not None:
-            self.wrap_gcode_command("%s EVENT=%s %s" % (self.p.mmu_event_macro, event_name, params))
+        self.call_macro_if_defined(self.p.mmu_event_macro, "EVENT=%s %s" % (event_name, params))
 
 
 
@@ -2032,9 +2074,19 @@ class MmuController(MmuFilamentMovement):
         extruder = self.printer.lookup_object(self.mmu_unit().extruder_name())
         current_temp = extruder.get_status(0)['temperature']
         current_target_temp = extruder.heater.target_temp
+        new_target_temp = current_temp
         klipper_minimum_temp = extruder.get_heater().min_extrude_temp
         gate_temp = self.gate_temperature[self.gate_selected] if self.gate_selected >= 0 and self.gate_temperature[self.gate_selected] > 0 else self.p.default_extruder_temp
-        self.log_trace("_ensure_safe_extruder_temperature: current_temp=%s, paused_extruder_temp=%s, current_target_temp=%s, klipper_minimum_temp=%s, gate_temp=%s, default_extruder_temp=%s, source=%s" % (current_temp, self.psm.paused_extruder_temp, current_target_temp, klipper_minimum_temp, gate_temp, self.p.default_extruder_temp, source))
+        self.log_trace(
+            f"_ensure_safe_extruder_temperature: "
+            f"current_temp={current_temp}, "
+            f"paused_extruder_temp={self.psm.paused_extruder_temp}, "
+            f"current_target_temp={current_target_temp}, "
+            f"klipper_minimum_temp={klipper_minimum_temp}, "
+            f"gate_temp={gate_temp}, "
+            f"default_extruder_temp={self.p.default_extruder_temp}, "
+            f"source={source}"
+        )
 
         if source == "pause":
             new_target_temp = self.psm.paused_extruder_temp if self.psm.paused_extruder_temp is not None else current_temp # Pause temp should not be None
@@ -2099,7 +2151,12 @@ class MmuController(MmuFilamentMovement):
             if wait and new_target_temp >= klipper_minimum_temp and abs(new_target_temp - current_temp) > self.p.extruder_temp_variance:
                 with self.wrap_action(ACTION_HEATING):
                     self.log_info("Waiting for extruder to reach target (%s) temperature: %.1f%sC" % (source, new_target_temp, UI_DEGREE))
-                    self.gcode.run_script_from_command("TEMPERATURE_WAIT SENSOR=%s MINIMUM=%.1f MAXIMUM=%.1f" % (self.mmu_unit().extruder_name(), new_target_temp - self.p.extruder_temp_variance, new_target_temp + self.p.extruder_temp_variance))
+                    self.gcode.run_script_from_command(
+                        f"TEMPERATURE_WAIT "
+                        f"SENSOR={self.mmu_unit().extruder_name()} "
+                        f"MINIMUM={new_target_temp - self.p.extruder_temp_variance:.1f} "
+                        f"MAXIMUM={new_target_temp + self.p.extruder_temp_variance:.1f}"
+                    )
 
 
     def selected_tool_string(self, tool=None):
@@ -2133,8 +2190,10 @@ class MmuController(MmuFilamentMovement):
         old_action = self.action
         self.action = action
         self.led_manager.action_changed(action, old_action)
-        if self.printer.lookup_object("gcode_macro %s" % self.p.action_changed_macro, None) is not None:
-            self.wrap_gcode_command("%s ACTION='%s' OLD_ACTION='%s'" % (self.p.action_changed_macro, self._get_action_string(), self._get_action_string(old_action)))
+        self.call_macro_if_defined(
+            self.p.action_changed_macro,
+            "ACTION='%s' OLD_ACTION='%s'" % (self._get_action_string(), self._get_action_string(old_action))
+        )
         return old_action
 
 

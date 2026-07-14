@@ -32,9 +32,10 @@ from .mmu_constants import *
 # Parameter specification model
 # ----------------------------
 
-_Default  = Union[Any, Callable[['TunableParametersBase'], Any]]
-_Guard    = Optional[Callable[['TunableParametersBase'], bool]]
-_OnChange = Optional[Callable[['TunableParametersBase', Any, Any], None]]
+_Default   = Union[Any, Callable[['TunableParametersBase'], Any]]
+_Guard     = Optional[Callable[['TunableParametersBase'], bool]]
+_Validator = Optional[Callable[['TunableParametersBase'], None]]
+_OnChange  = Optional[Callable[['TunableParametersBase', Any, Any], None]]
 
 _REQUIRED = object() # Sentinel flag for when a parameter has no default and must be provided in configfile
 
@@ -50,6 +51,7 @@ class ParamSpec:
       - section: required section header label for listing output
       - hidden: if True, omitted from listing output (defaults False)
       - guard: callable(self)->bool (feature gating for runtime change / listing if desired)
+      - validator: callable(self, value) -> (validate a proposed value; raise ValueError if invalid)
       - on_change: callable(self, old, new) executed after runtime change
       - fmt: printf-style format used by listing output
     """
@@ -61,6 +63,7 @@ class ParamSpec:
     limits: Dict[str, Any] = field(default_factory=dict)
     choices: Optional[Dict[str, str]] = None
     guard: _Guard = None
+    validator: _Validator = None
     on_change: _OnChange = None
     fmt: Optional[str] = None
 
@@ -221,6 +224,14 @@ class TunableParametersBase:
     def _is_in_configfile(self, spec):
         return spec.name not in self._not_in_configfile
 
+    def _validate_value(self, spec: ParamSpec, value: Any) -> None:
+        if spec.validator is None:
+            return
+        try:
+            spec.validator(self, value)
+        except ValueError as e:
+            raise ValueError(f"Invalid value for '{spec.name}': {e}") from e
+
 
     # ----- Load -----
 
@@ -246,6 +257,7 @@ class TunableParametersBase:
             else:
                 val = adapter.get_value(self, spec, default)
 
+            self._validate_value(spec, val)
             setattr(self, spec.name, val)
 
 
@@ -295,6 +307,7 @@ class TunableParametersBase:
 
             current = getattr(self, spec.name)
             new_val = adapter.get_value(self, spec, current)
+            self._validate_value(spec, new_val)
             if new_val != current:
                 setattr(self, spec.name, new_val)
                 # Call on_change handler AFTER the actual parameter is updated
@@ -399,6 +412,7 @@ class TunableParametersBase:
         old = getattr(self, name)
         adapter = _SourceAdapter(_Fake(value), is_gcmd=True)
         new = adapter.get_value(self, spec, old)
+        self._validate_value(spec, new)
 
         if new != old:
             setattr(self, name, new)

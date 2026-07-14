@@ -48,7 +48,7 @@ class MmuExtruderWrapper():
                 self._extruder_tmc = self.printer.load_object(config, section)
                 logging.info(f"MMU: Loaded: [{section}]")
                 break
-            except:
+            except Exception:
                 pass
 
         if self._extruder_tmc is None:

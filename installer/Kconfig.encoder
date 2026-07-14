@@ -14,15 +14,20 @@
 
 config UNSELECT_MMU_HAS_ENCODER
   def_bool n
-config MMU_HAS_ENCODER
-  prompt "Has encoder?"
-  depends on !UNSELECT_MMU_HAS_ENCODER
-  forceshow
-  default n
-  help
-    An encoder measures filament movement and can be used to validate
-    movement, detect clogs, monitor flow rate and detect filament
-    collision with the extruder in liue of a toolhead switch sensor.
+
+if !UNSELECT_MMU_HAS_ENCODER
+  comment "_"
+  comment "_Encoder"
+
+  config MMU_HAS_ENCODER
+    prompt "Has encoder?"
+    forceshow
+    default n
+    help
+      An encoder measures filament movement and can be used to validate
+      movement, detect clogs, monitor flow rate and detect filament
+      collision with the extruder in liue of a toolhead switch sensor.
+endif
 
 
 # -------------------------------------
@@ -84,7 +89,7 @@ if MMU_HAS_ENCODER
             Select for older TCRT5000 based encoders.
             (this was the one fitted to ERCF v1.1)
 
-        config HOICE_ENCODER_TYPE_OTHER
+        config CHOICE_ENCODER_TYPE_OTHER
           bool "Other"
           help
             Select for any other encoder and ensure you set the resolution correctly.
@@ -118,6 +123,21 @@ if MMU_HAS_ENCODER
 
       config PIN_ENCODER
         prompt "Encoder pin                     "
+
+      config BOOL_REGISTER_AS_SENSOR
+        bool "Register as virtual switch sensor"
+        default y
+        help
+          This controls whether the encoder appears as a (virtual) filament switch
+          sensor in UI's like Mainsail and Fluidd.
+          Note that it is always available as an sensor/endstop. This controlls
+          just the visibility in UI's
+
+      config PARAM_REGISTER_AS_SENSOR
+        int
+        default 1 if BOOL_REGISTER_AS_SENSOR
+        default 0
+
   endif
 
   endmenu

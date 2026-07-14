@@ -43,11 +43,14 @@ class MmuSensorManager:
 
             sf_buffer = mmu_unit.buffer
             sf_buffer_name = sf_buffer.name if sf_buffer is not None else None
+            encoder = mmu_unit.encoder
+            encoder_name = encoder.name if encoder is not None else None
             sensor_defs = [
                 (mmu_unit.sensors.shared_exit_sensor, SENSOR_SHARED_EXIT, mmu_unit.name),
                 (sf_buffer.compression_sensor if sf_buffer else None, SENSOR_COMPRESSION, sf_buffer_name),
                 (sf_buffer.tension_sensor if sf_buffer else None, SENSOR_TENSION, sf_buffer_name),
                 (sf_buffer.proportional_sensor if sf_buffer else None, SENSOR_PROPORTIONAL, sf_buffer_name),
+                (encoder.endstop_sensor if encoder else None, SENSOR_ENCODER, encoder_name),
             ]
 
             unit_sensors = collect_sensors([
@@ -81,12 +84,14 @@ class MmuSensorManager:
                     (sf_buffer and mmu_unit.buffer.compression_sensor, SENSOR_COMPRESSION),
                     (sf_buffer and mmu_unit.buffer.tension_sensor, SENSOR_TENSION),
                     (sf_buffer and mmu_unit.buffer.proportional_sensor, SENSOR_PROPORTIONAL),
+                    (encoder and mmu_unit.encoder.endstop_sensor, SENSOR_ENCODER),
+                    (mmu_unit.sensors.shared_exit_sensor, SENSOR_SHARED_EXIT),
                 ])
                 gate_sensors.update(unit_toolhead_sensors)
 
                 self.gate_sensors.append(gate_sensors)
 
-# PAUL TODO: this complicates filament position recovery. Need to address.
+                # TODO: this complicates filament position recovery. Need to address.
                 # Special case for "no bowden" designs where mmu_shared_exit is an alias for extruder sensor.
                 # This allows "gate loading" to use the extruder sensor
                 if (
@@ -307,6 +312,10 @@ class MmuSensorManager:
         if endstop_name in [SENSOR_COMPRESSION, SENSOR_TENSION]:
             return self.get_prefixed_sensor_name(endstop_name, self.mmu.mmu_unit().buffer.name)
 
+        # These have form: "<encoderName>:genericName"
+        if endstop_name in [SENSOR_ENCODER]:
+            return self.get_prefixed_sensor_name(endstop_name, self.mmu.mmu_unit().encoder.name)
+
         # These have form: "<toolheadName>:genericName"
         if endstop_name in [SENSOR_EXTRUDER_ENTRY, SENSOR_TOOLHEAD]:
             return self.get_prefixed_sensor_name(endstop_name, self.mmu.mmu_unit().toolhead_wrapper.name)
@@ -338,6 +347,11 @@ class MmuSensorManager:
             # Buffer-based sensors
             if generic in [SENSOR_COMPRESSION, SENSOR_TENSION]:
                 if prefix == self.mmu.mmu_unit().buffer.name:
+                    return generic
+
+            # Encoder-based sensors
+            if generic in [SENSOR_ENCODER]:
+                if prefix == self.mmu.mmu_unit().encoder.name:
                     return generic
 
             # Toolhead-based sensors
@@ -473,6 +487,9 @@ class MmuSensorManager:
     def _get_sensors(self, pos, gate, position_condition):
         """
         Common helper that defines sensors and relationship to filament_pos state for easy filament tracing.
+        Note:
+            Buffer based compression/tension sensor and excoder virtual sensor are excluded since they
+            are not simple filament present or not switches
         Returns {sensor_name: True/False/None} where None means sensor disabled.
         """
         def read_sensor(name):

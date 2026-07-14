@@ -6,6 +6,7 @@
 #   PARAM_SYNC_FEEDBACK_BUFFER_NAME
 #   PARAM_BUFFER_RANGE
 #   PARAM_BUFFER_MAXRANGE
+#   PARAM_BUFFER_SPRING_STATE
 #   MMU_HAS_SENSOR_BUFFER_COMPRESSION
 #   MMU_HAS_SENSOR_BUFFER_TENSION
 #   MMU_HAS_SENSOR_BUFFER_PROPORTIONAL
@@ -30,15 +31,20 @@
 
 config UNSELECT_MMU_HAS_SYNC_FEEDBACK_BUFFER
   def_bool n
-config MMU_HAS_SYNC_FEEDBACK_BUFFER
-  prompt "Has sync-feedback buffer?"
-  depends on !UNSELECT_MMU_HAS_SYNC_FEEDBACK_BUFFER
-  forceshow
-  default n
-  help
-    A sync-feedback sensor (often referred to as a "buffer") is
-    a sensor connected in the bowden path that can detect filament
-    compression and/or tension.
+
+if !UNSELECT_MMU_HAS_SYNC_FEEDBACK_BUFFER
+  comment "_"
+  comment "_Sync Feedback Buffer"
+
+  config MMU_HAS_SYNC_FEEDBACK_BUFFER
+    prompt "Has sync-feedback buffer?"
+    forceshow
+    default n
+    help
+      A sync-feedback sensor (often referred to as a "buffer") is
+      a sensor connected in the bowden path that can detect filament
+      compression and/or tension.
+endif
 
 
 # -------------------------------------
@@ -137,7 +143,7 @@ if MMU_HAS_SYNC_FEEDBACK_BUFFER
         default "none"
 
       comment "_"
-      comment "Sensors"
+      comment "Fitted Sensors"
 
       config UNSELECT_MMU_HAS_SENSOR_BUFFER_COMPRESSION
           bool
@@ -178,8 +184,11 @@ if MMU_HAS_SYNC_FEEDBACK_BUFFER
       config PIN_BUFFER_TENSION
         prompt "Sync feedback tension pin    " if MMU_HAS_SENSOR_BUFFER_TENSION
  
+      config UNSELECT_MMU_HAS_SENSOR_BUFFER_PROPORTIONAL
+          bool
       config MMU_HAS_SENSOR_BUFFER_PROPORTIONAL
         bool "Sync-Feedback Analog proportional position sensor?"
+        depends on !UNSELECT_MMU_HAS_SENSOR_BUFFER_PROPORTIONAL
         default n
         help
           A sync-feedback sensor (often referred to as a "buffer") is a sensor that can detect filament

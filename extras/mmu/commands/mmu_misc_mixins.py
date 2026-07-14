@@ -15,11 +15,13 @@
 #       
 # This file may be distributed under the terms of the GNU GPLv3 license.
 #       
+import logging
     
 # Happy Hare imports
-from ..mmu_constants   import * 
-from ..mmu_utils       import MmuError
-from ..unit.mmu_leds   import MmuLeds
+from ..mmu_constants    import * 
+from ..mmu_utils        import MmuError
+from ..mmu_sensor_utils import MmuCompoundEndstop
+from ..unit.mmu_leds    import MmuLeds
 
 
 class ClogTangleMixin:
@@ -139,10 +141,18 @@ class MoveMixin:
             return (0., False, 0., 0.)
 
         endstop = gcmd.get('ENDSTOP', "default")
+        endstops = [
+            e.strip()
+            for e in gcmd.get('ENDSTOPS', "").split(',')
+            if e.strip()
+        ]
         move = gcmd.get_float('MOVE', 100.)
         speed = gcmd.get_float('SPEED', None)
         accel = gcmd.get_float('ACCEL', None) # Ignored for extruder led moves
         motor = gcmd.get('MOTOR', "gear").lower()
+
+        if endstops and endstop != 'default':
+            raise gcmd.error("Can only specify ENDSTOPS= or ENDSTOP=, not both")
 
         if motor not in ["gear", "extruder", "gear+extruder"]:
             raise gcmd.error("Valid motor names are 'gear', 'extruder', 'gear+extruder'")
@@ -158,15 +168,49 @@ class MoveMixin:
             for name in drive_stepper.rail.get_all_endstop_names()
         })
         valid_endstops.sort()
-        if endstop not in valid_endstops:
-            raise gcmd.error("Endstop name '%s' is not valid for motor '%s'. Options are: %s" % (endstop, motor, ', '.join(valid_endstops)))
 
-        qual_endstop = mmu.sensor_manager.get_qualified_endstop_name(endstop)
-        if drive_stepper.rail.is_endstop_virtual(qual_endstop) and stop_on_endstop == -1:
-            raise gcmd.error("Cannot reverse home on virtual (TMC stallguard) endstop '%s'" % endstop)
+        endstops = endstops or [endstop]
+        endstop_objs = []
 
-        mmu.log_debug("Homing '%s' motor to '%s' endstop, up to %.1fmm..." % (motor, endstop, move))
-        return mmu.move_filament(trace_str, move, speed=speed, accel=accel, motor=motor, homing_move=stop_on_endstop, endstop_name=endstop)
+        for endstop in endstops:
+            if endstop not in valid_endstops:
+                raise gcmd.error("Endstop name '%s' is not valid for motor '%s'. Options are: %s" % (endstop, motor, ', '.join(valid_endstops)))
+
+            qual_endstop = mmu.sensor_manager.get_qualified_endstop_name(endstop)
+
+            if drive_stepper.rail.is_endstop_virtual(qual_endstop) and stop_on_endstop == -1:
+                raise gcmd.error("Cannot reverse home on virtual (TMC stallguard) endstop '%s'" % endstop)
+
+            endstop_objs.append(drive_stepper.rail.get_extra_endstop(qual_endstop))
+
+        endstop_name = None
+        compound_endstop = None
+        try:
+            if len(endstop_objs) > 1:
+                endstop_name = "compound"
+                compound_endstop = MmuCompoundEndstop(mmu.printer, name=endstop_name, endstops=endstop_objs)
+                drive_stepper.rail.add_compound_endstop(endstop_name, compound_endstop)
+            else:
+                endstop_name = endstops[0]
+            
+            mmu.log_debug("Homing '%s' motor to '%s' endstop, up to %.1fmm..." % (motor, endstop_name, move))
+            result = mmu.move_filament(trace_str, move, speed=speed, accel=accel, motor=motor, homing_move=stop_on_endstop, endstop_name=endstop_name)
+
+            # Add triggered endstop to return tuple
+            moved, homed, actual, delta = result
+            if homed:
+                if compound_endstop is not None:
+                    triggered_name = compound_endstop.get_triggered_endstop_name()
+                else:
+                    triggered_name = endstop_name
+            else:
+                triggered_name = None
+
+            return moved, homed, actual, delta, triggered_name
+
+        finally:
+            if compound_endstop is not None:
+                drive_stepper.rail.remove_compound_endstop(endstop_name)
 
 
 class LedMixin:

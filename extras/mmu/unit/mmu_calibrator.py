@@ -523,7 +523,8 @@ class MmuCalibrator:
         Called after full load sequence to notify of possible bowden length and encoder
         calibration mismatch
         """
-        self._autotune_bowden_length(gate, DIRECTION_LOAD, bowden_length, bowden_travel)
+        if bowden_length > 0:
+            self._autotune_bowden_length(gate, DIRECTION_LOAD, bowden_length, bowden_travel)
         if encoder_move_ratio is not None:
             self.note_encoder_telemetry(gate, encoder_move_ratio)
 
@@ -533,7 +534,8 @@ class MmuCalibrator:
         Called after full unload sequence to notify of possible bowden length and encoder
         calibration mismatch
         """
-        self._autotune_bowden_length(gate, DIRECTION_UNLOAD, bowden_length, bowden_travel)
+        if bowden_length > 0:
+            self._autotune_bowden_length(gate, DIRECTION_UNLOAD, bowden_length, bowden_travel)
         if encoder_move_ratio is not None:
             self.note_encoder_telemetry(gate, encoder_move_ratio)
 
@@ -564,6 +566,10 @@ class MmuCalibrator:
 
             if not self.is_gear_rd_calibrated(gate):
                 self.mmu.log_info(f"Autotune: {msg}.\nIgnored because rotation distance not yet calibrated for gate")
+                return
+
+            if bowden_length <= 0:
+                self.mmu.log_debug(f"Autotune: {msg}.\nSkipped - no meaningful bowden length to autotune for this gate")
                 return
 
             if abs(bowden_travel - bowden_length) > 0.2 * bowden_length:

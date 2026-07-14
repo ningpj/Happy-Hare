@@ -19,13 +19,19 @@
 
 config UNSELECT_MMU_HAS_LEDS
   def_bool n
-config MMU_HAS_LEDS
-  prompt "Has Leds?"
-  depends on !UNSELECT_MMU_HAS_LEDS
-  forceshow
-  default n
-  help
-    Select if your MMU has LEDs.
+
+if !UNSELECT_MMU_HAS_LEDS
+  #comment "_"
+  comment "_Leds"
+
+  config MMU_HAS_LEDS
+    prompt "Has Leds?"
+    depends on !UNSELECT_MMU_HAS_LEDS
+    forceshow
+    default n
+    help
+      Select if your MMU has LEDs.
+endif
 
 
 # -------------------------------------
@@ -40,6 +46,7 @@ if MMU_HAS_LEDS
       default y
       help
         This allows you to install but turn off LED on startup.
+
     config PARAM_ENABLED
       string
       default "True" if BOOL_ENABLE_LEDS
@@ -52,6 +59,7 @@ if MMU_HAS_LEDS
         This allows you to turn off LED animations perhaps reducing the overhead
         on your main klipper CPU. Only disable if you have frequent TTC errors
         caused by overload (rarely necessary).
+
     config PARAM_ANIMATION
       string
       default "True" if BOOL_ENABLE_LEDS_ANIMATION
@@ -59,24 +67,34 @@ if MMU_HAS_LEDS
 
     config PARAM_EXIT_LEDS
       string
+      array_editor ";"
       default ""
 
     config PARAM_ENTRY_LEDS
       string
+      array_editor ";"
       default ""
 
     config PARAM_STATUS_LEDS
       string
+      array_editor ";"
       default ""
 
     config PARAM_LOGO_LEDS
       string
+      array_editor ";"
       default ""
 
     if !CUSTOM_LED_SETUP
 
+      config BOOL_EMU_SLB_HACK
+        bool
+        default y if MMU_HAS_PER_GATE_MCU && PARAM_VENDOR = "EMU" && PARAM_BOARD_TYPE = "SLB v1"
+
       config PARAM_CHAIN_COUNT
         int "Chain count     "
+        default 4 if BOOL_EMU_SLB_HACK
+        default 1 if MMU_HAS_PER_GATE_MCU
         default PARAM_NUM_GATES
 
       config PARAM_COLOR_ORDER
@@ -112,13 +130,18 @@ if MMU_HAS_LEDS
 
       # Hack to special case SLB v1 board wiring with EMU
       menu "Neopixel per-gate box pins" 
-        depends on MMU_HAS_LEDS && MMU_HAS_PER_GATE_MCU && PARAM_VENDOR = "EMU" && PARAM_BOARD_TYPE = "SLB v1"
+        depends on BOOL_EMU_SLB_HACK
 
         @repeat var=i min=0 max=11@
           config PIN_NEOPIXEL_BOX_$(i)
             string
             prompt "Neopixel box gate $(i) pin" if PARAM_NUM_GATES > $(i)
         @endrepeat@
+
+        config PARAM_CHAIN_COUNT
+          int "Chain count     "
+          default PARAM_NUM_GATES
+
       endmenu
 
     endif

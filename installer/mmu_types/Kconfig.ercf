@@ -30,6 +30,7 @@ if MMU_FAMILY_ERCF
         ERCF v2.0 is a community upgraded version incorporating
         popular mods and filler with custom Binky based encoder.
       imply MMU_HAS_LEDS
+      imply MMU_HAS_SENSOR_ENTRY
       imply BOOL_HAS_BYPASS
       imply MMU_HAS_FILAMENT_BUFFER
       imply PREFERS_CHOICE_GATE_HOMING_ENDSTOP_ENCODER
@@ -41,6 +42,7 @@ if MMU_FAMILY_ERCF
         loading/unloading, improved Binky based encoder and many
         ease of use features with hinged gates.
       imply MMU_HAS_LEDS
+      imply MMU_HAS_SENSOR_ENTRY
       imply BOOL_HAS_BYPASS
       imply PREFERS_CHOICE_GATE_HOMING_ENDSTOP_ENCODER
   endchoice

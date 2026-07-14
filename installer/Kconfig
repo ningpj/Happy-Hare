@@ -43,12 +43,15 @@
 #      @endrepeat@
 # 6. help added to menus
 # 7. "if XX" construct is allowed on comment lines
+# 8. Added 'array_editor <separator> [size]' option for strings that represent lists
+#    E.g. `array_editor ";" PARAM_NUM_GATES
 #
 # Menuconfig:
 # 1. 'r' to reset value to default
 # 2. Flexible comment lines and section separator using "_" and "_comment"
 # 3. Lots of formatting changes and style options
 # 4. Variable input dialogs with better parsing
+# 5. Added array editor - used on "," or ";" separated strings
 #
 #
 # Capability parmams:
@@ -208,6 +211,7 @@ osource "/tmp/.Kconfig.generated"
 if MULTI_UNIT_ENTRY_POINT
   config MMU_UNITS
     prompt "MMU unit names"
+    array_editor ","
     help
       Comma-separated list of unit names. Careful: Use only alphanumeric characters.
       If this is the first time configuring mulit-unit from previous single-unit install
@@ -245,11 +249,11 @@ endif
 
 if !MULTI_UNIT_ENTRY_POINT
   source "mmu_types/Kconfig"        # Base MMU type menu
+  source "Kconfig.name"             # Simple display name
   source "boards/Kconfig"           # MCU Selection menu
   if !SHOW_MMU_ADDITIONS_WITH_TYPE
     source "Kconfig.mmu_additions"  # MMU Additions/Customization menu (if not inlined with mmu type)
   endif
-  source "Kconfig.name"             # Simple display name
   comment "_"
   source "connection/Kconfig"       # MCU Connection
   source "Kconfig.pins"             # Raw pin editing

@@ -19,7 +19,7 @@
 # Per-gate:
 #   as above with _<gate_index> extension
 #
-# SUPPORTED SENSOR TYPES (keep in sync with mmu_hardware.cfg template):
+# SUPPORTED SENSOR TYPES
 #   - AHT1X     (humidity/temperature, requires patched aht1x driver)
 #   - AHT2X     (humidity/temperature, requires patched aht1x driver)
 #   - AHT3X     (humidity/temperature, requires patched aht1x driver)
@@ -28,31 +28,25 @@
 # SUPPORTED I2C HARDWARE BUS OPTIONS:
 #   - i2c2_PB10_PB11  (default)
 #   - i2c3_PB3_PB4    (alternative)
+#
+# Can be disabled and forced off with:
+#   select UNSELECT_MMU_HAS_NFC_READER
+
 
 config UNSELECT_MMU_HAS_ENVIRONMENT_SENSOR
   def_bool n
 
-config MMU_CREATE_MCU_ENVIRONMENT_SENSORS
-  bool "Create MCU CPU sensor(s)?"
-  default y
-  help
-    Create [temperature_sensor] sections for the MCU(s) themselves for CPU temperature monitoring.
+if !UNSELECT_MMU_HAS_ENVIRONMENT_SENSOR
+  comment "_"
+  comment "_Environment Sensor"
 
-if MMU_CREATE_MCU_ENVIRONMENT_SENSORS
-  config MMU_HIDE_MCU_ENVIRONMENT_SENSORS
-    bool "Hide in Mainsail / Fluidd"
-    default y if MMU_HAS_ENVIRONMENT_SENSOR
+  config MMU_HAS_ENVIRONMENT_SENSOR
+    bool "Has environment sensor(s)?"
+    forceshow
     default n
     help
-      Hide MCU temperature sensor(s) in Mainsail / Fluidd interface.
+      Select if the MMU has a humidity/temperature sensor in the filament storage enclosure
 endif
-
-config MMU_HAS_ENVIRONMENT_SENSOR
-  bool "Has environment sensor(s)?"
-  depends on !UNSELECT_MMU_HAS_ENVIRONMENT_SENSOR
-  default n
-  help
-    Select if the MMU has a humidity/temperature sensor in the filament storage enclosure
 
 
 # -------------------------------------
@@ -202,17 +196,27 @@ if MMU_HAS_ENVIRONMENT_SENSOR && !CUSTOM_ENVIRONMENT_SENSOR_SETUP
     # -------------------------------------
 
     if MMU_HAS_PER_GATE_ENV_SENSORS
+
       @repeat var=i min=0 max=11@
         if PARAM_NUM_GATES > $(i)
-          menu "Gate $(i) sensor"
-            config PARAM_ENVIRONMENT_SENSOR_NAME_$(i)
+
+          config PARAM_ENVIRONMENT_SENSOR_$(i)
+            string
+
+          menuconfig PARAM_ENVIRONMENT_SENSOR_GATE_$(i)
+            bool "Gate $(i) environment sensor"
+            default y
+            help
+              Select to enable for gate
+
+          if PARAM_ENVIRONMENT_SENSOR_GATE_$(i)
+
+            config PARAM_ENVIRONMENT_SENSOR_$(i)
               string "Gate $(i) sensor name       "
-              default "$(UNIT_NAME)_env$(i)"
+              default "$(UNIT_NAME)_Env$(i)"
               help
                 Name of the environment sensor for this gate in the printer config
-                E.g., "temperature_sensor UNIT0_env0"
-
-                Blank to skip configuration block for this gate. 
+                E.g., "unit0_env0"
 
             choice CHOICE_ENVIRONMENT_SENSOR_TYPE_$(i)
               prompt "Gate $(i) sensor type       "
@@ -309,10 +313,30 @@ if MMU_HAS_ENVIRONMENT_SENSOR && !CUSTOM_ENVIRONMENT_SENSOR_SETUP
                 help
                   Software i2c SDA pin (e.g., "PB11")
             endif
-          endmenu
+          endif
         endif
       @endrepeat@
     endif
 
   endmenu
+endif
+
+
+# -------------------------------------
+# MCU CPU Temperature sensors
+# -------------------------------------
+
+config BOOL_CREATE_MCU_ENVIRONMENT_SENSORS
+  bool "Create MCU CPU sensor(s)?"
+  default y
+  help
+    Create [temperature_sensor] sections for the MCU(s) themselves for CPU temperature monitoring.
+
+if BOOL_CREATE_MCU_ENVIRONMENT_SENSORS
+  config BOOL_HIDE_MCU_ENVIRONMENT_SENSORS
+    bool "Hide in Mainsail / Fluidd"
+    default y if MMU_HAS_ENVIRONMENT_SENSOR
+    default n
+    help
+      Hide MCU temperature sensor(s) in Mainsail / Fluidd interface.
 endif

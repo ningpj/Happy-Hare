@@ -31,7 +31,7 @@ class MacroSelectorParameters(TunableParametersBase):
 
     _SPECS: Sequence[ParamSpec] = (
         ParamSpec('select_tool_macro',        'str', _REQUIRED, section="SELECTOR", limits=dict(minval=1.0)),
-        ParamSpec('select_tool_num_switches', 'int',  0,        section="SELECTOR", limits=dict(minval=1), hidden=True),
+        ParamSpec('select_tool_num_switches', 'int',  1,        section="SELECTOR", limits=dict(minval=1), hidden=True),
     )
 
     def __init__(self, config, selector):
@@ -81,13 +81,12 @@ class MacroSelector(BaseSelector):
     def handle_connect(self):
         super().handle_connect()
 
-        self.self.calibrator.mark_calibrated(CALIBRATED_SELECTOR) # No calibration necessary
+        self.mmu_unit.calibrator.mark_calibrated(CALIBRATED_SELECTOR) # No calibration necessary
+
 
     def handle_ready(self):
         super().handle_ready()
 
-        logging.info("Happy Hare MacroSelector: Gate %d" % self.mmu.gate_selected)
-        self.select_gate(self.mmu.gate_selected)
 
     def _select_gate(self, lgate):
         """
@@ -97,9 +96,9 @@ class MacroSelector(BaseSelector):
         demultiplexer-style selectors.
         """
         # Store parameters as list
-        params = ['GATE=' + str(gate)]
+        params = ['LGATE=' + str(lgate)]
         if self.binary_mode: # If demultiplexer, pass binary parameters to the macro in the form of S0=, S1=, S2=, etc.
-            binary = list(reversed('{0:b}'.format(gate).zfill(self.p.select_tool_num_switches)))
+            binary = list(reversed('{0:b}'.format(lgate).zfill(self.p.select_tool_num_switches)))
             for i in range(self.p.select_tool_num_switches):
                 char = binary[i]
                 params.append('S' + str(i) + '=' + str(char))

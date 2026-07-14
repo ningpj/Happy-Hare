@@ -62,6 +62,7 @@ if BOARD_TYPE_AFC_LITE_1_0
   config PIN_GEAR_DIAG_3
     default "$(MCU_NAME):PC8" 
 
+
   config PIN_ENTRY_SENSOR_0
     default "^$(MCU_NAME):PC5" 
   config PIN_ENTRY_SENSOR_1
@@ -71,6 +72,7 @@ if BOARD_TYPE_AFC_LITE_1_0
   config PIN_ENTRY_SENSOR_3
     default "^$(MCU_NAME):PB2" 
 
+
   config PIN_EXIT_SENSOR_0
     default "^$(MCU_NAME):PE8" 
   config PIN_EXIT_SENSOR_1
@@ -79,6 +81,7 @@ if BOARD_TYPE_AFC_LITE_1_0
     default "^$(MCU_NAME):PE10" 
   config PIN_EXIT_SENSOR_3
     default "^$(MCU_NAME):PE11" 
+
 
   config PIN_ESPOOLER_EN_0
     default "$(MCU_NAME):PA2" 
@@ -108,8 +111,52 @@ if BOARD_TYPE_AFC_LITE_1_0
   config PIN_ESPOOLER_FWD_3
     default "$(MCU_NAME):PD13" 
 
+
   config PIN_NEOPIXEL
     default "$(MCU_NAME):PE14"
+
+
+  # Aka "Hub"
   config PIN_SHARED_EXIT_SENSOR
     default "^$(MCU_NAME):PC4"
+
+
+  # Aka "Buffer" - when filament is under tension (neck compressed) or compression (neck advances)
+  if !OPTION_TURTLE_NECK_V2_BUFFER
+    config PIN_BUFFER_TENSION
+      default "^$(MCU_NAME):PE13"
+    config PIN_BUFFER_COMPRESSION
+      default "^$(MCU_NAME):PE12"
+  endif
+
+
+# Spare neopixel ports:
+#   PE15, PB10, PB11
+
+
+# -------------------------------------
+# Separate Buffer
+# -------------------------------------
+
+  if OPTION_TURTLE_NECK_V2_BUFFER
+
+    config PIN_BUFFER_SENSOR_0
+      default "$(MCU_NAME)_buffer:PB5"
+    config PIN_BUFFER_SENSOR_1
+      default "$(MCU_NAME)_buffer:PB6"
+    config PIN_BUFFER_SENSOR_2
+      default "$(MCU_NAME)_buffer:PB7"
+    config PIN_BUFFER_SENSOR_3
+      default "$(MCU_NAME)_buffer:PB8"
+
+    config PIN_BUFFER_TENSION
+      default "$(MCU_NAME)_buffer:PB1"
+    config PIN_BUFFER_COMPRESSION
+      default "$(MCU_NAME)_buffer:PB2"
+
+    config PIN_BUFFER_NEOPIXEL
+      default "$(MCU_NAME)_buffer:PD3"
+
+  endif
+
 endif
