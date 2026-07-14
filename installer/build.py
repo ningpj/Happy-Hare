@@ -192,6 +192,7 @@ class KConfig(kconfiglib.Kconfig):
         """
         result = {}
         grouped = {}
+        grouped_names = {}  # key -> {index: original symbol name}, for ungrouping singletons
 
         choice_member_names = {
             sym.name
@@ -205,8 +206,6 @@ class KConfig(kconfiglib.Kconfig):
 
             raw = sym_obj.user_value if sym_obj.user_value is not None else sym_obj.str_value
 
-            # Normalize BOOL/TRISTATE user_value (an int tri-state)
-            # to the "n"/"m"/"y" form str_value would already give us
             if sym_obj.type in (kconfiglib.BOOL, kconfiglib.TRISTATE) and isinstance(raw, int):
                 raw = kconfiglib.TRI_TO_STR[raw]
 
@@ -217,23 +216,20 @@ class KConfig(kconfiglib.Kconfig):
             else:
                 value = raw.replace("\\n", "\n")
 
-            # Choice members: only include selected/enabled member. Checked before the
-            # array-grouping regex below (see that comment for why).
+            # Choice members: only include selected/enabled member. Checked
+            # before the array-grouping regex below, since choice member names
+            # commonly end in version/revision digits (e.g. MMU_TYPE_ERCF_1_1)
+            # that would otherwise incorrectly match the "_<int>" pattern.
             if sym_name in choice_member_names:
                 if value is True or value in ("y", "m"):
                     result[sym_name] = value
                 continue
 
-            # Array-suffix grouping only makes sense for STRING/INT/HEX/FLOAT symbols
-            # (the array_editor use case, e.g. GATE_NAME_0, GATE_NAME_1). A BOOL/
-            # TRISTATE flag is never an array element, no matter what its name ends
-            # in -- and plenty legitimately end in version/revision digits (e.g.
-            # MMU_TYPE_ERCF_1_1, BOARD_TYPE_VVD_1_0), which would otherwise collide
-            # with this regex and get silently dropped from the result.
             m = re.match(r"^(.+_)(\d+)$", sym_name)
-            if m and sym_obj.type not in (kconfiglib.BOOL, kconfiglib.TRISTATE):
+            if m:
                 key = m.group(1)
                 nr = int(m.group(2))
+
                 if nr > 12:
                     logging.warning(
                         f"Symbol '{sym_name}' looks like an indexed array element (index={nr}) "
@@ -241,12 +237,24 @@ class KConfig(kconfiglib.Kconfig):
                     )
                     result[sym_name] = value
                     continue
+
                 grouped.setdefault(key, {})[nr] = value
+                grouped_names.setdefault(key, {})[nr] = sym_name
                 continue
 
             result[sym_name] = value
 
         for key, values in grouped.items():
+            if len(values) == 1:
+                # A single match under this prefix isn't a genuine array --
+                # it's almost certainly a symbol whose name just happens to
+                # end in digits (e.g. a hardware version number). Restore it
+                # under its real name instead of wrapping it in a bogus
+                # one-element list.
+                (idx, value), = values.items()
+                result[grouped_names[key][idx]] = value
+                continue
+
             max_index = max(values)
             default = False if all(isinstance(v, bool) for v in values.values()) else ""
             result[key] = [
