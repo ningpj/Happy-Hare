@@ -432,6 +432,9 @@ class MmuController(MmuFilamentMovement):
         except Exception as e:
             self.log_assertion(f"Error booting up MMU: {e}", exc_info=sys.exc_info())
 
+        # Broadcast event in case individual modules need delayed initialization
+        self.printer.send_event("mmu:bootup")
+
         # Give macros a chance to initialize if they need to
         self.init_macros()
 
@@ -1615,6 +1618,22 @@ class MmuController(MmuFilamentMovement):
             self.log_info("Disabled extruder heater")
             self.gcode.run_script_from_command("M104 S0")
         return self.reactor.NEVER
+
+
+    def set_pending_spool_id(self, next_spool_id):
+        """
+        Public method for initiating the next spoolman spool id
+
+        Args:
+          next_spool_id valid spoolman id, <= 0 to cancel pending
+        """
+        if next_spool_id > 0:
+            self.pending_spool_id = next_spool_id
+            self.reactor.update_timer(self.pending_spool_id_timer, self.reactor.monotonic() + self.p.pending_spool_id_timeout)
+        else:
+            # Disable timer to prevent reuse
+            self.pending_spool_id = -1
+            self.reactor.update_timer(self.pending_spool_id_timer, self.reactor.NEVER)
 
 
     def _setup_pending_spool_id_timer(self):

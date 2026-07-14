@@ -93,13 +93,7 @@ class MmuGateMapCommand(BaseCommand):
 
         if next_spool_id:
             if mmu.p.spoolman_support != SPOOLMAN_PULL:
-                if next_spool_id > 0:
-                    mmu.pending_spool_id = next_spool_id
-                    mmu.reactor.update_timer(mmu.pending_spool_id_timer, mmu.reactor.monotonic() + mmu.p.pending_spool_id_timeout)
-                else:
-                    # Disable timer to prevent reuse
-                    mmu.pending_spool_id = -1
-                    mmu.reactor.update_timer(mmu.pending_spool_id_timer, mmu.reactor.NEVER)
+                mmu.set_pending_spool_id(next_spool_id)
             else:
                 mmu.log_error("Cannot use use NEXT_SPOOLID feature with spoolman_support: pull. Use 'push' or 'readonly' modes")
                 return

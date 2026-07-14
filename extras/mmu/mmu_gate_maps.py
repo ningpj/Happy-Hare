@@ -55,6 +55,7 @@ class MmuGateMaps:
             (VARS_MMU_GATE_TEMPERATURE,    'gate_temperature', int(self.p.default_extruder_temp)),
             (VARS_MMU_GATE_SPOOL_ID,       'gate_spool_id', -1),
             (VARS_MMU_GATE_SPEED_OVERRIDE, 'gate_speed_override', 100),
+            (VARS_MMU_GATE_SPOOL_RFID,     'gate_spool_rfid', ""),
         ]
 
         for _, attr, default in self._gate_map_vars:
@@ -172,6 +173,7 @@ class MmuGateMaps:
         self.mmu.var_manager.set(VARS_MMU_GATE_TEMPERATURE, self.gate_temperature)
         self.mmu.var_manager.set(VARS_MMU_GATE_SPOOL_ID, self.gate_spool_id)
         self.mmu.var_manager.set(VARS_MMU_GATE_SPEED_OVERRIDE, self.gate_speed_override)
+        self.mmu.var_manager.set(VARS_MMU_GATE_SPOOL_RFID, self.gate_spool_rfid)
         self.mmu.var_manager.write()
         self.update_t_macros()
 
@@ -303,6 +305,7 @@ class MmuGateMaps:
         else:
             self.gate_spool_id = list(self.p.default_gate_spool_id)
         self.gate_speed_override = list(self.p.default_gate_speed_override)
+        self.gate_spool_rfid = list(self.p.default_gate_spool_rfid)
         self.update_gate_color_rgb()
         self.persist_gate_map(spoolman_sync=True)
 
@@ -485,6 +488,7 @@ class MmuGateMaps:
 
             available_fstr = "{};".format(available).ljust(11, UI_SPACE)
             fil_fstr = "{} | {}{}C | {} | {}".format(material, temperature, UI_DEGREE, color, name)
+            rfid_fstr = " | RFID" if self.gate_spool_rfid[g] else ""
 
             spool_option = (str(self.gate_spool_id[g]) if self.gate_spool_id[g] > 0 else "n/a")
             if self.p.spoolman_support == SPOOLMAN_OFF:
@@ -497,7 +501,7 @@ class MmuGateMaps:
             speed_fstr = " [Speed:{}%]".format(self.gate_speed_override[g]) if self.gate_speed_override[g] != 100 else ""
             extra_fstr = " [SELECTED]" if g == self.mmu.gate_selected else ""
 
-            msg += "\n{}{}{}{}{}{}".format(gate_fstr, available_fstr, spool_fstr, fil_fstr, speed_fstr, extra_fstr)
+            msg += "\n{}{}{}{}{}{}".format(gate_fstr, available_fstr, spool_fstr, fil_fstr, rfid_fstr, speed_fstr, extra_fstr)
         return msg
 
 
@@ -655,6 +659,7 @@ class MmuGateMaps:
         self.gate_temperature = list(self.gate_temperature)
         self.gate_spool_id = list(self.gate_spool_id)
         self.gate_speed_override = list(self.gate_speed_override)
+        self.gate_spool_rfid = list(self.gate_spool_rfid)
 
 
     def get_status(self, eventtime):
@@ -672,6 +677,7 @@ class MmuGateMaps:
             'gate_temperature': self.gate_temperature,
             'gate_spool_id': self.gate_spool_id,
             'gate_speed_override': self.gate_speed_override,
+            'gate_spool_rfid': self.gate_spool_rfid,
             'gate_color_rgb': self.gate_color_rgb,
 
             'slicer_tool_map': self.slicer_tool_map,

@@ -96,6 +96,7 @@ class MmuMachineParameters(TunableParametersBase):
         ParamSpec('default_gate_color',            'list',    [], section="DEFAULT MAPS", hidden=True),
         ParamSpec('default_gate_temperature',      'intlist', [], section="DEFAULT MAPS", hidden=True),
         ParamSpec('default_gate_spool_id',         'intlist', [], section="DEFAULT MAPS", hidden=True),
+        ParamSpec('default_gate_spool_rfid',       'list',    [], section="DEFAULT MAPS", hidden=True),
         ParamSpec('default_gate_speed_override',   'intlist', [], section="DEFAULT MAPS", hidden=True),
         ParamSpec('default_endless_spool_groups',  'intlist', [], section="DEFAULT MAPS", hidden=True),
 
