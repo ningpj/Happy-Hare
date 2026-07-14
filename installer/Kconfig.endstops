@@ -47,11 +47,13 @@ config PREFERS_CHOICE_EXTRUDER_HOMING_ENDSTOP_NONE
   def_bool n
 
 
-menu "Endstops for Bowden movement"
+menu "Endstops and Bowden movement"
 
 # -------------------------------------
 # Gate Endstop
 # -------------------------------------
+
+  comment "_Gate homing"
 
   choice CHOICE_GATE_HOMING_ENDSTOP 
     prompt "Gate homing endstop"
@@ -158,8 +160,24 @@ menu "Endstops for Bowden movement"
 
 
 # -------------------------------------
-# Extruder preload endstop
+# Gate homing and buffer distances
 # -------------------------------------
+
+  config PARAM_BOWDEN_UNLOAD_HOMING_BUFFER
+    float "Bowden unload homing buffer"
+    default 40
+    help
+      Distance to reduce fast bowden unload to allow for accurate
+      gate homing and no gate overshoot when filament is being unloaded
+
+
+
+# -------------------------------------
+# Extruder endstop
+# -------------------------------------
+
+  comment "_"
+  comment "_Extruder homing"
 
   choice CHOICE_EXTRUDER_HOMING_ENDSTOP
     prompt "Extruder homing endstop" 
@@ -228,5 +246,60 @@ menu "Endstops for Bowden movement"
     default "encoder"              if CHOICE_EXTRUDER_HOMING_ENDSTOP_ENCODER
     default "mmu_gear_touch"       if CHOICE_EXTRUDER_HOMING_ENDSTOP_TOUCH
     default "none"
+
+
+# -------------------------------------
+# Extruder homing and buffer distances
+# -------------------------------------
+
+  config PARAM_BOWDEN_LOAD_HOMING_BUFFER
+    float "Bowden load homing buffer  "
+    default 20
+    help
+      Distance to reduce fast bowden load to prevent collisions
+      and allow for accurate extruder homing
+
+  config PARAM_EXTRUDER_COLLISION_HOMING_CURRENT
+    int
+    range 10 100
+    default 30
+
+  config PARAM_EXTRUDER_COLLISION_HOMING_CURRENT
+    prompt "Collision homing current   "
+    depends on CHOICE_EXTRUDER_HOMING_ENDSTOP_ENCODER || CHOICE_EXTRUDER_HOMING_ENDSTOP_TOUCH
+    help
+      When using extruder collision homing method (encoder or mmu_gear_touch)
+      the current of the gear stepper can be reduced when homing. Specify
+      the % current reduction.
+
+  config PARAM_EXTRUDER_HOMING_MAX
+    float "Extruder homing max        "
+    default 100
+    help
+      The maximum distance filament will travel attempting to home
+      to the extruder. Should be greater than "Bowden load homing buffer"
+
+  if MMU_HAS_SENSOR_TOOLHEAD
+    config BOOL_EXTRUDER_FORCE_HOMING
+      bool "Force extruder homing"
+      default n if CHOICE_EXTRUDER_HOMING_ENDSTOP_ENCODER || CHOICE_EXTRUDER_HOMING_ENDSTOP_TOUCH
+      default y
+      help
+        By default, for not calibrating loads, Happy Hare will not home to the extruder
+        if a toolhead sensor is fitted (because homing point is inside the extruder).
+        However the extruder homing can be forced by setting this option.
+
+    config PARAM_EXTRUDER_FORCE_HOMING
+      int
+      default 1 if BOOL_EXTRUDER_FORCE_HOMING
+      default 0
+
+    config PARAM_TOOLHEAD_HOMING_MAX
+      float "Toolhead sensor homing max "
+      depends on MMU_HAS_SENSOR_TOOLHEAD
+      default 40
+      help
+        Additional distance to advance in order to attempt to home to toolhead sensor
+  endif
 
 endmenu

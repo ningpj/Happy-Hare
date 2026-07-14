@@ -174,6 +174,9 @@ class MmuSensorManager:
         self.mmu.log_debug(f"bypass_sensors_map={fmt(self.bypass_sensors_map)}")
         self.mmu.log_debug("-------------------")
 
+        # Initialize with assumption of unit 0 selected
+        self.active_sensors_map = self.unit_sensors[0]
+
 
     def _handle_gate_selected(self, gate, prev_gate):
         """
@@ -183,7 +186,7 @@ class MmuSensorManager:
         if gate == TOOL_GATE_UNKNOWN:
             unit = self.mmu.unit_selected
             if unit is None:
-                self.log_assertion(f"Unknown unit in _handle_gate_selected()")
+                self.mmu.log_assertion(f"Unknown unit in _handle_gate_selected()")
                 unit = 0
             self.active_sensors_map = self.unit_sensors[unit]
 
