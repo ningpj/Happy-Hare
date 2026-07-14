@@ -39,6 +39,7 @@ class MmuGateMapCommand(BaseCommand):
         + "SPOOLID      = # Optionally the spoolman ID for the filament (don't need to specify other attributes)\n"
         + "TEMP         = # Default temperature of filament\n"
         + "SPEED        = % Speed override (use <100 for soft TPU types)\n"
+        + "RFID         = # RFID tag value read from the gate's spool (blank to clear)\n"
         + "AVAILABLE    = [-1|0|1|2] Filament availability: Unknown | Empty | Available | Available from filament buffer\n"
         + "(no parameters for status report)\n"
     )
@@ -48,6 +49,7 @@ class MmuGateMapCommand(BaseCommand):
         + f"{CMD} GATE=5 COLOR=red MATERIAL=pla  ...Set filament attributes for gate 5\n"
         + f"{CMD} NEXT_SPOOLID=45                ...Automatically mark the next spool preloaded or loaded with spoolman id 45\n"
         + f"{CMD} GATE=0 SPEED=50                ...Set load/unload speed of gate 0 to 50% - great for TPU!\n"
+        + f"{CMD} GATE=0 RFID=E2003412            ...Record the RFID tag read for the spool loaded in gate 0\n"
         + f"{CMD} RESET=1                        ...Reset filament attributes to defaults optionally configured in cfg files\n"
     )
 
@@ -96,7 +98,7 @@ class MmuGateMapCommand(BaseCommand):
                 mmu.set_pending_spool_id(next_spool_id)
             else:
                 mmu.log_error("Cannot use use NEXT_SPOOLID feature with spoolman_support: pull. Use 'push' or 'readonly' modes")
-                return
+            return
 
         changed_gate_ids = []
 
@@ -124,6 +126,8 @@ class MmuGateMapCommand(BaseCommand):
                             self._safe_int(fil.get('temp', mmu.p.default_extruder_temp)),
                             mmu.p.default_extruder_temp
                         )
+                        # RFID is read locally from gate hardware, not owned by spoolman, so preserve it unless explicitly supplied
+                        mmu.gate_spool_rfid[gate_idx] = fil.get('rfid', mmu.gate_spool_rfid[gate_idx])
                         # gate_speed_override and gate_status can be set locally
                 else:
                     # Update map (ui or from spoolman in "readonly" and "push" modes)
@@ -145,6 +149,10 @@ class MmuGateMapCommand(BaseCommand):
                             )
                             mmu.gate_speed_override[gate_idx] = self._safe_int(fil.get('speed_override', mmu.gate_speed_override[gate_idx]))
                             mmu.gate_status[gate_idx] = self._safe_int(fil.get('status', mmu.gate_status[gate_idx])) # For UI manual fixing of availabilty
+
+                        # RFID is read locally from gate hardware; always allow it through regardless of spoolman origin
+                        if not from_spoolman:
+                            mmu.gate_spool_rfid[gate_idx] = fil.get('rfid', mmu.gate_spool_rfid[gate_idx])
 
                         # If spool_id has changed, clean up possible stale use of old one
                         if spool_id != mmu.gate_spool_id[gate_idx]:
@@ -183,6 +191,11 @@ class MmuGateMapCommand(BaseCommand):
                 spool_id = gcmd.get_int('SPOOLID', None, minval=-1)
                 temperature = gcmd.get_int('TEMP', int(mmu.p.default_extruder_temp))
                 speed_override = gcmd.get_int('SPEED', mmu.gate_speed_override[gate_idx], minval=10, maxval=150)
+                rfid = gcmd.get('RFID', None)
+
+                # RFID is read locally from gate hardware and isn't owned by spoolman, so it's always settable
+                rfid = rfid if rfid is not None else mmu.gate_spool_rfid[gate_idx]
+                mmu.gate_spool_rfid[gate_idx] = rfid
 
                 if mmu.p.spoolman_support != SPOOLMAN_PULL:
                     # Local gate map, can update attributes
