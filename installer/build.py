@@ -217,11 +217,23 @@ class KConfig(kconfiglib.Kconfig):
             else:
                 value = raw.replace("\\n", "\n")
 
+            # Choice members: only include selected/enabled member. Checked before the
+            # array-grouping regex below (see that comment for why).
+            if sym_name in choice_member_names:
+                if value is True or value in ("y", "m"):
+                    result[sym_name] = value
+                continue
+
+            # Array-suffix grouping only makes sense for STRING/INT/HEX/FLOAT symbols
+            # (the array_editor use case, e.g. GATE_NAME_0, GATE_NAME_1). A BOOL/
+            # TRISTATE flag is never an array element, no matter what its name ends
+            # in -- and plenty legitimately end in version/revision digits (e.g.
+            # MMU_TYPE_ERCF_1_1, BOARD_TYPE_VVD_1_0), which would otherwise collide
+            # with this regex and get silently dropped from the result.
             m = re.match(r"^(.+_)(\d+)$", sym_name)
-            if m:
+            if m and sym_obj.type not in (kconfiglib.BOOL, kconfiglib.TRISTATE):
                 key = m.group(1)
                 nr = int(m.group(2))
-
                 if nr > 12:
                     logging.warning(
                         f"Symbol '{sym_name}' looks like an indexed array element (index={nr}) "
@@ -229,14 +241,7 @@ class KConfig(kconfiglib.Kconfig):
                     )
                     result[sym_name] = value
                     continue
-
                 grouped.setdefault(key, {})[nr] = value
-                continue
-
-            # Non-indexed choice members: only include selected/enabled member.
-            if sym_name in choice_member_names:
-                if value is True or value in ("y", "m"):
-                    result[sym_name] = value
                 continue
 
             result[sym_name] = value
