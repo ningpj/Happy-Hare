@@ -56,11 +56,6 @@ class MmuStatusCommand(BaseCommand):
 
         lines = []
 
-        lines.append(
-            f"MMU: Happy Hare v{mmu.mmu_machine.happy_hare_version} "
-            f"controlling {mmu.mmu_machine.num_units} units:\n"
-        )
-
         status_suffix = (
             " (DISABLED)"
             if not mmu.is_enabled
@@ -68,8 +63,10 @@ class MmuStatusCommand(BaseCommand):
             if mmu.is_mmu_paused()
             else ""
         )
-        if status_suffix:
-            lines.append(status_suffix)
+        lines.append(
+            f"MMU: Happy Hare v{mmu.mmu_machine.happy_hare_version} "
+            f"controlling {mmu.mmu_machine.num_units} units:{status_suffix}"
+        )
 
         for i in range(mmu.mmu_machine.num_units):
             unit = mmu.mmu_machine.get_mmu_unit_by_index(i)
@@ -182,13 +179,13 @@ class MmuStatusCommand(BaseCommand):
                     lines.append(
                         f"\n- Filament finds extruder entrance by homing a maximum of {self._f_calc('bowden_load_homing_buffer + extruder_homing_max')} "
                         f"to extruder using ENCODER COLLISION detection "
-                        f"(at {mmu_unit.p.extruder_collision_homing_current}% current)"
+                        f"(at {{5}}{mmu_unit.p.extruder_collision_homing_current}%{{6}} current)"
                     )
                 elif mmu_unit.p.extruder_homing_endstop == SENSOR_GEAR_TOUCH:
                     lines.append(
                         f"\n- Filament finds extruder entrance by homing homes a maximum of {self._f_calc('bowden_load_homing_buffer + extruder_homing_max')} "
                         f"to extruder using 'touch' (stallguard) detection "
-                        f"(at ((5)){mmu_unit.p.extruder_collision_homing_current}%{{6}} current)"
+                        f"(at {{5}}{mmu_unit.p.extruder_collision_homing_current}%{{6}} current)"
                     )
                 else:
                     lines.append(
@@ -196,16 +193,17 @@ class MmuStatusCommand(BaseCommand):
                         f"to {mmu_unit.p.extruder_homing_endstop.upper()} sensor"
                     )
 
+                # Adjustments to get exactly to extruder entrance
                 if mmu_unit.p.extruder_homing_endstop == SENSOR_EXTRUDER_ENTRY:
                     lines.append(f" and then moving {self._f_calc('toolhead_entry_to_extruder')}")
                 elif mmu_unit.has_buffer() and mmu_unit.p.extruder_homing_endstop == SENSOR_COMPRESSION:
                     lines.append(f" and then moving -{self._f_calc('buffer_range / 2')} to center sync-feedback buffer")
-            else:
 
-                if mmu.sensor_manager.has_sensor(SENSOR_TOOLHEAD):
-                    lines.append("\n- No extruder homing is necessary because will home to toolhead sensor")
-                else:
-                    lines.append("\n- WARNING: no extruder homing is performed - extruder loading cannot be precise")
+            elif mmu.sensor_manager.has_sensor(SENSOR_TOOLHEAD):
+                lines.append("\n- No extruder homing is necessary because will home to toolhead sensor")
+
+            else:
+                lines.append("\n- WARNING: no extruder homing is performed - extruder loading cannot be precise")
 
             # Extruder loading ---------------------------------------------------
 
@@ -216,7 +214,7 @@ class MmuStatusCommand(BaseCommand):
                     move = self._f_calc('bowden_load_homing_buffer + toolhead_homing_max')
 
                 lines.append(
-                    f"\n- Extruder (synced) loads by homing a maximum of {self._f_calc('bowden_load_homing_buffer + toolhead_homing_max')} "
+                    f"\n- Extruder (synced) loads by homing a maximum of {move} "
                     "to TOOLHEAD sensor before moving the last "
                     f"{self._f_calc('toolhead_sensor_to_nozzle - toolhead_residual_filament - toolhead_ooze_reduction - toolchange_retract - filament_remaining')} "
                     "to the nozzle"
@@ -340,7 +338,7 @@ class MmuStatusCommand(BaseCommand):
             # Bowden unloading ---------------------------------------------------
 
             if mmu_unit.require_bowden_move:
-                if self.calibrated_bowden_length >= 0:
+                if self.calibrated_bowden_length > 0:
                     if (
                         mmu.has_encoder()
                         and mmu_unit.p.bowden_pre_unload_test

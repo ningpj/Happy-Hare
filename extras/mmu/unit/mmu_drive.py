@@ -142,22 +142,35 @@ class MmuDrive():
 
 
     def has_endstop(self, endstop_name):
+        """
+        Check if endstop name exists on driving stepper
+        Caution: sync mode needs to be correct before calling this
+        """
         return self._driving_stepper.rail.has_endstop(endstop_name)
 
 
     def get_endstop(self, endstop_name):
         """
-        Returns just the endstop obj. Not (endstop, name) tuple
+        Returns just the endstop obj. Not (endstop, name) tuple on driving stepper
+        Caution: sync mode needs to be correct before calling this
         """
         endstop, _ = self._driving_stepper.rail.get_homing_endstops(endstop_name)[0]
         return endstop
 
 
     def get_extra_endstop_names(self):
+        """
+        Return extra endstops registered on driving stepper
+        Caution: sync mode needs to be correct before calling this
+        """
         return self._driving_stepper.rail.get_extra_endstop_names()
 
 
     def is_endstop_virtual(self, endstop):
+        """
+        Check if endstop is virtual (stallguard)
+        Caution: sync mode needs to be correct before calling this
+        """
         return self._driving_stepper.rail.is_endstop_virtual(endstop)
 
 
