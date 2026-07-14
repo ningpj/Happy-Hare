@@ -1633,7 +1633,7 @@ class MmuController(MmuFilamentMovement):
             self.log_info(f"Spool ID: Assignment of {next_spool_id} will timeout in {self.p.pending_spool_id_timeout} seconds")
         else:
             # Disable timer to prevent reuse
-            self.pending_spool_id > 0:
+            if self.pending_spool_id > 0:
                 self.log_info("Spool ID: Automatic assignment of id cancelled")
             self.pending_spool_id = -1
             self.reactor.update_timer(self.pending_spool_id_timer, self.reactor.NEVER)
