@@ -1,9 +1,9 @@
-# klippy/extras/nfc_gates/shared_reader.py
+# klippy/extras/mmu/mmu_nfc_shared_reader.py
 #
 # NFC Gate Reader — shared-reader (single in-body reader) manager
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# SharedNFCReader is a single physical NFC reader shared across every gate on
+# MmuSharedNfcReader is a single physical NFC reader shared across every gate on
 # the MMU.
 # It answers a different question than a lane does: not "is my filament at my
 # reader," but "which gate, if any, is Happy Hare about to load, and what tag
@@ -22,13 +22,13 @@
 # piece of design work, not part of this extraction.
 #
 # All of these methods only ever run when self._shared is True, i.e. only on
-# a SharedNFCReader instance -- they were previously defined directly on
+# a MmuSharedNfcReader instance -- they were previously defined directly on
 # NFCGate, gated by "if self._shared:" checks at each call site.
 
-from .log import logger
+from .mmu_nfc_log import logger
 
 try:
-    from .log import color_console_tags
+    from .mmu_nfc_log import color_console_tags
 except ImportError:
     def color_console_tags(text):
         text = str(text)
@@ -37,18 +37,20 @@ except ImportError:
         text = text.replace('[ERROR]', '<span style="color:#FF6060">[ERROR]</span>')
         return text
 
-from . import rc522_driver, shared_preload
-from .NFC_LEDManager import (
-    EVENT_AUTO_CREATE, EVENT_SPOOL_READY, EVENT_TAG_READ, EVENT_UNRESOLVED,
-    NFCLEDManager, shared_effect_name)
-from .gate_state import (
+from .unit.nfc import rc522_driver
+from . import mmu_nfc_shared_preload as shared_preload
+EVENT_AUTO_CREATE = 'auto_create'
+EVENT_SPOOL_READY = 'spool_ready'
+EVENT_TAG_READ = 'tag_read'
+EVENT_UNRESOLVED = 'unresolved'
+from .mmu_nfc_gate_state import (
     EVENT_CHANGED, EVENT_REMOVED, EVENT_UID_ONLY, DIRECT_METADATA_SPOOL)
-from ..mmu.mmu_constants import TOOL_GATE_BYPASS
-from .nfc_manager import (
-    NFCGate, _flag_param, _raw_klipper_config, _shared_preload_hook_message)
+from .mmu_constants import TOOL_GATE_BYPASS
+from .mmu_nfc_manager import (
+    NFCGate, _raw_klipper_config, _shared_preload_hook_message)
 
 
-class SharedNFCReader(NFCGate):
+class MmuSharedNfcReader(NFCGate):
     """Single shared NFC reader used across every gate on the MMU."""
 
     def _shared_led_target(self):
@@ -56,16 +58,19 @@ class SharedNFCReader(NFCGate):
         segment = (segment or 'exit').strip().lower()
         mcu_index = getattr(self, '_shared_mcu_index', None)
         if segment == 'gate':
-            mmu = self._get_mmu()
-            gate_count = mmu.num_gates if mmu is not None else None
-            if (mcu_index is None
-                    or (gate_count is not None
-                        and not (0 <= int(mcu_index) < int(gate_count)))):
-                if gate_count is not None:
+            unit = getattr(self, '_mmu_unit', None)
+            selected_gate = (getattr(self.mmu, 'gate_selected', None)
+                             if self.mmu is not None else None)
+            gate = (selected_gate
+                    if unit is not None and unit.manages_gate(selected_gate)
+                    else mcu_index)
+            if (gate is None or unit is None
+                    or not unit.manages_gate(int(gate))):
+                if unit is not None:
                     logger.warning(
-                        "[%s]: shared_led_segment=gate derived GATE=%s but "
-                        "Happy Hare has %s gates; using UNIT LEDs instead",
-                        self._name, mcu_index, gate_count)
+                        "[%s]: shared_led_segment=gate resolved GATE=%s but "
+                        "unit %s manages gates %s; using unit exit LEDs instead",
+                        self._name, gate, unit.name, unit.gate_range())
                 else:
                     logger.warning(
                         "[%s]: shared_led_segment=gate has no valid gate; "
@@ -73,10 +78,10 @@ class SharedNFCReader(NFCGate):
                         self._name)
                 segment = 'exit'
                 mcu_index = None
-        return (
-            getattr(self, '_mmu_led_unit', 'unit0'),
-            segment,
-            mcu_index)
+            else:
+                segment = 'exit'
+                mcu_index = int(gate)
+        return getattr(self, '_mmu_unit', None), segment, mcu_index
 
     def _shared_gate_effect_name(self, base):
         """Return the Happy Hare LED effect name for a shared reader event.
@@ -85,12 +90,12 @@ class SharedNFCReader(NFCGate):
           gate -> legacy per-gate effect {base}_exit_{index}
           else -> whole-chain effect {unit}_{base}_{segment}
         """
-        led_unit, segment, mcu_index = self._shared_led_target()
-        return shared_effect_name(
-            base,
-            led_unit=led_unit,
-            segment=segment,
-            mcu_index=mcu_index)
+        unit, segment, gate = self._shared_led_target()
+        if unit is None:
+            return base
+        if gate is not None:
+            return "%s_%s_%d" % (base, segment, gate)
+        return "unit%d_%s_%s" % (unit.unit_index, base, segment)
 
     def _shared_play_led_effect(self, effect_name, gcmd=None, event='',
                                 duration=None):
@@ -101,29 +106,19 @@ class SharedNFCReader(NFCGate):
                 gcmd.respond_info(
                     "[WARN] NFC[%s]: no LED effect configured" % self._name)
             return False
-        led_unit, segment, mcu_index = self._shared_led_target()
-        gate_effect = shared_effect_name(
-            effect_name, led_unit=led_unit, segment=segment,
-            mcu_index=mcu_index)
+        unit, segment, gate = self._shared_led_target()
+        gate_effect = self._shared_gate_effect_name(effect_name)
         logger.info(
             "[%s]: LED effect %s scheduled",
             self._name, gate_effect)
         if gcmd is not None:
             gcmd.respond_info(
                 "NFC[%s]: LED effect %s started" % (self._name, gate_effect))
-        # Deferred via async callback — safe from both timer callbacks and
-        # GCode handlers (run_script from a GCode handler re-enters the
-        # GCode mutex and deadlocks).
-        NFCLEDManager(
-            self.printer, reactor=self.reactor, runner=self._safe_run_script,
-            name=self._name).play_shared_event(
-                event, effect_name,
-                led_unit=led_unit,
-                segment=segment,
-                mcu_index=mcu_index,
-                replace=True, async_dispatch=True,
-                duration=duration)
-        return True
+        if self.mmu is None or unit is None:
+            return False
+        return self.mmu.led_manager.set_transient_effect(
+            unit, effect_name, segment=segment, gate=gate,
+            duration=duration)
 
     def _shared_arm_led_failsafe(self, timeout, reason):
         if not self._shared:
@@ -203,12 +198,10 @@ class SharedNFCReader(NFCGate):
 
     def _shared_restore_hh_leds(self):
         self._shared_cancel_led_failsafe()
-        # Deferred via async callback — safe from both timer callbacks and
-        # GCode handlers (run_script from a GCode handler re-enters the
-        # GCode mutex and deadlocks).
-        NFCLEDManager(
-            self.printer, reactor=self.reactor, runner=self._safe_run_script,
-            name=self._name).release(async_dispatch=True)
+        unit, segment, gate = self._shared_led_target()
+        if self.mmu is not None and unit is not None:
+            self.mmu.led_manager.restore_transient_effect(
+                unit, segment=segment, gate=gate)
 
     def _shared_clear_cache(self, gcmd):
         """Clear shared reader tag/cache state while keeping staged spool."""
@@ -242,6 +235,8 @@ class SharedNFCReader(NFCGate):
 
     def _shared_bypass_selected(self):
         """Return True when Happy Hare currently has bypass selected."""
+        if not getattr(self, '_shared_bypass_enabled', True):
+            return False
         mmu = self._get_mmu()
         if mmu is None:
             return False
@@ -533,7 +528,7 @@ class SharedNFCReader(NFCGate):
     def _shared_preload_policy(self):
         coordinator = getattr(self, '_shared_preload_coordinator', None)
         if coordinator is None:
-            coordinator = shared_preload.SharedPreloadCoordinator(self)
+            coordinator = shared_preload.MmuNfcSharedPreload(self)
             self._shared_preload_coordinator = coordinator
         return coordinator
 
@@ -759,94 +754,6 @@ class SharedNFCReader(NFCGate):
                 "using %.0fs default", self._name, default)
         return default
 
-    def cmd_NFC_SHARED(self, gcmd):
-        if self._cmd_low_level_debug(gcmd):
-            return
-        read_value = gcmd.get("READ", None)
-        if read_value is not None:
-            self._set_reading(gcmd, gcmd.get_int("READ", minval=0, maxval=1) == 1)
-            return
-        if _flag_param(gcmd, 'STATUS'):
-            gcmd.respond_info(color_console_tags(
-                "NFC %s" % self.shared_status_detail()))
-            return
-        if _flag_param(gcmd, 'SUMMARY'):
-            gcmd.respond_info(color_console_tags(
-                "NFC %s" % self.shared_summary_line()))
-            return
-        if _flag_param(gcmd, 'HELP'):
-            self._shared_help(gcmd)
-            return
-        if _flag_param(gcmd, 'REPLACE'):
-            self._shared_replace_pending(gcmd)
-            return
-        if _flag_param(gcmd, 'RESET'):
-            self._shared_reset_and_poll(gcmd)
-            return
-        if _flag_param(gcmd, 'CLEAR'):
-            self._shared_clear_pending()
-            self._shared_last_error = None
-            self._shared_last_action = "shared state cleared"
-            self._polling = False
-            self._shared_read_deadline = 0.0
-            self.reactor.update_timer(self._poll_timer, self.reactor.NEVER)
-            self._state.current_uid   = None
-            self._state.current_spool = None
-            logger.info("[%s]: shared state cleared", self._name)
-            gcmd.respond_info(color_console_tags(
-                "NFC[%s]: shared state cleared" % self._name))
-            return
-        if _flag_param(gcmd, 'PRELOAD_CHECK'):
-            self._shared_preload_check(gcmd)
-            return
-        if _flag_param(gcmd, 'PRELOAD_COMMIT'):
-            self._shared_preload_commit(gcmd)
-            return
-        if _flag_param(gcmd, 'PRELOAD_CLEAR_ASSIGNED'):
-            self._shared_preload_clear_assigned(gcmd)
-            return
-        if _flag_param(gcmd, 'CANCEL'):
-            self._shared_clear_pending()
-            self._shared_last_error = None
-            self._shared_last_action = "pending spool canceled"
-            self._polling = False
-            self._shared_read_deadline = 0.0
-            self.reactor.update_timer(self._poll_timer, self.reactor.NEVER)
-            logger.info("[%s]: pending spool canceled", self._name)
-            gcmd.respond_info(color_console_tags(
-                "NFC[%s]: pending spool canceled" % self._name))
-            return
-        if _flag_param(gcmd, 'POLL'):
-            if self._is_printing():
-                logger.warning(
-                    "[%s]: shared poll skipped while printing",
-                    self._name)
-                gcmd.respond_info(
-                    "[WARN] NFC[%s]: shared poll skipped while printing" % self._name)
-                return
-            self._poll()
-            logger.info(
-                "[%s]: shared POLL=1 complete — %s",
-                self._name, self.shared_status_line().strip())
-            gcmd.respond_info(color_console_tags(
-                "NFC[%s]: one poll complete; %s"
-                % (self._name, self.shared_status_line().strip())))
-            return
-        if _flag_param(gcmd, 'SCAN'):
-            self._manual_scan(gcmd)
-            return
-        if _flag_param(gcmd, 'INIT'):
-            self._manual_init(gcmd)
-            return
-        if _flag_param(gcmd, 'LED_TEST'):
-            self._shared_play_tag_read_effect(
-                gcmd, duration=self._shared_read_effect_duration)
-            return
-        if _flag_param(gcmd, 'CLEAR_CACHE'):
-            self._shared_clear_cache(gcmd)
-            return
-        self._shared_help(gcmd)
-
     def get_status(self, _eventtime=None):
         status = super().get_status(_eventtime)
         if not status.get('enabled', True):
@@ -864,4 +771,3 @@ class SharedNFCReader(NFCGate):
         status['has_per_lane_readers'] = bool(
             getattr(self, '_has_per_lane_readers', False))
         return status
-

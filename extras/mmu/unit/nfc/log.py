@@ -1,4 +1,4 @@
-# klippy/extras/mmu/nfc/log.py
+# klippy/extras/mmu/unit/nfc/log.py
 #
 # Minimal logging shim for the extracted reader drivers.
 #

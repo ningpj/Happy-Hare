@@ -1,4 +1,4 @@
-# klippy/extras/nfc_gates/rc522_driver.py
+# klippy/extras/mmu/unit/nfc/rc522_driver.py
 #
 # EMU NFC Gate Reader — RC522 SPI driver
 # Version 1.0.0  |  2026-04-14

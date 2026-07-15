@@ -1,4 +1,4 @@
-# klippy/extras/nfc_gates/pn532_driver.py
+# klippy/extras/mmu/unit/nfc/pn532_driver.py
 #
 # EMU NFC Gate Reader — PN532 I2C driver
 # Version 1.0.0  |  2026-04-14
@@ -358,7 +358,7 @@ class _PN532Base:
         Configure the PN532 SAM in normal mode.
 
         HH_code uses timeout=0x14 and irq=0x01.  This driver defaults to the
-        previous nfc_gates values because Klipper is polling readiness instead
+        previous MMU NFC values because Klipper is polling readiness instead
         of consuming the IRQ pin directly.
         """
         payload = self._transceive([_CMD_SAMCONFIGURATION, 0x01,

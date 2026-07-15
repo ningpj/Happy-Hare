@@ -1,15 +1,13 @@
-# klippy/extras/nfc_gates/scan_jog.py
+# klippy/extras/mmu/mmu_nfc_scan_jog.py
 #
 # Scan-and-jog mode helpers for NFCGate.
 
-from .NFC_LEDManager import (
-    EVENT_REWIND, EVENT_SCAN_START, EVENT_TAG_READ, NFCLEDManager)
-from .gate_state import (
+from .mmu_nfc_gate_state import (
     DIRECT_METADATA_SPOOL, EVENT_CHANGED, EVENT_UID_ONLY, CurrentTag)
-from .log import info_both, logger
+from .mmu_nfc_log import info_both, logger
 
 try:
-    from .log import color_console_tags
+    from .mmu_nfc_log import color_console_tags
 except ImportError:
     def color_console_tags(text):
         text = str(text)
@@ -50,24 +48,12 @@ def _led_effect(gate, effect_name):
     """
     if not effect_name:
         return
-    led = NFCLEDManager(
-        gate.printer, reactor=gate.reactor, name=gate._name,
-        console=getattr(gate, '_console', None))
-    result = led.play_lane_event(
-        _scan_led_event(effect_name), effect_name, gate._gate, replace=True)
-    if not result.ok and result.error is not None:
+    try:
+        gate.mmu.led_manager.set_transient_effect(
+            gate._mmu_unit, effect_name, segment='exit', gate=gate._gate)
+    except Exception as e:
         gate._console("[WARN] NFC[%s]: LED effect failed — %s"
-                      % (gate._name, result.error))
-
-
-def _scan_led_event(effect_name):
-    if effect_name == LED_SEARCHING:
-        return EVENT_SCAN_START
-    if effect_name == LED_TAG_READ:
-        return EVENT_TAG_READ
-    if effect_name == LED_REWINDING:
-        return EVENT_REWIND
-    return EVENT_SCAN_START
+                      % (gate._name, e))
 
 
 def _led_reassert_callback(gate, eventtime):
@@ -102,8 +88,9 @@ def _cancel_led_reassert(gate):
 def _led_release(gate):
     """Return LED control to Happy Hare."""
     _cancel_led_reassert(gate)
-    led = NFCLEDManager(gate.printer, reactor=gate.reactor, name=gate._name)
-    led.release()
+    if gate.mmu is not None:
+        gate.mmu.led_manager.restore_transient_effect(
+            gate._mmu_unit, segment='exit', gate=gate._gate)
 
 
 def _drain_scan_queue(gate):

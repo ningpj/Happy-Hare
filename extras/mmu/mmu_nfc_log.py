@@ -1,4 +1,4 @@
-# klippy/extras/nfc_gates/log.py
+# klippy/extras/mmu/mmu_nfc_log.py
 #
 # EMU NFC Gate Reader — dedicated logger
 # Version 1.0.0  |  2026-04-14
@@ -13,7 +13,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Dedicated logger for all NFC gate modules.
 #
-# All nfc_gate / nfc_gates output goes to nfc_reader.log (same directory as
+# All MMU NFC output goes to nfc_reader.log (same directory as
 # klippy.log).  WARNING and ERROR records automatically also appear in
 # klippy.log via _KlippyForwardHandler.  INFO and DEBUG stay in nfc_reader.log
 # only.  Optional UI console output is configured by NFC_manager after reading
@@ -27,8 +27,7 @@
 #   4  trace          — full poll + driver detail → nfc_reader.log only
 #
 # Usage (from any module in this package):
-#   from .log import logger           # inside nfc_gates/
-#   from nfc_gates.log import logger  # from nfc_gate.py (top-level extra)
+#   from .mmu_nfc_log import logger
 
 import datetime
 import logging
@@ -331,7 +330,7 @@ class _KlippyForwardHandler(logging.Handler):
     """Forward WARNING and ERROR records to klippy.log (the root logger).
 
     Attached to the nfc_gate logger so that any logger.warning() or
-    logger.error() call anywhere in the nfc_gates package automatically
+    logger.error() call anywhere in the MMU NFC package automatically
     appears in klippy.log without requiring explicit log_both() calls.
     INFO and DEBUG records stay in nfc_reader.log only.
     """

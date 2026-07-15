@@ -3,8 +3,12 @@
 # Responsible for setting:
 #
 # MMU_HAS_NFC_READER
+# MMU_HAS_SHARED_NFC_READER
 # MMU_SHARED_NFC_READER
 # MMU_HAS_PER_GATE_NFC_READERS
+# CHOICE_NFC_TOPOLOGY_SHARED
+# CHOICE_NFC_TOPOLOGY_PER_LANE
+# CHOICE_NFC_TOPOLOGY_HYBRID
 #
 # Shared:
 #   PARAM_NFC_READER
@@ -27,6 +31,28 @@
 # Per-gate:
 #   PARAM_NFC_READER_X
 #     as above with _<gate_index> extension
+#
+# Runtime parameters (for mmu_parameters.cfg):
+#   PARAM_NFC_SPOOLMAN_URL, PARAM_NFC_SPOOLMAN_RFID_KEY
+#   PARAM_NFC_SPOOLMAN_TIMEOUT, PARAM_NFC_SPOOLMAN_CACHE_TTL
+#   PARAM_NFC_TAG_PARSING, PARAM_NFC_BAMBU_READS
+#   PARAM_NFC_SPOOLMAN_AUTO_CREATE, PARAM_NFC_TAG_MAX_PAGES
+#   PARAM_NFC_STARTUP_POLLING, PARAM_NFC_STARTUP_POLL_DELAY
+#   PARAM_NFC_POLL_INTERVAL, PARAM_NFC_ABSENT_THRESHOLD
+#   PARAM_NFC_TRANSCEIVE_DELAY, PARAM_NFC_CRC_DELAY
+#   PARAM_NFC_LOG_FILE, PARAM_NFC_DEBUG
+#   PARAM_NFC_CONSOLE_OUTPUT, PARAM_NFC_CONSOLE_LOG_LEVEL
+#   PARAM_NFC_SCAN_ENABLED, PARAM_NFC_SCAN_JOG_MM, PARAM_NFC_SCAN_JOG_MAX
+#   PARAM_NFC_SCAN_REWIND_BUFFER_MM, PARAM_NFC_SCAN_DECODE_RETRY_MM
+#   PARAM_NFC_SCAN_DECODE_RETRY_ROUNDS, PARAM_NFC_SCAN_READS_PER_POSITION
+#   PARAM_NFC_SCAN_POLL_INTERVAL, PARAM_NFC_SCAN_MOTION_MODE
+#   PARAM_NFC_SCAN_CONTINUOUS_STEP_MM, PARAM_NFC_SCAN_CONTINUOUS_SPEED
+#   PARAM_NFC_SCAN_CONTINUOUS_ACCEL, PARAM_NFC_SCAN_CONTINUOUS_POLL_INTERVAL
+#
+# Macro variables (for mmu_macro_vars.cfg):
+#   PARAM_NFC_SCAN_SEARCHING_EFFECT, PARAM_NFC_SCAN_TAG_READ_EFFECT
+#   PARAM_NFC_SCAN_REWIND_EFFECT, PARAM_NFC_LANE_AUTO_CREATE_EFFECT
+#   PARAM_NFC_LANE_UNRESOLVED_EFFECT
 #
 # SUPPORTED SENSOR TYPES
 #   - rc522  (spi)
@@ -59,46 +85,64 @@ endif
 
 if MMU_HAS_NFC_READER && ! CUSTOM_NFC_READER_SETUP
   menu "NFC reader config"
-    config MMU_SHARED_NFC_READER
-      depends on MULTI_UNIT
-      bool "Shared with existing unit?"
+    choice CHOICE_NFC_READER_TOPOLOGY
+      prompt "Reader arrangement "
+      default CHOICE_NFC_TOPOLOGY_SHARED
+      help
+        Shared uses one reader for filament presentation and bypass. Per-lane
+        uses a reader at each configured gate. Hybrid installs both the shared
+        presentation reader and per-lane readers.
+
+      config CHOICE_NFC_TOPOLOGY_SHARED
+        bool "Shared reader"
+
+      config CHOICE_NFC_TOPOLOGY_PER_LANE
+        bool "Per-lane readers"
+
+      config CHOICE_NFC_TOPOLOGY_HYBRID
+        bool "Hybrid (shared and per-lane)"
+    endchoice
+
+    config MMU_HAS_SHARED_NFC_READER
+      bool
+      default y if CHOICE_NFC_TOPOLOGY_SHARED || CHOICE_NFC_TOPOLOGY_HYBRID
       default n
 
-    if MMU_SHARED_NFC_READER
-      config PARAM_NFC_READER
-        prompt "Shared NFC name   "
-        default "-specify name-"
-        help
-          Enter the name of the shared NFC reder.
-    endif
+    config MMU_HAS_PER_GATE_NFC_READERS
+      bool
+      default y if CHOICE_NFC_TOPOLOGY_PER_LANE || CHOICE_NFC_TOPOLOGY_HYBRID
+      default n
 
+    # MMU_SHARED_NFC_READER retains its existing template meaning: the named
+    # shared reader is owned/configured by another MMU unit.
+    config MMU_SHARED_NFC_READER
+      depends on MULTI_UNIT && MMU_HAS_SHARED_NFC_READER
+      bool "Reuse another unit's shared reader?"
+      default n
+      help
+        Select this only when another MMU unit creates the physical shared NFC
+        reader. This unit will reference that existing Klipper object by name.
 
-    # ------------------------------------
-    # Single NFC: all settings on one page
-    # ------------------------------------
+    # ---------------------------------------
+    # Shared presentation/bypass NFC hardware
+    # ---------------------------------------
 
-    if !MMU_SHARED_NFC_READER
-
-      config MMU_HAS_PER_GATE_NFC_READERS
-        bool "Per-gate NFC readers?"
-        default n
-        help
-          Most designs will only have a single NFC reader that allows presenting
-          filament prior to preload. However, some designs have a reader built
-          in per gate.
-
-      if !MMU_HAS_PER_GATE_NFC_READERS
+    menu "Shared reader hardware"
+      depends on MMU_HAS_SHARED_NFC_READER
 
         config PARAM_NFC_READER
-          string "NFC reader name   "
+          string "Shared reader name"
+          default "-specify name-" if MMU_SHARED_NFC_READER
           default "$(UNIT_NAME)_nfc"
           help
-            The name of the klipper object for this NFC reader. Unless it is going to be shared
-            accross multiple MMU units it is recommended to use the default.
+            Klipper object name for the shared presentation/bypass reader.
+            When reusing another unit's reader, enter that existing object name.
+
+      if !MMU_SHARED_NFC_READER
 
         choice CHOICE_NFC_READER_TYPE
           prompt "Reader type       "
-          default CHOICE_NFC_READER_TYPE_RC522
+          default CHOICE_NFC_READER_TYPE_PN532
           help
             Select the type of NFC reader being used.
 
@@ -146,17 +190,39 @@ if MMU_HAS_NFC_READER && ! CUSTOM_NFC_READER_SETUP
               SPI speed for the RC522 reader, in Hz.
         endif
 
-        if CHOICE_NFC_READER_TYPE_PN532 || CHOICE_NFC_READER_TYPE_PN7160
+        if CHOICE_NFC_READER_TYPE_PN532
           config PARAM_NFC_READER_I2C_ADDRESS
-              int "I2C address       "
-              default 36 if CHOICE_NFC_READER_TYPE_PN532
-              default 40 if CHOICE_NFC_READER_TYPE_PN7160
-              range 36 36 if CHOICE_NFC_READER_TYPE_PN532
-              range 36 43 if CHOICE_NFC_READER_TYPE_PN7160
-              help
-                I2C address of the NFC reader.
-                PN532 uses 36 (0x24)
-                PN7160 supports 40-43 (0x28-0x2B)
+            int
+            default 36
+        endif
+
+        if CHOICE_NFC_READER_TYPE_PN7160
+          choice CHOICE_NFC_READER_I2C_ADDRESS
+            prompt "I2C address       "
+            default CHOICE_NFC_READER_I2C_ADDRESS_40
+
+            config CHOICE_NFC_READER_I2C_ADDRESS_40
+              bool "0x28 (40)"
+
+            config CHOICE_NFC_READER_I2C_ADDRESS_41
+              bool "0x29 (41)"
+
+            config CHOICE_NFC_READER_I2C_ADDRESS_42
+              bool "0x2A (42)"
+
+            config CHOICE_NFC_READER_I2C_ADDRESS_43
+              bool "0x2B (43)"
+          endchoice
+
+          config PARAM_NFC_READER_I2C_ADDRESS
+            int
+            default 40 if CHOICE_NFC_READER_I2C_ADDRESS_40
+            default 41 if CHOICE_NFC_READER_I2C_ADDRESS_41
+            default 42 if CHOICE_NFC_READER_I2C_ADDRESS_42
+            default 43 if CHOICE_NFC_READER_I2C_ADDRESS_43
+        endif
+
+        if CHOICE_NFC_READER_TYPE_PN532 || CHOICE_NFC_READER_TYPE_PN7160
 
           config PARAM_NFC_READER_I2C_BUS
             string "I2C bus name      "
@@ -187,7 +253,8 @@ if MMU_HAS_NFC_READER && ! CUSTOM_NFC_READER_SETUP
               Optional IRQ pin for the PN7160 reader.
               Don't forget to prefix with mcu name. E.g. mmu:PG13
         endif
-      endif
+      endif # shared reader hardware is owned by this unit
+    endmenu # shared reader
 
 
       # --------------------------------------
@@ -195,7 +262,8 @@ if MMU_HAS_NFC_READER && ! CUSTOM_NFC_READER_SETUP
       # all of that gate's settings
       # --------------------------------------
 
-      if MMU_HAS_PER_GATE_NFC_READERS
+      menu "Per-lane reader hardware"
+        depends on MMU_HAS_PER_GATE_NFC_READERS
         @repeat var=i min=0 max=11@
           if PARAM_NUM_GATES > $(i)
 
@@ -219,7 +287,7 @@ if MMU_HAS_NFC_READER && ! CUSTOM_NFC_READER_SETUP
 
               choice CHOICE_NFC_READER_TYPE_$(i)
                 prompt "Gate $(i) reader type       "
-                default CHOICE_NFC_READER_TYPE_RC522_$(i)
+                default CHOICE_NFC_READER_TYPE_PN532_$(i)
                 help
                   Select the type of NFC reader being used for this gate.
 
@@ -261,17 +329,39 @@ if MMU_HAS_NFC_READER && ! CUSTOM_NFC_READER_SETUP
                     SPI speed for this gate's RC522 reader, in Hz.
               endif
 
-              if CHOICE_NFC_READER_TYPE_PN532_$(i) || CHOICE_NFC_READER_TYPE_PN7160_$(i)
+              if CHOICE_NFC_READER_TYPE_PN532_$(i)
                 config PARAM_NFC_READER_I2C_ADDRESS_$(i)
-                  int "I2C address              "
-                  default 36 if CHOICE_NFC_READER_TYPE_PN532_$(i)
-                  default 40 if CHOICE_NFC_READER_TYPE_PN7160_$(i)
-                  range 36 36 if CHOICE_NFC_READER_TYPE_PN532_$(i)
-                  range 36 43 if CHOICE_NFC_READER_TYPE_PN7160_$(i)
-                  help
-                    I2C address of the NFC reader.
-                    PN532 uses 36 (0x24)
-                    PN7160 supports 40-43 (0x28-0x2B)
+                  int
+                  default 36
+              endif
+
+              if CHOICE_NFC_READER_TYPE_PN7160_$(i)
+                choice CHOICE_NFC_READER_I2C_ADDRESS_$(i)
+                  prompt "Gate $(i) I2C address      "
+                  default CHOICE_NFC_READER_I2C_ADDRESS_40_$(i)
+
+                  config CHOICE_NFC_READER_I2C_ADDRESS_40_$(i)
+                    bool "0x28 (40)"
+
+                  config CHOICE_NFC_READER_I2C_ADDRESS_41_$(i)
+                    bool "0x29 (41)"
+
+                  config CHOICE_NFC_READER_I2C_ADDRESS_42_$(i)
+                    bool "0x2A (42)"
+
+                  config CHOICE_NFC_READER_I2C_ADDRESS_43_$(i)
+                    bool "0x2B (43)"
+                endchoice
+
+                config PARAM_NFC_READER_I2C_ADDRESS_$(i)
+                  int
+                  default 40 if CHOICE_NFC_READER_I2C_ADDRESS_40_$(i)
+                  default 41 if CHOICE_NFC_READER_I2C_ADDRESS_41_$(i)
+                  default 42 if CHOICE_NFC_READER_I2C_ADDRESS_42_$(i)
+                  default 43 if CHOICE_NFC_READER_I2C_ADDRESS_43_$(i)
+              endif
+
+              if CHOICE_NFC_READER_TYPE_PN532_$(i) || CHOICE_NFC_READER_TYPE_PN7160_$(i)
 
                 config PARAM_NFC_READER_I2C_BUS_$(i)
                   string "Gate $(i) I2C bus name      "
@@ -306,9 +396,534 @@ if MMU_HAS_NFC_READER && ! CUSTOM_NFC_READER_SETUP
           endif
         @endrepeat@
 
-      endif # per gate
+      endmenu # per lane
 
-    endif # not shared
+
+    # -------------------------------------------------
+    # NFC runtime parameters for mmu_parameters.cfg
+    # -------------------------------------------------
+
+    menu "NFC runtime parameters"
+      menu "Shared reader behavior"
+        depends on MMU_HAS_SHARED_NFC_READER
+
+        config PARAM_NFC_SHARED_BYPASS_ENABLED
+          bool "Use reader for bypass?"
+          default y
+          help
+            Allow the shared reader to stage and apply a spool while the MMU
+            bypass is selected. This is available in both Shared and Hybrid
+            arrangements.
+
+        choice CHOICE_NFC_SHARED_LED_SEGMENT
+          prompt "Shared LED segment"
+          default CHOICE_NFC_SHARED_LED_SEGMENT_EXIT
+          help
+            MMU LED segment used for shared-reader status effects.
+
+          config CHOICE_NFC_SHARED_LED_SEGMENT_EXIT
+            bool "Exit"
+
+          config CHOICE_NFC_SHARED_LED_SEGMENT_ENTRY
+            bool "Entry"
+
+          config CHOICE_NFC_SHARED_LED_SEGMENT_STATUS
+            bool "Status"
+
+          config CHOICE_NFC_SHARED_LED_SEGMENT_GATE
+            bool "Gate (legacy single lane)"
+        endchoice
+
+        config PARAM_NFC_SHARED_LED_SEGMENT
+          string
+          default "exit" if CHOICE_NFC_SHARED_LED_SEGMENT_EXIT
+          default "entry" if CHOICE_NFC_SHARED_LED_SEGMENT_ENTRY
+          default "status" if CHOICE_NFC_SHARED_LED_SEGMENT_STATUS
+          default "gate" if CHOICE_NFC_SHARED_LED_SEGMENT_GATE
+
+        config PARAM_NFC_SHARED_MISSED_LIMIT
+          int "Missed-read limit  "
+          default 3
+          range 1 255
+          help
+            Consecutive missed reads before the shared tag is treated as absent.
+
+        config PARAM_NFC_SHARED_FORCE_SPOOL_ID
+          bool "Require resolved spool?"
+          default y
+          help
+            Prevent shared-reader preload until the tag resolves to a Spoolman
+            spool ID.
+      endmenu
+
+      menu "Spoolman"
+      choice CHOICE_NFC_SPOOLMAN_URL
+        prompt "Connection mode    "
+        default CHOICE_NFC_SPOOLMAN_URL_AUTO
+        help
+          Select how NFC connects to Spoolman.
+
+        config CHOICE_NFC_SPOOLMAN_URL_AUTO
+          bool "Auto"
+          help
+            Discover Spoolman through Moonraker.
+
+        config CHOICE_NFC_SPOOLMAN_URL_DISABLED
+          bool "Disabled"
+          help
+            Disable Spoolman NFC lookups.
+
+        config CHOICE_NFC_SPOOLMAN_URL_ADDRESS
+          bool "IP address"
+          help
+            Connect directly to the specified Spoolman server.
+      endchoice
+
+      if CHOICE_NFC_SPOOLMAN_URL_ADDRESS
+        config PARAM_NFC_SPOOLMAN_ADDRESS
+          string "Spoolman IP address"
+          default "http://192.168.1.50:7912"
+          help
+            Enter the direct Spoolman server address. Include the URL scheme
+            and port, for example: http://192.168.1.50:7912
+      endif
+
+      config PARAM_NFC_SPOOLMAN_URL
+        string
+        default "auto" if CHOICE_NFC_SPOOLMAN_URL_AUTO
+        default "disabled" if CHOICE_NFC_SPOOLMAN_URL_DISABLED
+        default PARAM_NFC_SPOOLMAN_ADDRESS if CHOICE_NFC_SPOOLMAN_URL_ADDRESS
+
+      if !CHOICE_NFC_SPOOLMAN_URL_DISABLED
+      config PARAM_NFC_SPOOLMAN_RFID_KEY
+        string "Spoolman RFID key  "
+        default "rfid_tag"
+        help
+          Spool extra-field key containing the NFC tag UID.
+
+      config PARAM_NFC_SPOOLMAN_TIMEOUT
+        string "Spoolman timeout   "
+        default "5.0"
+        help
+          Maximum seconds to wait for each Spoolman HTTP request before the
+          lookup is treated as failed.
+
+      config PARAM_NFC_SPOOLMAN_CACHE_TTL
+        int "Spoolman cache TTL "
+        default 300
+        range 0 3600
+        help
+          Seconds to cache successful UID to spool lookups. Zero disables it.
+      endif
+      endmenu
+
+      menuconfig PARAM_NFC_TAG_PARSING
+        bool "Parse rich tag data?"
+        default n
+        help
+          Read supported metadata stored on the tag instead of resolving only
+          by UID. Rich reads take longer and depend on reader/tag capabilities.
+
+      if PARAM_NFC_TAG_PARSING
+      config PARAM_NFC_BAMBU_READS
+        bool "Enable Bambu reads?"
+        default n
+        help
+          Enables authenticated Bambu factory-spool reads. Requires
+          pycryptodome in Klipper's Python environment.
+
+      config PARAM_NFC_SPOOLMAN_AUTO_CREATE
+        bool "Auto-create Spoolman spools?"
+        default n
+        help
+          Create a Spoolman spool when rich tag metadata is available but no
+          existing spool matches the tag.
+
+      config PARAM_NFC_TAG_MAX_PAGES
+        int "Fallback tag pages "
+        default 16
+        range 4 135
+        help
+          Maximum NTAG user pages read for non-NDEF or binary tags. NDEF data
+          uses its encoded length instead. The default limits unnecessary I/O.
+      endif # rich tag parsing
+
+      choice CHOICE_NFC_STARTUP_POLLING
+        prompt "Startup polling    "
+        default CHOICE_NFC_STARTUP_POLLING_ENABLED
+        help
+          Select whether reader polling starts automatically after reader
+          initialization.
+
+        config CHOICE_NFC_STARTUP_POLLING_MANUAL
+          bool "Manual start only (-1)"
+
+        config CHOICE_NFC_STARTUP_POLLING_DISABLED
+          bool "Disabled (0)"
+
+        config CHOICE_NFC_STARTUP_POLLING_ENABLED
+          bool "Start automatically (1)"
+      endchoice
+
+      config PARAM_NFC_STARTUP_POLLING
+        int
+        default -1 if CHOICE_NFC_STARTUP_POLLING_MANUAL
+        default 0 if CHOICE_NFC_STARTUP_POLLING_DISABLED
+        default 1 if CHOICE_NFC_STARTUP_POLLING_ENABLED
+
+      config PARAM_NFC_STARTUP_POLL_DELAY
+        string "Startup poll delay"
+        default "0.0"
+        help
+          Seconds to wait before the first automatic poll. Per-lane delays can
+          be staggered to avoid initializing every reader simultaneously.
+
+      config PARAM_NFC_POLL_INTERVAL
+        int "Poll interval (s) "
+        default 10
+        range 1 3600
+        help
+          Seconds between normal per-lane tag checks. Shared-reader active
+          polling uses Scan poll interval instead.
+
+      config PARAM_NFC_ABSENT_THRESHOLD
+        int "Absent threshold  "
+        default 3
+        range 1 255
+        help
+          Consecutive missed per-lane polls required before a tag and its spool
+          are declared removed.
+
+      config PARAM_NFC_TRANSCEIVE_DELAY
+        string "Transceive delay  "
+        default "0.250"
+        help
+          Seconds allowed around PN532 passive-target transceive operations.
+
+      config PARAM_NFC_CRC_DELAY
+        string "CRC/release delay "
+        default "0.050"
+        help
+          Seconds to wait after releasing a PN532 target before issuing the
+          next command.
+
+      config PARAM_NFC_LOG_FILE
+        string "NFC log file      "
+        default "nfc_reader.log"
+        help
+          NFC-specific log filename. Relative names are created in Klipper's
+          log directory.
+
+      choice CHOICE_NFC_DEBUG_LEVEL
+        prompt "NFC debug level   "
+        default CHOICE_NFC_DEBUG_LEVEL_WARNINGS
+        help
+          Controls detail written to the NFC log. Protocol trace is very
+          verbose and should normally be used only for diagnosis.
+
+        config CHOICE_NFC_DEBUG_LEVEL_OFF
+          bool "0 - No logging"
+
+        config CHOICE_NFC_DEBUG_LEVEL_ERRORS
+          bool "1 - Errors only"
+
+        config CHOICE_NFC_DEBUG_LEVEL_WARNINGS
+          bool "2 - Warnings and errors"
+
+        config CHOICE_NFC_DEBUG_LEVEL_STATE
+          bool "3 - State and integration"
+
+        config CHOICE_NFC_DEBUG_LEVEL_TRACE
+          bool "4 - Full protocol trace"
+      endchoice
+
+      config PARAM_NFC_DEBUG
+        int
+        default 0 if CHOICE_NFC_DEBUG_LEVEL_OFF
+        default 1 if CHOICE_NFC_DEBUG_LEVEL_ERRORS
+        default 2 if CHOICE_NFC_DEBUG_LEVEL_WARNINGS
+        default 3 if CHOICE_NFC_DEBUG_LEVEL_STATE
+        default 4 if CHOICE_NFC_DEBUG_LEVEL_TRACE
+
+      config PARAM_NFC_CONSOLE_OUTPUT
+        bool "NFC console output?"
+        default n
+        help
+          Send NFC informational and warning messages to Fluidd or Mainsail.
+          Errors are still reported when this option is disabled.
+
+      if PARAM_NFC_CONSOLE_OUTPUT
+        choice CHOICE_NFC_CONSOLE_LOG_LEVEL
+          prompt "Console log level"
+          default CHOICE_NFC_CONSOLE_LOG_LEVEL_WARNINGS
+          help
+            Controls how much NFC detail is echoed to the printer console.
+
+          config CHOICE_NFC_CONSOLE_LOG_LEVEL_ERRORS
+            bool "1 - Errors only"
+
+          config CHOICE_NFC_CONSOLE_LOG_LEVEL_WARNINGS
+            bool "2 - Warnings and errors"
+
+          config CHOICE_NFC_CONSOLE_LOG_LEVEL_STATE
+            bool "3 - State and integration"
+
+          config CHOICE_NFC_CONSOLE_LOG_LEVEL_TRACE
+            bool "4 - Full protocol trace"
+        endchoice
+      endif
+
+      config PARAM_NFC_CONSOLE_LOG_LEVEL
+        int
+        default 1 if CHOICE_NFC_CONSOLE_LOG_LEVEL_ERRORS
+        default 2 if CHOICE_NFC_CONSOLE_LOG_LEVEL_WARNINGS
+        default 3 if CHOICE_NFC_CONSOLE_LOG_LEVEL_STATE
+        default 4 if CHOICE_NFC_CONSOLE_LOG_LEVEL_TRACE
+        default 2
+
+      config PARAM_NFC_LOW_LEVEL_DEBUG
+        bool "Low-level reader debugging?"
+        default n
+        help
+          Expose manual PN532 I2C and RC522 SPI diagnostic commands. Leave
+          disabled for normal printing.
+
+      menuconfig PARAM_NFC_SCAN_ENABLED
+        bool "Automatic scan-jog?"
+        default n
+        help
+          Automatically detect eligible preload events and run the configured
+          scan-jog motion. Enable this entry to configure scan and motion
+          parameters.
+
+      if PARAM_NFC_SCAN_ENABLED
+
+      menu "Scan parameters"
+        config PARAM_NFC_SCAN_JOG_MM
+          string "Scan jog distance "
+          default "150.0"
+          help
+            Filament travel in millimeters for a scan step. Smaller values
+            sample more tag positions but increase scan time.
+
+        config PARAM_NFC_SCAN_JOG_MAX
+          string "Maximum scan travel"
+          default ""
+          help
+            Optional maximum scan travel in millimeters. Leave blank to derive
+            it from Happy Hare's calibrated path length.
+
+        config PARAM_NFC_SCAN_REWIND_BUFFER_MM
+          string "Scan rewind buffer"
+          default "30.0"
+          help
+            Millimeters reserved for Happy Hare's final gate-settle behavior.
+            Keep the default unless testing a parking integration that uses it.
+
+        config PARAM_NFC_SCAN_DECODE_RETRY_MM
+          string "Decode retry step "
+          default "5.0"
+          help
+            Millimeters between nearby retry positions when a tag UID is found
+            but its richer payload cannot be decoded completely.
+
+        config PARAM_NFC_SCAN_DECODE_RETRY_ROUNDS
+          int "Decode retry rounds"
+          default 5
+          range 0 10
+          help
+            Number of alternating left/right decode-retry rounds. Zero disables
+            positional decode retries.
+
+        config PARAM_NFC_SCAN_READS_PER_POSITION
+          int "Reads per position"
+          default 1
+          range 1 20
+          help
+            Extra reader attempts made while stopped before forward searching
+            and at decode-retry positions.
+
+        config PARAM_NFC_SCAN_POLL_INTERVAL
+          string "Scan poll interval"
+          default "0.25"
+          help
+            Seconds between reads during scan operations. The shared reader
+            also uses this as its active polling cadence.
+      endmenu
+
+      menu "Scan motion"
+        choice CHOICE_NFC_SCAN_MOTION_MODE
+          prompt "Scan motion mode   "
+          default CHOICE_NFC_SCAN_MOTION_CONTINUOUS
+          help
+            Continuous searches with one NFC virtual-endstop homing move.
+            Stopped-position retains stop-and-retry behavior for recovery.
+
+          config CHOICE_NFC_SCAN_MOTION_CONTINUOUS
+            bool "Continuous"
+
+          config CHOICE_NFC_SCAN_MOTION_STOPPED
+            bool "Stopped-position"
+        endchoice
+
+        config PARAM_NFC_SCAN_MOTION_MODE
+          string
+          default "continuous" if CHOICE_NFC_SCAN_MOTION_CONTINUOUS
+          default "stopped" if CHOICE_NFC_SCAN_MOTION_STOPPED
+
+        if CHOICE_NFC_SCAN_MOTION_CONTINUOUS
+          config PARAM_NFC_SCAN_CONTINUOUS_STEP_MM
+            string "Continuous step   "
+            default "150.0"
+            help
+              Legacy step size retained for compatibility. Forward continuous
+              scanning currently requests the complete available scan travel.
+
+          config PARAM_NFC_SCAN_CONTINUOUS_SPEED
+            string "Continuous speed  "
+            default "200.0"
+            help
+              Filament speed in millimeters per second during continuous NFC
+              search motion.
+
+          config PARAM_NFC_SCAN_CONTINUOUS_ACCEL
+            string "Continuous accel  "
+            default "2000.0"
+            help
+              Filament acceleration in millimeters per second squared during
+              continuous NFC search motion.
+
+          config PARAM_NFC_SCAN_CONTINUOUS_POLL_INTERVAL
+            string "Continuous poll   "
+            default "0.03"
+            help
+              Seconds between reader checks while continuous motion is active.
+              Lower values react faster but increase reader and host activity.
+        endif
+      endmenu
+      endif # automatic scan-jog
+    endmenu
+
+
+    # -------------------------------------------------
+    # NFC presentation variables for mmu_macro_vars.cfg
+    # -------------------------------------------------
+
+    menu "NFC macro variables"
+      menu "Shared reader effects"
+        depends on MMU_HAS_SHARED_NFC_READER
+
+        config PARAM_NFC_SHARED_TAG_READ_EFFECT
+          string "Shared tag-read effect"
+          default "mmu_RFID_read"
+          help
+            MMU LED effect shown when the shared reader detects a tag. Leave
+            empty to disable this effect.
+
+        config PARAM_NFC_SHARED_READ_EFFECT_DURATION
+          string "Tag-read duration  "
+          default "2.0"
+          help
+            Failsafe duration in seconds for the shared tag-read effect and the
+            duration used by LED_TEST. Normal reads remain interruptible.
+
+        config PARAM_NFC_SHARED_SPOOL_READY_EFFECT
+          string "Spool-ready effect"
+          default "mmu_RFID_ready"
+          help
+            Effect held while a resolved shared-reader spool is staged and
+            waiting for preload, commit, cancellation, or timeout.
+
+        config PARAM_NFC_SHARED_TAG_UNRESOLVED_EFFECT
+          string "Unresolved effect "
+          default "mmu_RFID_unresolved"
+          help
+            Effect shown when a shared-reader tag cannot be resolved to a
+            Spoolman spool. Leave empty to disable it.
+
+        config PARAM_NFC_SHARED_UNRESOLVED_EFFECT_DURATION
+          string "Unresolved duration"
+          default "2.0"
+          help
+            Seconds to show the unresolved-tag effect before returning LED
+            control to Happy Hare.
+
+        config PARAM_NFC_SHARED_SPOOL_WARNING_EFFECT
+          string "Timeout warning effect"
+          default "mmu_RFID_warning"
+          help
+            Interruptible effect shown when the staged-spool timeout reaches
+            approximately 80 percent.
+
+        config PARAM_NFC_SHARED_AUTO_CREATE_EFFECT
+          string "Auto-create effect "
+          default "mmu_RFID_creating"
+          help
+            Effect shown while a missing spool is being created in Spoolman.
+            It stops when the create request completes.
+
+        if PARAM_NFC_SHARED_BYPASS_ENABLED
+          config PARAM_NFC_SHARED_BYPASS_TAG_READ_EFFECT
+            string "Bypass tag-read effect"
+            default "mmu_RFID_bypass_read"
+            help
+              Effect shown when a tag is detected while bypass is selected.
+
+          config PARAM_NFC_SHARED_BYPASS_READ_EFFECT_DURATION
+            string "Bypass read duration"
+            default "2.0"
+            help
+              Failsafe duration in seconds for the bypass tag-read effect.
+
+          config PARAM_NFC_SHARED_BYPASS_SPOOL_READY_EFFECT
+            string "Bypass-ready effect"
+            default "mmu_RFID_bypass_ready"
+            help
+              Effect shown after a bypass tag resolves to a spool.
+
+          config PARAM_NFC_SHARED_BYPASS_READY_EFFECT_DURATION
+            string "Bypass-ready duration"
+            default "2.0"
+            help
+              Seconds to show the resolved bypass-ready effect.
+        endif
+      endmenu
+
+      config PARAM_NFC_SCAN_SEARCHING_EFFECT
+        string "Searching LED effect"
+        default "mmu_RFID_searching"
+        help
+          Per-gate effect shown during forward scan-jog tag search. Leave empty
+          to disable this effect.
+
+      config PARAM_NFC_SCAN_TAG_READ_EFFECT
+        string "Tag-read LED effect"
+        default "mmu_RFID_read"
+        help
+          Per-gate effect shown after scan-jog confirms a tag. Leave empty to
+          disable this effect.
+
+      config PARAM_NFC_SCAN_REWIND_EFFECT
+        string "Rewind LED effect "
+        default "mmu_RFID_rewinding"
+        help
+          Per-gate effect shown while scan-jog returns filament to its parked
+          position. Leave empty to disable it.
+
+      config PARAM_NFC_LANE_AUTO_CREATE_EFFECT
+        string "Auto-create effect "
+        default "mmu_RFID_creating"
+        help
+          Per-gate effect shown while NFC creates a spool from rich tag data in
+          Spoolman. Leave empty to disable it.
+
+      config PARAM_NFC_LANE_UNRESOLVED_EFFECT
+        string "Unresolved effect  "
+        default "mmu_RFID_unresolved"
+        help
+          Per-gate effect shown when a detected tag cannot be matched to a
+          spool. Leave empty to disable it.
+    endmenu
 
   endmenu
 endif

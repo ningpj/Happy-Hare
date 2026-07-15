@@ -14,20 +14,20 @@
 # Klipper entry point for [nfc_gate] and [nfc_gate laneN] config sections.
 # Per-lane/shared NFC Reader path.
 #
-# All implementation lives in the nfc_gates/ package.
+# All implementation lives in the Happy Hare mmu package.
 # This file exists only because Klipper maps config section names to filenames
 # in klippy/extras/ — [nfc_gate] requires a file called nfc_gate.py here.
 #
 # Install
 # ───────
-# Run install.sh — it symlinks this file and the nfc_gates/ package into
+# Run install.sh — it symlinks this file and the mmu package into
 # ~/klipper/klippy/extras/ automatically.
 
 __version__ = '1.0.0'
 
-from .nfc_gates import nfc_manager as _nfc_manager
-from .nfc_gates.nfc_manager import NFCGate, NFCGateDefaults, _lane_instances
-from .nfc_gates.shared_reader import SharedNFCReader
+from .mmu import mmu_nfc_manager as _nfc_manager
+from .mmu.mmu_nfc_manager import NFCGate, NFCGateDefaults, _lane_instances
+from .mmu.mmu_nfc_shared_reader import MmuSharedNfcReader
 
 # Tracks which printer object owns the current _lane_instances contents.
 # A new Printer is created on every Klipper RESTART, so when this changes
@@ -62,7 +62,7 @@ def load_config_prefix(config):
     # class's __init__ parses config -- a [nfc_gate shared] section gets the
     # shared reader's own command surface (NFC_SHARED and friends); every
     # other section gets a plain per-lane NFCGate.
-    gate_cls = SharedNFCReader if config.getboolean('shared', False) else NFCGate
+    gate_cls = MmuSharedNfcReader if config.getboolean('shared', False) else NFCGate
     gate     = gate_cls(config, defaults)
     # Replace any existing entry for this lane name (guards against Klipper
     # calling load_config_prefix more than once per section in a single run).

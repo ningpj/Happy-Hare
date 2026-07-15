@@ -1,4 +1,4 @@
-# klippy/extras/nfc_gates/klipper_interface.py
+# klippy/extras/mmu/mmu_nfc_klipper_interface.py
 #
 # EMU NFC Gate Reader — reactor-thread GCode macro dispatcher
 # Copyright (C) 2026  WoodWorker
@@ -17,9 +17,9 @@
 
 import re
 
-from .gate_state import (DIRECT_METADATA_SPOOL,
+from .mmu_nfc_gate_state import (DIRECT_METADATA_SPOOL,
                          EVENT_CHANGED, EVENT_UID_ONLY, EVENT_REMOVED)
-from .log import logger
+from .mmu_nfc_log import logger
 
 
 class KlipperInterface:
@@ -69,7 +69,7 @@ class KlipperInterface:
                         " SCAN_FINISH=1" if scan_finish else "")
                     if self._debug >= 3:
                         logger.info(
-                            "nfc_gates: gate %d → spool %d detected (UID %s%s)",
+                            "mmu_nfc: gate %d → spool %d detected (UID %s%s)",
                             gate, spool_id, uid_hex,
                             " [auto-created]" if auto_created else "")
                 else:
@@ -97,7 +97,7 @@ class KlipperInterface:
                     script = ' '.join(parts)
                     if self._debug >= 3:
                         logger.info(
-                            "nfc_gates: gate %d → tag %s metadata-only "
+                            "mmu_nfc: gate %d → tag %s metadata-only "
                             "(name=%s material=%s color=%s brand=%s "
                             "min_temp=%s max_temp=%s diameter=%s weight=%s)",
                             gate, uid_hex, name, material, color, brand,
@@ -110,28 +110,28 @@ class KlipperInterface:
                 if self._debug >= 3:
                     if self._spoolman_enabled:
                         logger.info(
-                            "nfc_gates: gate %d → tag %s "
+                            "mmu_nfc: gate %d → tag %s "
                             "(no spool ID in Spoolman)",
                             gate, uid_hex)
                     else:
                         logger.info(
-                            "nfc_gates: gate %d → tag %s "
+                            "mmu_nfc: gate %d → tag %s "
                             "(Spoolman disabled; no metadata spool)",
                             gate, uid_hex)
             elif event_type == EVENT_REMOVED:
                 script = "_NFC_SPOOL_REMOVED GATE={} READER={}".format(gate, self._name)
                 if self._debug >= 3:
                     logger.info(
-                        "nfc_gates: gate %d → spool removed (was spool_id=%s)",
+                        "mmu_nfc: gate %d → spool removed (was spool_id=%s)",
                         gate, spool_id)
             else:
-                logger.warning("nfc_gates: unknown event type %r", event_type)
+                logger.warning("mmu_nfc: unknown event type %r", event_type)
                 return
             if self._debug >= 3:
-                logger.info("nfc_gates: dispatching GCode: %s", script)
+                logger.info("mmu_nfc: dispatching GCode: %s", script)
             gcode.run_script(script)
             if self._debug >= 3:
-                logger.info("nfc_gates: dispatched GCode OK: %s", script)
+                logger.info("mmu_nfc: dispatched GCode OK: %s", script)
         except Exception:
-            logger.exception("nfc_gates: GCode dispatch failed for gate %d event %r",
+            logger.exception("mmu_nfc: GCode dispatch failed for gate %d event %r",
                               gate, event_type)

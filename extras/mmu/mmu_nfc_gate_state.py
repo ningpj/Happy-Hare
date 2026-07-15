@@ -1,4 +1,4 @@
-# klippy/extras/nfc_gates/gate_state.py
+# klippy/extras/mmu/mmu_nfc_gate_state.py
 #
 # EMU NFC Gate Reader — per-gate debounce state machine and tag observation
 # Copyright (C) 2026  WoodWorker

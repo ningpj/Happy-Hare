@@ -46,6 +46,7 @@ from .unit.mmu_sync_feedback            import MmuSyncFeedback
 from .unit.selectors                    import SELECTOR_REGISTRY
 from .unit.selectors.mmu_base_selectors import VirtualSelector
 from .unit.mmu_environment_manager      import MmuEnvironmentManager
+from .unit.mmu_nfc                      import MmuNfc
 
 
 # Default selector classes for known vendors
@@ -204,9 +205,6 @@ class MmuUnit:
         if len(self.nfc_readers) not in [0, self.num_gates]:
             raise config.error("'nfc_readers' must be empty or a comma separated list of 'num_gates' elements")
 
-        if self.nfc_reader and self.nfc_readers:
-            raise config.error("Can't configure both single and per-gate 'nfc_reader'/'nfc_readers'")
-
         self.nfc_reader = resolve_object_name(
             config, self.nfc_reader, "mmu_nfc_reader ", "nfc reader"
         )
@@ -328,6 +326,11 @@ class MmuUnit:
         params = c = config.getsection('mmu_unit_parameters %s' % self.name)
         self.p = MmuUnitParameters(c, self)
         logging.info("MMU: Read: [%s]" % c.get_name())
+
+        # Create NFC state managers after unit parameters and physical reader
+        # references are available. This is the native replacement for
+        # constructing runtime objects from optional [nfc_gate ...] sections.
+        self.nfc = MmuNfc(params, self, self.p)
 
         # Create calibrator to oversee autotune / calibration updates based on available telemetry
         self.calibrator = MmuCalibrator(params, self, self.p)
@@ -453,6 +456,7 @@ class MmuUnit:
             self.buffer,
             self.sync_feedback,
             self.environment_manager,
+            self.nfc,
         ]
 
 

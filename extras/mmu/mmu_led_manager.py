@@ -307,6 +307,46 @@ class MmuLedManager:
         return ''
 
 
+    def set_transient_effect(self, mmu_unit, effect, segment='exit',
+                             gate=None, duration=None, fadetime=0):
+        """Apply a feature-owned effect through Happy Hare's LED pipeline.
+
+        ``effect`` is the configured base effect name.  The normal MMU naming,
+        segment availability, gate ownership, animation/static handling and
+        timed restoration are all handled by ``_set_led``.
+        """
+        if mmu_unit is None or not effect:
+            return False
+        segment = (segment or 'exit').strip().lower()
+        if segment not in ('exit', 'entry', 'status', 'logo'):
+            return False
+        leds = mmu_unit.leds
+        if leds is None or not leds.enabled:
+            return False
+        if not leds.animation and effect not in leds.get_effect_names():
+            logging.warning(
+                "MMU: LED effect '%s' has no static RGB mapping for unit %s",
+                effect, mmu_unit.name)
+            return False
+        kwargs = {'%s_effect' % segment: effect}
+        self._set_led(mmu_unit.unit_index, gate, duration=duration,
+                      fadetime=fadetime, **kwargs)
+        return True
+
+
+    def restore_transient_effect(self, mmu_unit, segment='exit', gate=None,
+                                 fadetime=0):
+        """Return a transient segment/gate override to MMU default state."""
+        if mmu_unit is None:
+            return False
+        segment = (segment or 'exit').strip().lower()
+        if segment not in ('exit', 'entry', 'status', 'logo'):
+            return False
+        kwargs = {'%s_effect' % segment: 'default'}
+        self._set_led(mmu_unit.unit_index, gate, fadetime=fadetime, **kwargs)
+        return True
+
+
     # Make the necessary configuration changes to LED accross all mmu_units
     #
     # Effects for LED segments when not providing "action status feedback" can be:
