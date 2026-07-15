@@ -22,6 +22,11 @@ import logging
 import re
 import copy
 
+# Check for python 3.x
+if sys.version_info[0] < 3:
+    sys.stderr.write("ERROR: Python 3 is required to run Happy-Hare 4.x\n")
+    sys.exit(1)
+
 # Notes:
 # {placeholder} style placeholders are no longer used with jinja templating
 # {template} is used to support advanced multi-line config lists/dicts like:
@@ -837,8 +842,23 @@ class ConfigBuilder(object):
             document_body.append(WhitespaceNode("\n"))
             self.document.body[0:0] = document_body
         else:
-            self.document.body.append(WhitespaceNode("\n"))
-            self.document.body.extend(document_body)
+            # if not at_top and include, insert after last include
+            inserted = False
+            if section_name.startswith("include "):
+                last_idx = None
+                for idx, node in enumerate(self.document.body):
+                    if isinstance(node, SectionNode) and node.name.startswith("include "):
+                        last_idx = idx
+
+                if last_idx is not None:
+                    insert_at = last_idx + 1
+                    self.document.body[insert_at:insert_at] = document_body + [WhitespaceNode("\n\n")]
+                    inserted = True
+
+            # append to end if not inserted
+            if not inserted:
+                self.document.body.append(WhitespaceNode("\n"))
+                self.document.body.extend(document_body)
 
     def remove_section(self, section_name):
         self.parser.filter_tree(
