@@ -84,7 +84,8 @@ class MmuNfcManager:
         if uid:
             self.mmu.log_info("NFC: RFID read")
             # initiate spoolman lookup... as async thread
-            #
+            # then call:
+            # self.mmu.set_pending_spool_id(next_spool_id)
         
 
         # Reschedule
