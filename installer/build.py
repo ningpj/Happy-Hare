@@ -27,6 +27,11 @@ import kconfiglib
 from .parser   import ConfigBuilder, WhitespaceNode
 from .upgrades import Upgrades
 
+# Check for python 3.x
+if sys.version_info[0] < 3:
+    sys.stderr.write("ERROR: Python 3 is required to run Happy-Hare 4.x\n")
+    sys.exit(1)
+
 # Documented params that are not in templates or are commented out.
 # This list prevents removal on upgrade/reinstall.
 supplemental_params = [
@@ -685,8 +690,8 @@ def install_includes(dest_file, kconfig):
         builder,
         "INSTALL_CLIENT_MACROS",
         "mmu/optional/client_macros.cfg",
-        comment="Happy Hare Client macros (should be near the bottom of file before SAVE_CONFIG section)",
-        at_top=True
+        comment="Happy Hare Client macros (should be after last include or other PAUSE/CANCEL macros)",
+        at_top=False
     )
 
     # Required --------
