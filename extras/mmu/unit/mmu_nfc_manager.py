@@ -19,7 +19,11 @@ import logging
 from ..mmu_constants import *
 from ..mmu_utils     import MmuError
 
-NFC_CHECK_INTERVAL = 1 # How often to shared NFC reader
+NFC_CHECK_INTERVAL = 2 # How often to query shared NFC reader in seconds
+
+class MmuNfcManager:
+
+    def __init__(self, config, mmu_unit, params):
 
 class MmuNfcManager:
 
@@ -31,6 +35,47 @@ class MmuNfcManager:
         self.printer = config.get_printer()
         self.reactor = self.printer.get_reactor()
 
+        # Load objects now for validation
+
+        # Optional shared reader
+        self.shared_nfc_reader_obj = None
+        reader_name = mmu_unit.nfc_reader
+        if reader_name:
+            section = 'mmu_nfc_reader %s' % reader_name
+            obj = self.printer.lookup_object(section, None)
+            if not obj:
+                if config.has_section(section):
+                    c = config.getsection(section)
+                    self.shared_nfc_reader_obj = obj = MmuNfcReader(c, mmu_unit)
+
+                    self.printer.add_object(c.get_name(), obj)
+                    logging.info("MMU: Created: [%s]" % c.get_name())
+                else:
+                    raise config.error("MMU NFC reader section [%s] not found!" % section)
+
+        # Per-gate readers
+        self.nfc_reader_objs = []
+        for lgate, reader_name in enumerate(mmu_unit.nfc_readers):
+            if not reader_name:
+                # Just means reader is not available for gate
+                self.nfc_reader_objs.append(None)
+                continue
+
+            section = 'mmu_nfc_reader %s' % reader_name
+            obj = self.printer.lookup_object(section, None)
+            if not obj:
+                if config.has_section(section):
+                    c = config.getsection(section)
+                    obj = MmuNfcReader(c, mmu_unit)
+                    self.nfc_reader_objs.append(obj)
+
+                    self.printer.add_object(c.get_name(), obj)
+                    logging.info("MMU: Created: [%s]" % c.get_name())
+                else:
+                    raise config.error("MMU NFC reader section [%s] not found!" % section)
+
+        self._periodic_timer = self.reactor.register_timer(self._check_nfc_reader)
+
         # Listen of important mmu events
         self.printer.register_event_handler("mmu:enabled", self._handle_mmu_enabled)
         self.printer.register_event_handler("mmu:disabled", self._handle_mmu_disabled)
@@ -38,8 +83,6 @@ class MmuNfcManager:
 
         # Register event handlers
         self.printer.register_event_handler('klippy:connect', self._handle_connect)
-
-        self._periodic_timer = self.reactor.register_timer(self._check_nfc_reader)
 
 
     def _handle_connect(self):
@@ -79,13 +122,14 @@ class MmuNfcManager:
         """
         Reactor callback to periodically check shared nfc reader
         """
-        # Read shared reader...
-        uid = "ad343ee5901"
-        if uid:
-            self.mmu.log_info("NFC: RFID read")
+        ## Read shared reader... logic similar to...
+        #uid = "ad343ee5901"
+        #if uid:
+        #    self.mmu.log_info("NFC: RFID read")
             # initiate spoolman lookup... as async thread
             # then call:
             # self.mmu.set_pending_spool_id(next_spool_id)
+            # or MMU_GATE_MAP NEXT_SPOOL_ID=<next_spool_id>
         
 
         # Reschedule

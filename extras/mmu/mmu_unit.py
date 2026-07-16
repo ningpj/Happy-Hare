@@ -46,6 +46,7 @@ from .unit.mmu_sync_feedback            import MmuSyncFeedback
 from .unit.selectors                    import SELECTOR_REGISTRY
 from .unit.selectors.mmu_base_selectors import VirtualSelector
 from .unit.mmu_environment_manager      import MmuEnvironmentManager
+from .unit.mmu_nfc_manager              import MmuNfcManager
 
 
 # Default selector classes for known vendors
@@ -195,7 +196,7 @@ class MmuUnit:
 
 
         # ---------------------------------------------------------------------------------------------------
-        # Optional nfc readers for spool rfid tags
+        # Optional NFC readers for spool rfid tags
         # ---------------------------------------------------------------------------------------------------
 
         self.nfc_reader  = config.get('nfc_reader', '')
@@ -203,9 +204,6 @@ class MmuUnit:
 
         if len(self.nfc_readers) not in [0, self.num_gates]:
             raise config.error("'nfc_readers' must be empty or a comma separated list of 'num_gates' elements")
-
-        if self.nfc_reader and self.nfc_readers:
-            raise config.error("Can't configure both single and per-gate 'nfc_reader'/'nfc_readers'")
 
         self.nfc_reader = resolve_object_name(
             config, self.nfc_reader, "mmu_nfc_reader ", "nfc reader"
@@ -322,6 +320,10 @@ class MmuUnit:
 
         # ---------------------------------------------------------------------------------------------------
         # Load subcomponents
+        # This is done in a deliberate order, allows passing of parent ownership
+        # and better config checking.
+        # I.e. most of these objects have special constructers and are not designed
+        # for regular klipper object loading
         # ---------------------------------------------------------------------------------------------------
 
         # Load parameters config for this unit
@@ -442,6 +444,10 @@ class MmuUnit:
         self.environment_manager = MmuEnvironmentManager(params, self, self.p)
         logging.info("MMU: Created: heater and environment manager for unit %s" % self.name)
 
+        # Create NFC manager
+        self.nfc_manager = MmuNfcManager(params, self, self.p)
+        logging.info("MMU: Created: nfc manager for unit %s" % self.name)
+
         self.subcomponents = [
             self.calibrator,
             self.toolhead_wrapper,
@@ -453,6 +459,7 @@ class MmuUnit:
             self.buffer,
             self.sync_feedback,
             self.environment_manager,
+            self.nfc_manager,
         ]
 
 
@@ -918,7 +925,7 @@ class MmuUnit:
             unit_info['filament_heaters'] = self.filament_heaters
 
         if self.nfc_reader:
-            # Single NFC reader
+            # Single (shared) NFC reader
             unit_info['nfc_reader'] = self.nfc_reader
 
         elif self.nfc_readers:

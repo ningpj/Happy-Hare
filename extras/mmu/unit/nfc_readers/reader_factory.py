@@ -1,4 +1,4 @@
-# klippy/extras/mmu/nfc/reader_factory.py
+# klippy/extras/mmu/unit/nfc/reader_factory.py
 #
 # Reader driver factory for mmu_nfc_reader.
 #

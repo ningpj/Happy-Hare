@@ -1,7 +1,7 @@
-# klippy/extras/mmu_rfid_reader.py
+# klippy/extras/mmu_nfc_reader.py
 #
-# mmu_rfid_reader — standalone RFID/NFC reader chip driver for Happy Hare
-# Version 1.0.0
+# mmu_nfc_reader — standalone RFID/NFC reader chip driver for Happy Hare
+# Version 1.1.0
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Extracted from a larger NFC gate-management extension. This module keeps
@@ -13,19 +13,19 @@
 #
 # Config
 # ──────
-# [mmu_rfid_reader]                 # optional: shared defaults, no hardware
+# [mmu_nfc_reader]                  # optional: shared defaults, no hardware
 #   i2c_bus: i2c1                   # shared I2C bus name, if using I2C chips
 #   i2c_address: 0x24               # shared I2C address default
 #   reader_type: pn532              # default chip type for instances below
 #   debug: 2                        # 0=silent .. 4=trace, logged to klippy.log
 #
-# [mmu_rfid_reader lane0]           # one reader instance; name = "lane0"
+# [mmu_nfc_reader lane0]            # one reader instance; name = "lane0"
 #   reader_type: rc522              # pn532 | pn7160 | rc522 (overrides default)
 #   cs_pin: mcu:PA4                 # rc522 only (SPI chip-select)
 #   #spi_bus:                       # optional, rc522 only
 #   #spi_speed: 1000000             # optional, rc522 only
 #
-# [mmu_rfid_reader lane1]
+# [mmu_nfc_reader lane1]
 #   reader_type: pn532
 #   i2c_address: 0x24               # pn532/pn7160 only
 #   #i2c_bus:
@@ -39,25 +39,27 @@
 #
 # Macro / status access
 # ──────────────────────
-#   {printer["mmu_rfid_reader lane0"].last_uid}
-#   {printer["mmu_rfid_reader lane0"].present}
-#   {printer["mmu_rfid_reader lane0"].alive}
+#   {printer["mmu_nfc_reader lane0"].last_uid}
+#   {printer["mmu_nfc_reader lane0"].present}
+#   {printer["mmu_nfc_reader lane0"].alive}
+#
+# Python API (for other extras)
+# ──────────────────────────────
+#   inst = printer.lookup_object("mmu_nfc_reader gate0")
+#   inst.init()                      # (re)initialize, returns bool alive
+#   uid, target_info = inst.read(timeout=0.5)
+#   inst.release(reason="...")       # returns True if a release was issued
 
 import logging
 
 from .nfc import reader_factory
 from .nfc import pn532_driver
 
-# Tracks which printer object owns _instances, mirroring the reset-on-RESTART
-# pattern from the source project: a new Printer is created on every Klipper
-# RESTART, so a change here means a fresh config load and stale entries must
-# be dropped.
-_current_printer = None
 _instances = []
 
 
-class MmuRfidReaderDefaults:
-    """Shared defaults from the base [mmu_rfid_reader] section, if present."""
+class MmuNfcReaderDefaults:
+    """Shared defaults from the base [mmu_nfc_reader] section, if present."""
 
     def __init__(self, config):
         self.reader_type = config.get('reader_type', None)
@@ -73,15 +75,14 @@ class MmuRfidReaderDefaults:
 
 
 class MmuRfidReader:
-    """One [mmu_rfid_reader <name>] instance: one physical reader chip."""
+    """One [mmu_nfc_reader <name>] instance: one physical reader chip."""
 
-    def __init__(self, config, defaults, index):
+    def __init__(self, config, mmu_unit):
         self.printer = config.get_printer()
         self.reactor = self.printer.get_reactor()
         self.gcode = self.printer.lookup_object('gcode')
         self.name = config.get_name().split()[-1]
-        self._index = index
-        self._defaults = defaults
+        self._defaults = self.printer.load_object('mmu_nfc_reader', None)
 
         default_reader_type = (
             defaults.reader_type if defaults and defaults.reader_type
@@ -113,10 +114,10 @@ class MmuRfidReader:
         self.last_target_info = None
         self.present = False
 
-        self.printer.register_event_handler(
-            'klippy:connect', self._handle_connect)
+        self.printer.register_event_handler('klippy:connect', self._handle_connect)
 
         self._register_commands()
+
 
     def _register_commands(self):
         # Register each command once globally; NAME= (or the sole instance,
@@ -136,26 +137,82 @@ class MmuRfidReader:
             except self.printer.config_error:
                 pass
 
+
     def _reactor_sleep(self, seconds):
         self.reactor.pause(self.reactor.monotonic() + seconds)
 
+
     def _handle_connect(self):
         try:
-            self.reader.init()
-            self.alive = bool(self.reader.is_alive())
+            self.init()
         except Exception:
             self.alive = False
             logging.exception(
-                "mmu_rfid_reader %s: init failed", self.name)
+                "mmu_nfc_reader %s: init failed", self.name)
         if self.alive:
-            logging.info("mmu_rfid_reader %s: %s OK",
+            logging.info("mmu_nfc_reader %s: %s OK",
                          self.name, self.reader_type)
         else:
             logging.warning(
-                "mmu_rfid_reader %s: %s did not respond at connect time",
+                "mmu_nfc_reader %s: %s did not respond at connect time",
                 self.name, self.reader_type)
 
-    # ---- GCode commands (module-level dispatch by NAME=) -----------------
+
+    # ---- Public Python API (no gcmd required) -----------------------------
+
+    def init(self):
+        """(Re)initialize the reader chip.
+
+        Updates and returns self.alive. Raises on hardware/driver error;
+        callers that just want a best-effort init (e.g. GCode handlers)
+        should catch exceptions themselves.
+        """
+        self.reader.init()
+        self.alive = bool(self.reader.is_alive())
+        return self.alive
+
+
+    def read(self, timeout=0.5):
+        """Read a tag/target once.
+
+        Returns a (uid, target_info) tuple. target_info is the dict from
+        the driver's read_target() if supported, else None. Updates
+        last_uid, last_target_info and present as a side effect. Raises on
+        hardware/driver error.
+        """
+        uid = None
+        target_info = None
+        read_target = getattr(self.reader, 'read_target', None)
+        if read_target is not None:
+            target_info = read_target(timeout=timeout)
+            if target_info is not None:
+                uid = target_info.get('uid')
+        else:
+            uid = self.reader.read_tag(timeout=timeout)
+        self.last_uid = uid
+        self.last_target_info = target_info
+        self.present = uid is not None
+        return uid, target_info
+
+
+    def release(self, reason="manual"):
+        """Release the current target, if the driver supports it.
+
+        Returns True if a release call was actually issued to the driver,
+        False if the driver has no releasable-target concept.
+        """
+        release_fn = getattr(self.reader, '_release_current_target', None)
+        if release_fn is None:
+            return False
+        try:
+            release_fn(reason=reason)
+        except TypeError:
+            release_fn()
+        self.present = False
+        return True
+
+
+    # ---- GCode commands (module-level dispatch by NAME=) -------------------
 
     def _cmd_init(self, gcmd):
         _lookup(gcmd, self.name)._do_init(gcmd)
@@ -166,58 +223,44 @@ class MmuRfidReader:
     def _cmd_release(self, gcmd):
         _lookup(gcmd, self.name)._do_release(gcmd)
 
+
     def _do_init(self, gcmd):
         try:
-            self.reader.init()
-            self.alive = bool(self.reader.is_alive())
+            alive = self.init()
         except Exception as e:
             self.alive = False
             gcmd.respond_info(
-                "mmu_rfid_reader %s: init error: %s" % (self.name, e))
+                "mmu_nfc_reader %s: init error: %s" % (self.name, e))
             return
         gcmd.respond_info(
-            "mmu_rfid_reader %s: %s %s" %
-            (self.name, self.reader_type,
-             "OK" if self.alive else "not responding"))
+            "mmu_nfc_reader %s: %s %s" %
+            (self.name, self.reader_type, "OK" if alive else "not responding"))
+
 
     def _do_read(self, gcmd):
         timeout = gcmd.get_float('TIMEOUT', 0.5, minval=0.01, maxval=5.0)
-        uid = None
-        target_info = None
         try:
-            read_target = getattr(self.reader, 'read_target', None)
-            if read_target is not None:
-                target_info = read_target(timeout=timeout)
-                if target_info is not None:
-                    uid = target_info.get('uid')
-            else:
-                uid = self.reader.read_tag(timeout=timeout)
+            uid, _target_info = self.read(timeout=timeout)
         except Exception as e:
             gcmd.respond_info(
-                "mmu_rfid_reader %s: read error: %s" % (self.name, e))
+                "mmu_nfc_reader %s: read error: %s" % (self.name, e))
             return
-        self.last_uid = uid
-        self.last_target_info = target_info
-        self.present = uid is not None
         if uid is None:
             gcmd.respond_info(
-                "mmu_rfid_reader %s: no tag detected" % self.name)
+                "mmu_nfc_reader %s: no tag detected" % self.name)
         else:
             gcmd.respond_info(
-                "mmu_rfid_reader %s: UID=%s" % (self.name, uid))
+                "mmu_nfc_reader %s: UID=%s" % (self.name, uid))
+
 
     def _do_release(self, gcmd):
-        release = getattr(self.reader, '_release_current_target', None)
-        if release is None:
+        released = self.release(reason="gcode_manual")
+        if not released:
             gcmd.respond_info(
-                "mmu_rfid_reader %s: nothing to release" % self.name)
+                "mmu_nfc_reader %s: nothing to release" % self.name)
             return
-        try:
-            release(reason="gcode_manual")
-        except TypeError:
-            release()
-        self.present = False
-        gcmd.respond_info("mmu_rfid_reader %s: released" % self.name)
+        gcmd.respond_info("mmu_nfc_reader %s: released" % self.name)
+
 
     def get_status(self, eventtime=None):
         return {
@@ -237,30 +280,30 @@ def _lookup(gcmd, default_name):
             if inst.name == default_name:
                 return inst
         raise gcmd.error(
-            "Multiple [mmu_rfid_reader] instances configured; "
+            "Multiple [mmu_nfc_reader] instances configured; "
             "specify NAME=<name>")
     for inst in _instances:
         if inst.name == name:
             return inst
-    raise gcmd.error("No mmu_rfid_reader named '%s'" % name)
+    raise gcmd.error("No mmu_nfc_reader named '%s'" % name)
 
 
 def load_config(config):
-    # Handles the base [mmu_rfid_reader] section - shared defaults only.
+    # Handles the base [mmu_nfc_reader] section - shared defaults only.
     global _current_printer
     _current_printer = config.get_printer()
     del _instances[:]
-    return MmuRfidReaderDefaults(config)
+    return MmuNfcReaderDefaults(config)
 
 
 def load_config_prefix(config):
-    # Handles [mmu_rfid_reader lane0], [mmu_rfid_reader lane1], etc.
+    # Handles [mmu_nfc_reader gate0], [mmu_nfc_reader gate1], etc.
     global _current_printer
     printer = config.get_printer()
     if printer is not _current_printer:
         _current_printer = printer
         del _instances[:]
-    defaults = printer.lookup_object('mmu_rfid_reader', None)
+    defaults = printer.lookup_object('mmu_nfc_reader', None)
     index = len(_instances)
     reader = MmuRfidReader(config, defaults, index)
     for i, existing in enumerate(_instances):

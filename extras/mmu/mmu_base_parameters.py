@@ -44,7 +44,7 @@ class ParamSpec:
     """
     Single source of truth for a parameter:
       - name: instance attribute name + config key + (by default) gcmd key
-      - kind: 'int' | 'float' | 'choice' | 'str' | 'list' | 'intlist'
+      - kind: 'bool' | 'int' | 'float' | 'choice' | 'str' | 'list' | 'intlist'
       - default: value or callable(self)->value (for dependent defaults)
       - limits: pass-through kwargs like minval/maxval/above/below (values may be callables)
       - choices: for 'choice' (map used by config.getchoice)
@@ -104,6 +104,13 @@ class _SourceAdapter:
         if spec.kind == 'int':
             fn = getattr(self.src, 'get_int' if self.is_gcmd else 'getint')
             return fn(key, default, **limits)
+
+        if spec.kind == 'bool':
+            if self.is_gcmd:
+                fn = getattr(self.src, 'get_int')
+                return bool(fn(key, int(bool(default)), minval=0, maxval=1))
+            fn = getattr(self.src, 'getboolean')
+            return fn(key, default)
 
         if spec.kind == 'float':
             fn = getattr(self.src, 'get_float' if self.is_gcmd else 'getfloat')

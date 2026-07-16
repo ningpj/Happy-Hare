@@ -3,7 +3,7 @@
 # Responsible for setting:
 #
 # MMU_HAS_NFC_READER
-# MMU_SHARED_NFC_READER
+# MMU_HAS_SHARED_NFC_READER
 # MMU_HAS_PER_GATE_NFC_READERS
 #
 # Shared:
@@ -59,12 +59,12 @@ endif
 
 if MMU_HAS_NFC_READER && ! CUSTOM_NFC_READER_SETUP
   menu "NFC reader config"
-    config MMU_SHARED_NFC_READER
+    config MMU_HAS_SHARED_NFC_READER
       depends on MULTI_UNIT
       bool "Shared with existing unit?"
       default n
 
-    if MMU_SHARED_NFC_READER
+    if MMU_HAS_SHARED_NFC_READER
       config PARAM_NFC_READER
         prompt "Shared NFC name   "
         default "-specify name-"
@@ -77,7 +77,7 @@ if MMU_HAS_NFC_READER && ! CUSTOM_NFC_READER_SETUP
     # Single NFC: all settings on one page
     # ------------------------------------
 
-    if !MMU_SHARED_NFC_READER
+    if !MMU_HAS_SHARED_NFC_READER
 
       config MMU_HAS_PER_GATE_NFC_READERS
         bool "Per-gate NFC readers?"
