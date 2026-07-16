@@ -2639,8 +2639,9 @@ class MmuController(MmuFilamentMovement):
         self.printer.send_event("mmu:unit_selected", self.unit_selected, prev_unit)
 
 
+
 # -----------------------------------------------------------------------------------------------------------
-# MOONRAKER HOOKS
+# MOONRAKER HOOKS (SLICER INTEGRATION)
 # -----------------------------------------------------------------------------------------------------------
 
     def _moonraker_push_lane_data(self, gate_ids = None):
@@ -2667,7 +2668,7 @@ class MmuController(MmuFilamentMovement):
 
 
 # -----------------------------------------------------------------------------------------------------------
-# SPOOLMAN INTEGRATION
+# MOONRAKER SPOOLMAN INTEGRATION
 # -----------------------------------------------------------------------------------------------------------
 
     def _spoolman_sync(self, quiet = True):
@@ -2896,6 +2897,50 @@ class MmuController(MmuFilamentMovement):
         except Exception as e:
             self.log_error("Error while displaying spool location map: %s\n%s" % (str(e), SPOOLMAN_CONFIG_ERROR))
 
+
+    def _spoolman_get_spool_by_uid(self, uid, gate=None, quiet=True):
+        """
+        Resolve a scanned NFC/RFID tag UID to a spool via Spoolman.
+
+        On a successful lookup Moonraker calls back with either
+        'MMU_GATE_MAP NEXT_SPOOLID=<spool_id>' (gate is None) or
+        'MMU_GATE_MAP GATE=<gate> SPOOLID=<spool_id>' (gate supplied).
+
+        Args:
+            uid: Tag UID read from the NFC reader.
+            gate: Optional gate the tag was read on. If None the resolved
+                spool becomes the pending spool_id (shared reader); otherwise
+                it is assigned directly to that gate (per-gate reader).
+            quiet: If True, suppress non-critical output.
+        """
+        if self.p.spoolman_support == SPOOLMAN_OFF: return
+        self.log_debug("Requesting spool lookup for tag uid %s (gate %s) from spoolman" % (uid, gate))
+        try:
+            webhooks = self.printer.lookup_object('webhooks')
+            webhooks.call_remote_method("spoolman_get_spool_by_uid",
+                                        uid=uid, gate=gate, silent=quiet)
+        except Exception as e:
+            self.log_error("Error while looking up spool by tag uid: %s\n%s" % (str(e), SPOOLMAN_CONFIG_ERROR))
+
+
+    def _spoolman_set_spool_uid(self, spool_id, uid, quiet=True):
+        """
+        Register (write) an NFC/RFID tag UID onto a spool record in Spoolman
+        so future scans of that tag resolve to this spool_id.
+
+        Args:
+            spool_id: Spool ID to associate the tag with.
+            uid: Tag UID to write onto the spool record.
+            quiet: If True, suppress non-critical output.
+        """
+        if self.p.spoolman_support == SPOOLMAN_OFF: return
+        self.log_debug("Registering tag uid %s against spool %s in spoolman db" % (uid, spool_id))
+        try:
+            webhooks = self.printer.lookup_object('webhooks')
+            webhooks.call_remote_method("spoolman_set_spool_uid",
+                                        spool_id=spool_id, uid=uid, silent=quiet)
+        except Exception as e:
+            self.log_error("Error while registering tag uid on spool: %s\n%s" % (str(e), SPOOLMAN_CONFIG_ERROR))
 
 
 
