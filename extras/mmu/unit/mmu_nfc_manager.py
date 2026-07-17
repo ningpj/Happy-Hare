@@ -196,8 +196,10 @@ class MmuNfcManager:
 
 
     def set_enabled(self, value, shared=False, gate=None):
-        """Set a reader's top-level enabled flag. Re-initializes on a transition
-        to enabled, since a reader may have been powered down/idled while off."""
+        """
+        Set a reader's top-level enabled flag. Re-initializes on a transition
+        to enabled, since a reader may have been powered down/idled while off.
+        """
         value = bool(value)
         if shared:
             was, self.shared_enabled = self.shared_enabled, value
@@ -211,7 +213,9 @@ class MmuNfcManager:
 
 
     def set_active(self, value, shared=False, gate=None):
-        """Set a reader's runtime active flag (guards automatic reads only)."""
+        """
+        Set a reader's runtime active flag (guards automatic reads only).
+        """
         value = bool(value)
         if shared:
             self.shared_active = value
@@ -222,8 +226,10 @@ class MmuNfcManager:
 
 
     def init_reader(self, shared=False, gate=None):
-        """(Re)initialize a single addressed reader. Returns alive bool, or None
-        if no such reader is configured."""
+        """
+        (Re)initialize a single addressed reader. Returns alive bool, or None
+        if no such reader is configured.
+        """
         reader = self._reader_for(shared=shared, gate=gate)
         if reader is None:
             return None
@@ -232,12 +238,15 @@ class MmuNfcManager:
 
 
     def init_all(self):
-        """(Re)initialize every reader this unit controls."""
+        """
+        (Re)initialize every reader this unit controls.
+        """
         self._init_all_readers()
 
 
     def read_reader(self, shared=False, gate=None):
-        """Manual one-shot read of an addressed reader, returning the UID or None.
+        """
+        Manual one-shot read of an addressed reader, returning the UID or None.
 
         Intended for the MMU_NFC command. Overrides the 'active' guard (an explicit
         request is not an accidental read); callers should honor 'enabled' first.
@@ -250,7 +259,9 @@ class MmuNfcManager:
 
 
     def release_reader(self, shared=False, gate=None):
-        """Release the current target on an addressed reader."""
+        """
+        Release the current target on an addressed reader.
+        """
         reader = self._reader_for(shared=shared, gate=gate)
         if reader is None:
             return False
@@ -262,7 +273,8 @@ class MmuNfcManager:
 
 
     def get_status(self, eventtime=None):
-        """Pure status snapshot (no reader I/O) for printer variables.
+        """
+        Pure status snapshot (no reader I/O) for printer variables.
 
         Shape: {'unit', 'polling', 'shared': {..}|None, 'gates': {global_gate: {..}}}
         where each reader dict reports enabled/active/alive/present/uid (the cached
@@ -326,21 +338,27 @@ class MmuNfcManager:
 
 
     def _handle_not_printing(self, print_time):
-        """Re-activate all readers once printing stops."""
+        """
+        Re-activate all readers once printing stops.
+        """
         self._set_all_active(True)
 
 
     def _handle_spoolid_pending(self):
-        """A shared-reader spool lookup is in flight (broadcast by the controller).
+        """
+        A shared-reader spool lookup is in flight (broadcast by the controller).
         Deactivate the shared reader so no competing lookup is dispatched until it
-        resolves. Per-gate readers are unaffected."""
+        resolves. Per-gate readers are unaffected.
+        """
         self.shared_active = False
 
 
     def _handle_spoolid_not_pending(self, reread=False):
-        """The in-flight shared lookup resolved. Re-activate the shared reader;
+        """
+        The in-flight shared lookup resolved. Re-activate the shared reader;
         on a recoverable failure (reread) also drop the dedup/cooldown so the same
-        tag can be re-read immediately."""
+        tag can be re-read immediately.
+        """
         self.shared_active = True
         if reread:
             self.allow_reread()
@@ -353,26 +371,35 @@ class MmuNfcManager:
 
 
     def _local_index(self, gate):
-        """Map a global gate number to a per-gate reader slot index, or None."""
+        """
+        Map a global gate number to a per-gate reader slot index, or None.
+        """
         if gate is None:
             return None
         lgate = self.mmu_unit.local_gate(gate)
         return lgate if 0 <= lgate < len(self.gate_readers) else None
 
+
     def _reader_for(self, shared=False, gate=None):
-        """Resolve the reader object addressed by (shared | gate), or None."""
+        """
+        Resolve the reader object addressed by (shared | gate), or None.
+        """
         if shared:
             return self.shared_reader
         lg = self._local_index(gate)
         return self.gate_readers[lg] if lg is not None else None
 
+
     def _label_for(self, shared=False, gate=None):
-        """Driver logging label for an addressed reader: unit name (shared) or
-        logical gate number (per-gate)."""
+        """
+        Driver logging label for an addressed reader: unit name (shared) or
+        logical gate number (per-gate).
+        """
         if shared:
             return self.mmu_unit.name
         lg = self._local_index(gate)
         return self.mmu_unit.first_gate + lg if lg is not None else '?'
+
 
     def _all_readers(self):
         readers = []
@@ -458,7 +485,8 @@ class MmuNfcManager:
 
 
     def _read_reader(self, reader):
-        """Read a single tag UID from 'reader', returning a str UID or None.
+        """
+        Read a single tag UID from 'reader', returning a str UID or None.
 
         Uses read_uid() (driver read_tag()), which auto-releases the target on
         readers that hold one, so no separate release step is required.
