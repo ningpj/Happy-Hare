@@ -199,19 +199,18 @@ class MmuUnit:
         # Optional NFC readers for spool rfid tags
         # ---------------------------------------------------------------------------------------------------
 
+        # Create shared and per-gate NFC readers. We only store the reader names, the
+        # klipper objects are loaded and referenced by the MmuNfcManager.
+        # (all sensors are optional so any combination is possible)
         self.nfc_reader  = config.get('nfc_reader', '')
         self.nfc_readers = list(config.getlist('nfc_readers', []))
 
         if len(self.nfc_readers) not in [0, self.num_gates]:
             raise config.error("'nfc_readers' must be empty or a comma separated list of 'num_gates' elements")
 
-        self.nfc_reader = resolve_object_name(
-            config, self.nfc_reader, "mmu_nfc_reader ", "nfc reader"
-        )
-        self.nfc_readers = [
-            resolve_object_name(config, name, "mmu_nfc_reader ", "nfc reader")
-            for name in self.nfc_readers
-        ]
+        for name in [self.nfc_reader] + self.nfc_readers:
+            if name and not config.has_section('mmu_nfc_reader %s' % name):
+                raise config.error("MMU NFC reader section [mmu_nfc_reader %s] not found!" % name)
 
 
         # ---------------------------------------------------------------------------------------------------

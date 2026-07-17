@@ -32,6 +32,11 @@ from .mmu_gate_maps             import MmuGateMaps
 from .commands                  import COMMAND_REGISTRY
 from .commands.mmu_base_command import *
 
+# Safety net for a shared NFC lookup whose NEXT_SPOOLID result never arrives (lost
+# RPC / hung Moonraker). Must exceed Moonraker's worst-case request time (~16s) so a
+# slow comms failure signals '-1' before this fires. Normal outcomes resolve sooner.
+NFC_LOOKUP_TIMEOUT = 30.0
+
 
 # Main klipper module
 class MmuController(MmuFilamentMovement):
@@ -158,6 +163,7 @@ class MmuController(MmuFilamentMovement):
         self.form_tip_vars = None       # Current defaults of gcode variables for tip forming macro
         self.gate_maps.clear_slicer_tool_map()
         self.pending_spool_id = -1      # For automatic assignment of spool_id if set perhaps by rfid reader
+        self.nfc_lookup_pending = False # A shared NFC reader UID lookup is in flight (guards further shared reads)
         self.saved_toolhead_max_accel = None
         self.num_toolchanges = 0
 
@@ -210,6 +216,7 @@ class MmuController(MmuFilamentMovement):
 
         self._setup_hotend_off_timer()
         self._setup_pending_spool_id_timer()
+        self.nfc_lookup_timeout_timer = self.reactor.register_timer(self._nfc_lookup_timeout_handler, self.reactor.NEVER)
         self._clear_saved_toolhead_position()
 
         # This is a bit naughty to register commands here but I need to make sure we are the outermost wrapper
@@ -678,6 +685,19 @@ class MmuController(MmuFilamentMovement):
 
         # Merge environment status and fill in units without heater
         status["drying_state"] = merge_unit_status_list(eventtime, attr="environment_manager", key="drying_state", fill_value=DRYING_STATE_NONE)
+
+        # NFC readers are shared-reader + sparse per-gate (not a flat per-gate list),
+        # so report a per-unit dict list. Only present when readers are configured.
+        nfc_status = []
+        for unit in self.mmu_machine.units:
+            mgr = getattr(unit, 'nfc_manager', None)
+            if mgr is None:
+                continue
+            st = mgr.get_status(eventtime)
+            if st['shared'] is not None or st['gates']:
+                nfc_status.append(st)
+        if nfc_status:
+            status['nfc'] = nfc_status
 
         # Development/testing hook
         if hasattr(self, "developer_status_update"):
@@ -1637,6 +1657,41 @@ class MmuController(MmuFilamentMovement):
                 self.log_info("Spool ID: Automatic assignment of id cancelled")
             self.pending_spool_id = -1
             self.reactor.update_timer(self.pending_spool_id_timer, self.reactor.NEVER)
+
+
+    def nfc_lookup_resolved(self, reread=False):
+        """
+        Called when an in-flight shared NFC spool lookup completes - via a
+        MMU_GATE_MAP NEXT_SPOOLID callback (success, or -1/-2 failure) or the
+        safety-net timeout. Releases the guard so the shared reader(s) resume.
+
+        reread=True (recoverable failure, NEXT_SPOOLID=-1) also lets readers
+        re-read the same tag immediately; a definitive "unknown tag" (-2) or a
+        success passes reread=False so the tag isn't re-scanned.
+        """
+        self._nfc_set_lookup_pending(False, reread=reread)
+
+
+    def _nfc_set_lookup_pending(self, pending, reread=False):
+        """Arm/release the shared NFC lookup guard, broadcasting to every unit's
+        NFC manager. Idempotent: a no-op state change fires no event, so a late
+        NEXT_SPOOLID arriving after the timeout already resolved is harmless."""
+        pending = bool(pending)
+        if pending == self.nfc_lookup_pending:
+            return
+        self.nfc_lookup_pending = pending
+        if pending:
+            self.reactor.update_timer(self.nfc_lookup_timeout_timer, self.reactor.monotonic() + NFC_LOOKUP_TIMEOUT)
+            self.printer.send_event("mmu:spoolid_pending")
+        else:
+            self.reactor.update_timer(self.nfc_lookup_timeout_timer, self.reactor.NEVER)
+            self.printer.send_event("mmu:spoolid_not_pending", reread)
+
+
+    def _nfc_lookup_timeout_handler(self, eventtime):
+        self.log_debug("NFC: shared spool lookup timed out without a NEXT_SPOOLID result - releasing guard")
+        self._nfc_set_lookup_pending(False, reread=False)
+        return self.reactor.NEVER
 
 
     def _setup_pending_spool_id_timer(self):
@@ -2919,6 +2974,11 @@ class MmuController(MmuFilamentMovement):
             webhooks = self.printer.lookup_object('webhooks')
             webhooks.call_remote_method("spoolman_get_spool_by_uid",
                                         uid=uid, gate=gate, silent=quiet)
+            # Shared-reader lookups (gate is None) are guarded until NEXT_SPOOLID
+            # resolves, so no further shared reads dispatch a competing request.
+            # Per-gate lookups are deliberate/rare and stay outside the guard.
+            if gate is None:
+                self._nfc_set_lookup_pending(True)
         except Exception as e:
             self.log_error("Error while looking up spool by tag uid: %s\n%s" % (str(e), SPOOLMAN_CONFIG_ERROR))
 

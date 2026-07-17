@@ -765,6 +765,21 @@ class MmuServer:
                 return await self._send_gate_map_update(gate_ids, replace=True, silent=silent)
             return True
 
+    async def _send_next_spoolid(self, value):
+        '''
+        Send a bare 'MMU_GATE_MAP NEXT_SPOOLID=<value>' back to Happy Hare. Used to
+        report the terminal outcome of a shared-reader lookup so the Klipper side
+        can release its in-flight guard:
+          >0  resolved spool_id     -1  recoverable failure (re-read allowed)
+          -2  definitive unknown tag (release guard, do not re-read)
+        '''
+        if not self._mmu_backend_enabled():
+            return
+        try:
+            await self.klippy_apis.run_gcode(f"MMU_GATE_MAP NEXT_SPOOLID={value} QUIET=1")
+        except Exception as e:
+            logging.error(f"NFC: failed to send NEXT_SPOOLID={value}: {str(e)}")
+
     async def get_spool_by_uid(self, uid=None, gate=None, silent=False) -> bool:
         '''
         Resolve a scanned NFC/RFID tag UID to a spool_id and hand it back to
@@ -807,6 +822,11 @@ class MmuServer:
                 # failed rebuild preserves the existing cache, so don't cache a miss.
                 if not await self._build_spool_location_cache(silent=True):
                     await self._log_n_send(f"NFC: couldn't reach Spoolman to resolve tag {uid_norm} (check moonraker.log)", error=True, silent=silent)
+                    # Recoverable failure. For a shared-reader lookup signal
+                    # NEXT_SPOOLID=-1 so Klipper releases the in-flight guard and
+                    # allows the tag to be re-read (a retry may succeed).
+                    if gate is None:
+                        await self._send_next_spoolid(-1)
                     return False
                 spool_id = self.uid_to_spool_id.get(uid_norm)
 
@@ -816,6 +836,11 @@ class MmuServer:
                 self.uid_miss_cache = {u: exp for u, exp in self.uid_miss_cache.items() if exp > now}
                 self.uid_miss_cache[uid_norm] = now + NFC_UID_MISS_TTL
                 await self._log_n_send(f"NFC: unknown tag {uid_norm} - not registered against any spool in Spoolman", silent=silent)
+                # Definitive miss. For a shared-reader lookup signal NEXT_SPOOLID=-2
+                # so Klipper releases the guard WITHOUT re-reading (a re-scan of the
+                # same unregistered tag won't help and would just loop).
+                if gate is None:
+                    await self._send_next_spoolid(-2)
                 return False
 
             # Positive result - drop any stale negative-cache entry for this tag
@@ -823,9 +848,7 @@ class MmuServer:
 
             logging.info(f"NFC: tag {uid_norm} resolved to spool_id {spool_id}" + (f" for gate {gate}" if gate is not None else ""))
 
-            # Hand the result back to Happy Hare. Do not send NEXT_SPOOLID=-1 as a
-            # "miss" signal: MMU_GATE_MAP treats any non-zero NEXT_SPOOLID as truthy
-            # and -1 would cancel a pending assignment. A miss is handled above.
+            # Hand the resolved spool back to Happy Hare (which releases the guard).
             if self._mmu_backend_enabled():
                 if gate is None:
                     cmd = f"MMU_GATE_MAP NEXT_SPOOLID={spool_id} QUIET=1"
@@ -1069,6 +1092,7 @@ class MmuServer:
 
 def load_component(config):
     return MmuServer(config)
+
 
 
 

@@ -77,7 +77,7 @@ class MmuGateMapCommand(BaseCommand):
         replace = bool(gcmd.get_int('REPLACE', 0, minval=0, maxval=1)) # Hidden option for bulk filament update from spoolman
         from_spoolman = bool(gcmd.get_int('FROM_SPOOLMAN', 0, minval=0, maxval=1)) # Hidden option for bulk filament update from spoolman
         gate = gcmd.get_int('GATE', -1, minval=0, maxval=mmu.num_gates - 1)
-        next_spool_id = gcmd.get_int('NEXT_SPOOLID', None, minval=-1)
+        next_spool_id = gcmd.get_int('NEXT_SPOOLID', None, minval=-2)
 
         gate_map = None
         try:
@@ -94,10 +94,20 @@ class MmuGateMapCommand(BaseCommand):
             mmu.gate_maps.reset_gate_map()
 
         if next_spool_id:
-            if mmu.p.spoolman_support != SPOOLMAN_PULL:
+            # Completion of an in-flight shared NFC lookup (or a manual assignment).
+            #   >0  success - assign as the pending spool
+            #   -1  recoverable failure (e.g. Spoolman comms) - allow immediate re-read
+            #   -2  definitive "unknown tag" - release guard but don't re-read
+            if next_spool_id < 0:
+                mmu.set_pending_spool_id(-1) # Cancel any stale pending assignment
+                reread = (next_spool_id == -1)
+            elif mmu.p.spoolman_support != SPOOLMAN_PULL:
                 mmu.set_pending_spool_id(next_spool_id)
+                reread = False
             else:
                 mmu.log_error("Cannot use use NEXT_SPOOLID feature with spoolman_support: pull. Use 'push' or 'readonly' modes")
+                reread = False
+            mmu.nfc_lookup_resolved(reread=reread)
             return
 
         changed_gate_ids = []
