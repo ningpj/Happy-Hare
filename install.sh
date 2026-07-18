@@ -229,7 +229,7 @@ fi
 if [ -d "${CONFIG_KLIPPER_HOME}" ]; then
   kalico="${CONFIG_KLIPPER_HOME}/klippy/__init__.py"
 else
-  kalico="$HOME/klipper/klippy/__init__.py"
+  kalico="${HOME}/klipper/klippy/__init__.py"
 fi
 
 if [ -f ${kalico} ]; then
