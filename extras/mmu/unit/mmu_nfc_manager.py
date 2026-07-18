@@ -33,9 +33,9 @@
 import logging
 
 # Happy Hare imports
-from ..mmu_constants import *
-from ..mmu_utils     import MmuError
-from .mmu_nfc_reader import MmuNfcReader
+from ..mmu_constants     import *
+from ..mmu_utils         import MmuError
+from .nfc.mmu_nfc_reader import MmuNfcReader
 
 NFC_CHECK_INTERVAL = 2.0   # How often to poll the shared NFC reader (seconds)
 NFC_READ_TIMEOUT   = 0.1   # Per-poll reader read timeout (seconds) - keep small; runs on reactor thread
@@ -167,9 +167,9 @@ class MmuNfcManager:
         reader = self._reader_for(gate=gate)
         if reader is None:
             return None
-        uid = self._read_reader(reader)
+        uid, metadata = self._read_reader(reader, deep=self._want_metadata())
         if uid:
-            self._dispatch_lookup(uid, gate=gate)
+            self._dispatch_lookup(uid, gate=gate, metadata=metadata)
         return uid
 
 
@@ -255,7 +255,8 @@ class MmuNfcManager:
         reader = self._reader_for(shared=shared, gate=gate)
         if reader is None:
             return None
-        return self._read_reader(reader)
+        uid, _metadata = self._read_reader(reader)
+        return uid
 
 
     def release_reader(self, shared=False, gate=None):
@@ -467,7 +468,7 @@ class MmuNfcManager:
         if now < self._hold_until:
             return eventtime + NFC_CHECK_INTERVAL
 
-        uid = self._read_reader(self.shared_reader)
+        uid, metadata = self._read_reader(self.shared_reader, deep=self._want_metadata())
 
         if uid:
             # Only act on a newly presented tag; a tag left on the reader keeps
@@ -476,7 +477,7 @@ class MmuNfcManager:
                 self._last_uid = uid
                 self._hold_until = now + NFC_TAG_HOLD_TIME
                 self.mmu.log_debug("NFC: shared reader read tag UID=%s" % uid)
-                self._dispatch_lookup(uid, gate=None)
+                self._dispatch_lookup(uid, gate=None, metadata=metadata)
         else:
             # No tag present - forget the held UID so re-presentation is honored
             self._last_uid = None
@@ -484,28 +485,49 @@ class MmuNfcManager:
         return eventtime + NFC_CHECK_INTERVAL
 
 
-    def _read_reader(self, reader):
+    def _read_reader(self, reader, deep=False):
         """
-        Read a single tag UID from 'reader', returning a str UID or None.
+        Read a tag from 'reader', returning (uid, metadata).
 
-        Uses read_uid() (driver read_tag()), which auto-releases the target on
-        readers that hold one, so no separate release step is required.
+        With deep=False (default) reads just the UID via read_uid() - the tag
+        contents are never parsed and metadata is None. With deep=True (used only
+        when Spoolman auto-create is enabled) performs a structured read and
+        returns the parsed tag metadata dict alongside the UID. Both paths
+        auto-release the target, so no separate release step is required.
         """
         try:
-            uid = reader.read_uid(timeout=NFC_READ_TIMEOUT)
+            if deep:
+                uid, metadata = reader.read_tag_data(timeout=NFC_READ_TIMEOUT)
+            else:
+                uid = reader.read_uid(timeout=NFC_READ_TIMEOUT)
+                metadata = None
         except Exception as e:
             self.mmu.log_error("NFC: read error on reader '%s': %s" % (getattr(reader, 'name', '?'), str(e)))
-            return None
-        return str(uid) if uid else None
+            return None, None
+        return (str(uid) if uid else None), metadata
 
 
-    def _dispatch_lookup(self, uid, gate=None):
+    def _want_metadata(self):
+        """
+        True when reads should be deep (i.e. parse tag contents for Spoolman
+        auto-create). Gated entirely by the controller's auto-create policy so
+        that with spoolman_nfc_auto_create=0 the tag is never parsed and no
+        metadata is produced or forwarded to Spoolman.
+        """
+        return self.mmu is not None and self.mmu.nfc_auto_create_enabled()
+
+
+    def _dispatch_lookup(self, uid, gate=None, metadata=None):
         """
         Fire-and-forget Spoolman lookup via the controller. The result (or a
         recoverable failure) returns asynchronously as an MMU_GATE_MAP command
         from Moonraker; nothing is awaited here.
+
+        'metadata' is the parsed tag payload from a deep read (dict), forwarded
+        so Moonraker can auto-create a spool for an unknown tag when enabled. It
+        is None for this UID-only reader; a deep-read reader passes the dict.
         """
         try:
-            self.mmu._spoolman_get_spool_by_uid(uid, gate=gate)
+            self.mmu._spoolman_get_spool_by_uid(uid, gate=gate, metadata=metadata)
         except Exception as e:
             self.mmu.log_error("NFC: error initiating Spoolman lookup for UID=%s: %s" % (uid, str(e)))

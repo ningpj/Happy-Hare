@@ -2953,7 +2953,19 @@ class MmuController(MmuFilamentMovement):
             self.log_error("Error while displaying spool location map: %s\n%s" % (str(e), SPOOLMAN_CONFIG_ERROR))
 
 
-    def _spoolman_get_spool_by_uid(self, uid, gate=None, quiet=True):
+    def nfc_auto_create_enabled(self):
+        """
+        True when scanning an unknown NFC/RFID tag should auto-create a Spoolman
+        spool from parsed tag data. Auto-create is a write, so it requires a
+        writable Spoolman mode (not OFF/READONLY) on top of the opt-in flag.
+        Gates both the Klipper-side deep read/parse and the Moonraker-side create,
+        so with spoolman_nfc_auto_create=0 the tag is never parsed or sent.
+        """
+        return (bool(self.p.spoolman_nfc_auto_create)
+                and self.p.spoolman_support not in (SPOOLMAN_OFF, SPOOLMAN_READONLY))
+
+
+    def _spoolman_get_spool_by_uid(self, uid, gate=None, metadata=None, quiet=True):
         """
         Resolve a scanned NFC/RFID tag UID to a spool via Spoolman.
 
@@ -2961,19 +2973,28 @@ class MmuController(MmuFilamentMovement):
         'MMU_GATE_MAP NEXT_SPOOLID=<spool_id>' (gate is None) or
         'MMU_GATE_MAP GATE=<gate> SPOOLID=<spool_id>' (gate supplied).
 
+        When the UID is unknown, spoolman_nfc_auto_create is enabled and the
+        reader supplied parsed tag 'metadata' (material etc.), Moonraker creates
+        a vendor/filament/spool from that data and registers the UID against it -
+        turning the miss into a positive resolution. Auto-create is a write, so
+        it is suppressed in OFF/READONLY modes regardless of the flag.
+
         Args:
             uid: Tag UID read from the NFC reader.
             gate: Optional gate the tag was read on. If None the resolved
                 spool becomes the pending spool_id (shared reader); otherwise
                 it is assigned directly to that gate (per-gate reader).
+            metadata: Optional parsed tag payload (dict) from a deep tag read;
+                required for auto-create, ignored otherwise. None for UID-only readers.
             quiet: If True, suppress non-critical output.
         """
         if self.p.spoolman_support == SPOOLMAN_OFF: return
-        self.log_debug("Requesting spool lookup for tag uid %s (gate %s) from spoolman" % (uid, gate))
+        save = self.nfc_auto_create_enabled()
+        self.log_debug("Requesting spool lookup for tag uid %s (gate %s, save %s) from spoolman" % (uid, gate, save))
         try:
             webhooks = self.printer.lookup_object('webhooks')
             webhooks.call_remote_method("spoolman_get_spool_by_uid",
-                                        uid=uid, gate=gate, silent=quiet)
+                                        uid=uid, gate=gate, metadata=metadata, save=save, silent=quiet)
             # Shared-reader lookups (gate is None) are guarded until NEXT_SPOOLID
             # resolves, so no further shared reads dispatch a competing request.
             # Per-gate lookups are deliberate/rare and stay outside the guard.

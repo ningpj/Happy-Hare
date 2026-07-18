@@ -52,10 +52,58 @@
 
 import logging
 
-from .nfc_readers import reader_factory
-from .nfc_readers import pn532_driver
+from . import reader_factory
+from . import pn532_driver
 
 _instances = []
+
+
+# ── Deep-read helpers (tag-type classification + memory shaping) ───────────────
+
+def _classify_target(target_info):
+    """Map a reader read_target() dict to a deep-read strategy:
+    'mifare_classic' | 'ntag_type2' | 'iso15693_type5' | 'uid_only'."""
+    if not isinstance(target_info, dict):
+        return 'uid_only'
+    protocol = str(target_info.get('protocol') or '').strip().lower()
+    protocol_name = str(target_info.get('protocol_name') or '').strip().lower()
+    if protocol == 'uid_only' or protocol_name.endswith('uid_only'):
+        return 'uid_only'
+    if protocol == 'iso15693_type5' or protocol_name == 'iso15693':
+        return 'iso15693_type5'
+    try:
+        sak = int(target_info.get('sak', 0)) & 0xFF
+        uid_length = int(target_info.get('uid_length', 0))
+    except (TypeError, ValueError):
+        return 'uid_only'
+    # SAK bit 0x08 marks MIFARE Classic-compatible targets; SAK 0x00 is the
+    # common Type-2 / Ultralight / NTAG case.
+    if sak & 0x08:
+        return 'mifare_classic'
+    if sak == 0x00 and uid_length in (4, 7, 10):
+        return 'ntag_type2'
+    return 'uid_only'
+
+
+def _type5_parser_memory(raw):
+    """Strip the 4-byte ISO15693/Type-5 Capability Container so the byte stream
+    starts at the TLV area, as parse_tag() expects (like NTAG page 4)."""
+    data = bytes(raw or b'')
+    if len(data) >= 5 and data[0] in (0xE1, 0xE2):
+        return bytearray(data[4:])
+    return bytearray(data)
+
+
+def _mifare_usable(blocks, requested_sectors, allow_partial):
+    """True if an authenticated MIFARE read returned decodable blocks. When
+    allow_partial (the Bambu probe), at least one requested sector must have
+    authenticated; otherwise every requested sector must have."""
+    if not blocks or not blocks.get('blocks'):
+        return False
+    failed = blocks.get('auth_failed_sectors') or []
+    if allow_partial:
+        return len(failed) < len(requested_sectors)
+    return not failed
 
 
 class MmuNfcReaderDefaults:
@@ -68,6 +116,7 @@ class MmuNfcReaderDefaults:
         self.debug = config.getint('debug', 2, minval=0, maxval=4)
         self.transceive_delay = config.getfloat('transceive_delay', 0.250, minval=0.050, maxval=2.0)
         self.crc_delay = config.getfloat('crc_delay', 0.050, minval=0.005, maxval=1.0)
+        self.tag_max_pages = config.getint('tag_max_pages', 16, minval=4, maxval=135)
         self.low_level_debug = pn532_driver.get_low_level_debug(config)
 
 
@@ -96,6 +145,10 @@ class MmuNfcReader:
                                            minval=0.050, maxval=2.0)
         crc_delay = config.getfloat('crc_delay', self._defaults.crc_delay if self._defaults else 0.050,
                                     minval=0.005, maxval=1.0)
+        # Max NTAG/Type-5 user-memory pages read during a deep (metadata) read
+        self.tag_max_pages = config.getint('tag_max_pages',
+                                           self._defaults.tag_max_pages if self._defaults else 16,
+                                           minval=4, maxval=135)
         low_level_debug = pn532_driver.get_low_level_debug(config,
                                                            self._defaults.low_level_debug if self._defaults else False)
 
@@ -210,6 +263,132 @@ class MmuNfcReader:
         self.last_uid = uid
         self.present = uid is not None
         return uid
+
+
+    # ---- Deep read (UID + parsed tag metadata) ----------------------------
+    #
+    # A "deep read" reads the tag's full memory (NDEF pages / MIFARE sectors)
+    # and parses it into a filament metadata dict via tag_parser. It is
+    # more expensive than read_uid() and is performed only when Spoolman
+    # auto-create is enabled (the manager decides), so the default polling path
+    # neither parses tag contents nor produces anything beyond the UID.
+
+    def read_tag_data(self, timeout=0.5):
+        """Read a tag and parse its contents.
+
+        Returns (uid, metadata): metadata is the parsed tag dict (material,
+        color_hex, brand, weight_g, temps, tag_format, ...) from
+        tag_parser, or None if the tag carries no recognised rich data
+        or the driver can't do structured reads. Updates last_uid/present.
+        """
+        read_target = getattr(self.reader, 'read_target', None)
+        if read_target is None:
+            # Driver has no target concept - can't do a structured read
+            return self.read_uid(timeout=timeout), None
+        target_info = read_target(timeout=timeout)
+        if target_info is None:
+            self.last_uid = None
+            self.last_target_info = None
+            self.present = False
+            return None, None
+        uid = target_info.get('uid')
+        self.last_uid = uid
+        self.last_target_info = target_info
+        self.present = uid is not None
+        if not uid:
+            self.release(reason="deep_read_no_uid")
+            return None, None
+        metadata = None
+        try:
+            metadata = self._read_tag_metadata(target_info)
+        except Exception as e:
+            logging.warning("mmu_nfc_reader %s: deep tag read failed: %s", self.name, e)
+        return uid, metadata
+
+
+    def _read_tag_metadata(self, target_info):
+        """Capture raw tag memory per tag type and parse it, returning a metadata
+        dict or None. Structured reads release the target themselves (driver
+        finally blocks); an unsupported target is released here.
+        """
+        from . import tag_parser as parser
+        strategy = _classify_target(target_info)
+        if strategy == 'ntag_type2':
+            raw = self._capture_ntag()
+        elif strategy == 'iso15693_type5':
+            raw = self._capture_iso15693(target_info)
+        elif strategy == 'mifare_classic':
+            raw = self._capture_mifare(target_info)
+        else:
+            self.release(reason="deep_read_unsupported")
+            return None
+        if not raw:
+            return None
+        info = parser.parse_tag(raw, uid_hex=target_info.get('uid'))
+        if info is None or parser.is_parse_error(info):
+            return None
+        return info
+
+
+    def _capture_ntag(self):
+        """Read NTAG/Type-2 user memory from page 4 (NDEF-aware if the driver
+        supports it, else a fixed page span)."""
+        read_ndef = getattr(self.reader, 'ntag_read_ndef_user_memory', None)
+        if read_ndef is not None:
+            return read_ndef(start_page=4, max_pages=self.tag_max_pages)
+        return self.reader.ntag_read_user_memory(start_page=4, end_page=4 + self.tag_max_pages - 1)
+
+
+    def _capture_iso15693(self, target_info):
+        """Read ISO15693/Type-5 user memory and strip the capability container."""
+        read_type5 = getattr(self.reader, 'iso15693_read_user_memory', None)
+        if read_type5 is None:
+            return None
+        return _type5_parser_memory(read_type5(tag=target_info))
+
+
+    def _capture_mifare(self, target_info):
+        """Authenticated MIFARE Classic read, trying keys in order:
+          1. Bambu    - HKDF-derived Key A, sectors 0-4 (partial auth still
+             identifies a Bambu tag)
+          2. Factory default Key A, sectors 0-4 (e.g. QIDI Box)
+          3. Creality - UID-derived Key B, sector 1 only
+        Each attempt re-selects the tag via the driver. Bambu/Creality key
+        derivation needs pycryptodome; if it is missing those attempts are
+        skipped. Returns the block dict for the first usable read, or None.
+        """
+        from . import tag_parser as parser
+        uid_bytes = bytes(target_info.get('uid_bytes') or [])
+        if len(uid_bytes) < 4:
+            return None
+
+        try:
+            bambu_keys = parser._bambu_derive_keys(uid_bytes)
+        except Exception:
+            bambu_keys = None
+        if bambu_keys is not None:
+            blocks = self.reader.mifare_read_authenticated_blocks(
+                bambu_keys, sectors=[0, 1, 2, 3, 4], uid_bytes=uid_bytes)
+            if _mifare_usable(blocks, [0, 1, 2, 3, 4], allow_partial=True):
+                return blocks
+
+        blocks = self.reader.mifare_read_authenticated_blocks(
+            [b'\xff\xff\xff\xff\xff\xff'] * 16, sectors=[0, 1, 2, 3, 4], uid_bytes=uid_bytes)
+        if _mifare_usable(blocks, [0, 1, 2, 3, 4], allow_partial=False):
+            return blocks
+
+        try:
+            creality_key = parser._creality_derive_key_b(uid_bytes)
+        except Exception:
+            creality_key = None
+        if creality_key is not None:
+            sector_keys = [None] * 16
+            sector_keys[1] = creality_key
+            blocks = self.reader.mifare_read_authenticated_blocks(
+                sector_keys, sectors=[1], uid_bytes=uid_bytes, use_key_b=True)
+            if _mifare_usable(blocks, [1], allow_partial=False):
+                return blocks
+        return None
 
 
     def release(self, reason="manual"):

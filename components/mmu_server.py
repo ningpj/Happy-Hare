@@ -9,6 +9,8 @@
 # RFID support
 # Copyright (C) 2026  WoodWorker
 #
+# RFID Spool auto-create
+# Copyright (C) 2026 lameandboard
 #
 # Happy Hare's Moonraker component. It runs inside Moonraker (not Klipper) and
 # performs two largely independent jobs:
@@ -49,11 +51,13 @@
 # (")_(") MMU Ready
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
+# See <https://www.gnu.org/licenses/>.
 #
 from __future__ import annotations
 import json
 import logging, os, sys, re, time, asyncio
 import runpy, argparse, shutil, traceback, tempfile, filecmp
+import urllib.parse
 from typing import (
     TYPE_CHECKING,
     List,
@@ -83,10 +87,34 @@ MIN_SM_VER       = (0, 18, 1)
 
 NFC_UID_MISS_TTL = 30.0            # Seconds to remember a UID that isn't in Spoolman (avoids re-querying on every scan)
 
+# ─── RFID spool auto-create: SpoolmanDB reference data + offline fallbacks ─────
+# Reference filament data fetched (once per process) from SpoolmanDB, the
+# community database maintained by Spoolman's author. Used only to enrich
+# auto-created records (density, temps, canonical vendor/colour names); every
+# field degrades gracefully to the fallbacks below when the host is offline.
+SPOOLMANDB_MATERIALS_URL = "https://donkie.github.io/SpoolmanDB/materials.json"
+SPOOLMANDB_BAMBU_URL     = "https://donkie.github.io/SpoolmanDB/filaments/bambulab.json"
+
+DENSITY_FALLBACK = {               # g/cm³, used when SpoolmanDB is unreachable
+    "pla": 1.24, "pla+": 1.24, "abs": 1.04, "petg": 1.27, "nylon": 1.52,
+    "pa": 1.52, "tpu": 1.21, "flexible": 1.21, "asa": 1.05, "pc": 1.30,
+    "hips": 1.03, "pva": 1.23, "tpe": 1.21, "peek": 1.32, "pei": 1.27, "pom": 1.41,
+}
+DENSITY_DEFAULT        = 1.24      # PLA - safe default for unknown materials
+DEFAULT_SPOOL_WEIGHT_G = 1000      # Net filament weight when the tag doesn't supply one
+
+TAG_FORMAT_BRANDS = {              # Brand deduced from parser tag_format when the tag has none
+    "elegoo": "ELEGOO", "anycubic_ace": "Anycubic", "creality_cfs": "Creality",
+    "qidi": "QIDI", "opentag3d": "Generic", "openspool": "Generic",
+    "openprinttag": "Generic", "simplyprint_url": "Generic", "generic_ndef_json": "Generic",
+}
+
 DB_NAMESPACE     = "moonraker"
 ACTIVE_SPOOL_KEY = "spoolman.spool_id"
 
+
 class MmuServer:
+
     def __init__(self, config: ConfigHelper):
         self.config = config
         self.server = config.get_server()
@@ -111,6 +139,13 @@ class MmuServer:
         # confirmed absent from Spoolman, so frequent scans of an unknown tag
         # don't trigger a full spool fetch every time
         self.uid_miss_cache = {}
+
+        # Process-lifetime caches of SpoolmanDB reference data, fetched lazily on
+        # the first tag auto-create. None = not yet fetched; {}/[] = fetch failed
+        # (kept so a failed fetch isn't retried on every scan).
+        self._spoolmandb_materials = None   # {material_lower: density}
+        self._spoolmandb_bambu     = None   # [filament dict, ...] from bambulab.json
+        self._spoolmandb_bambu_mfr = None   # top-level manufacturer name (e.g. "Bambu Lab")
 
         self.nb_gates = None             # Set during initialization to the size of the MMU or 1 if standalone
         self.cache_lock = asyncio.Lock() # Lock to serialize a async calls for Happy Hare
@@ -141,6 +176,7 @@ class MmuServer:
         # Options
         self.update_location = self.config.getboolean("update_spoolman_location", True)
 
+
     async def _get_spoolman_version(self) -> tuple[int, int, int] | None:
         response = await self.http_client.get(url=f'{self.spoolman.spoolman_url}/v1/info')
         if response.status_code == 404:
@@ -154,6 +190,7 @@ class MmuServer:
             logging.info("info field in spoolman retrieved")
             return tuple([int(n) for n in response.json()['version'].split('.')])
 
+
     async def component_init(self) -> None:
         if self.spoolman is None:
             logging.warning("Spoolman not available. Happy Hare remote methods not available")
@@ -163,6 +200,7 @@ class MmuServer:
         self.printer_hostname = self.printer_info["hostname"]
         self.spoolman_has_extras = False
         asyncio.create_task(self._init_spoolman(retry=3)) # Spoolman may start up after us so retry a few times
+
 
     async def _init_spoolman(self, retry=1) -> bool:
         '''
@@ -201,6 +239,7 @@ class MmuServer:
                 return False
         return True
 
+
     async def _check_init_spoolman(self, silent=False) -> bool:
         if not self.spoolman_has_extras:
             db_awake = await self._init_spoolman()
@@ -210,6 +249,7 @@ class MmuServer:
                 elif not self.spoolman_has_extras:
                     await self._log_n_send("Incompatible Spoolman version for this feature. Check moonraker.log")
         return self.spoolman_has_extras
+
 
     # !TODO: implement mainsail/fluidd gui prompts?
     async def _log_n_send(self, msg, error=False, prompt=False, silent=False):
@@ -231,6 +271,7 @@ class MmuServer:
                 if error :
                     await self.klippy_apis.pause_print()
 
+
     async def _init_mmu_backend(self):
         '''
         Initialize MMU backend and check if enabled
@@ -248,10 +289,12 @@ class MmuServer:
         logging.info(f"MMU backend enabled: {self.mmu_enabled}")
         return True
 
+
     def _mmu_backend_enabled(self):
         if not hasattr(self, 'mmu_backend_present'):
             return False
         return self.mmu_backend_present and self.mmu_enabled
+
 
     async def _initialize_mmu(self):
         '''
@@ -271,6 +314,7 @@ class MmuServer:
             logging.info(f"MMU num_gates: {self.nb_gates}")
         return True
 
+
     async def _get_extra_fields(self, entity_type) -> bool:
         '''
         Helper to gets all extra fields for the entity type
@@ -286,6 +330,7 @@ class MmuServer:
         else:
             logging.info(f"Extra fields for {entity_type} found")
             return [r['key'] for r in response.json()]
+
 
     async def _add_extra_field(self, entity_type, field_key, field_name, field_type, default_value) -> bool:
         '''
@@ -307,6 +352,7 @@ class MmuServer:
         logging.info("  -fields: %s", response.json())
         return True
 
+
     async def _fetch_spool_info(self, spool_id) -> dict | None:
         '''
         Retrieve an individual spool_info record
@@ -325,6 +371,7 @@ class MmuServer:
         spool_info = response.json()
         return spool_info
 
+
     @staticmethod
     def _normalise_uid(uid_str) -> str:
         '''
@@ -336,6 +383,7 @@ class MmuServer:
                             .replace(':', '')
                             .replace('-', '')
                             .replace(' ', ''))
+
 
     def _get_uid_from_extra(self, extra) -> str:
         '''
@@ -352,6 +400,7 @@ class MmuServer:
             pass # Fall back to the raw value if it isn't valid JSON
         return self._normalise_uid(raw) if raw else ''
 
+
     def _get_filament_attr(self, spool_info) -> dict:
         spool_id = spool_info["id"]
         filament = spool_info["filament"]
@@ -364,6 +413,7 @@ class MmuServer:
         filament_id = filament.get('id', '')
         rfid = self._get_uid_from_extra(spool_info.get('extra'))
         return {'spool_id': spool_id, 'material': material, 'color': color_hex, 'name': name, 'temp': temp, 'bed_temp': bed_temp, 'vendor': vendor, 'filament_id': filament_id, 'rfid': rfid}
+
 
     async def _build_spool_location_cache(self, fix=False, silent=False) -> bool:
         '''
@@ -439,12 +489,14 @@ class MmuServer:
                     await self._log_n_send(f"Spool {sid} unassigned from printer {old_printer} and gate {old_gate}", silent=silent)
         return True
 
+
     # Function to find the first spool_id with a matching 'printer/gate', just 'gate' or just 'printer'
     def _find_first_spool_id(self, target_printer, target_gate):
         return next((spoolid
                 for spoolid, (printer, gate, _) in self.spool_location.items()
                 if (target_printer is None or printer == target_printer) and gate == target_gate
             ), -1)
+
 
     # Function to find all the spool_ids with a matching 'printer/gate', just 'gate' or just 'printer'
     def _find_all_spool_ids(self, target_printer, target_gate):
@@ -453,6 +505,7 @@ class MmuServer:
             for spoolid, (printer, gate, _) in self.spool_location.items()
             if (target_printer is None or printer == target_printer) and (target_gate is None or gate == target_gate)
         ]
+
 
     async def _set_spool_gate(self, spool_id, printer, gate, silent=False) -> bool:
         if not await self._check_init_spoolman(): return False
@@ -479,6 +532,7 @@ class MmuServer:
             return False
         return True
 
+
     async def _unset_spool_gate(self, spool_id, silent=False) -> bool:
         if not await self._check_init_spoolman(): return False
 
@@ -504,6 +558,7 @@ class MmuServer:
             return False
         return True
 
+
     async def _send_gate_map_update(self, gate_ids, replace=False, silent=False) -> bool:
         '''
         Retrieve filament attributes for list of (gate, spool_id) tuples
@@ -528,6 +583,7 @@ class MmuServer:
                 return False
         return True
 
+
     async def refresh_cache(self, fix=False, silent=False) -> bool:
         '''
         Rebuilds the local cache of essential spool information
@@ -537,6 +593,7 @@ class MmuServer:
             await self._initialize_mmu()
             return await self._build_spool_location_cache(fix=fix, silent=silent)
 
+
     async def get_filaments(self, gate_ids, silent=False) -> bool:
         '''
         Retrieve filament attributes for list of (gate, spool_id) tuples
@@ -544,6 +601,7 @@ class MmuServer:
         '''
         async with self.cache_lock:
             return await self._send_gate_map_update(gate_ids, silent=silent)
+
 
     async def push_gate_map(self, gate_ids=None, silent=False) -> bool:
         '''
@@ -608,6 +666,7 @@ class MmuServer:
             # Send update of filament attributes back to Happy Hare
             return await self._send_gate_map_update(gate_ids, silent=silent)
 
+
     async def pull_gate_map(self, silent=False) -> bool:
         '''
         Get all spools assigned to the current printer from Spoolman db and map them to gates
@@ -619,6 +678,7 @@ class MmuServer:
 
             gate_ids = [(gate, self._find_first_spool_id(self.printer_hostname, gate)) for gate in range(self.nb_gates)]
             return await self._send_gate_map_update(gate_ids, replace=True, silent=silent)
+
 
     async def clear_spools_for_printer(self, printer=None, sync=False, silent=False) -> bool:
         '''
@@ -653,6 +713,7 @@ class MmuServer:
                 gate_ids = [(gate, spool_id) for gate, spool_id in updated_gate_ids.items()]
                 return await self._send_gate_map_update(gate_ids, replace=True, silent=silent)
             return True
+
 
     async def set_spool_gate(self, spool_id=None, gate=None, sync=False, silent=False) -> bool:
         '''
@@ -723,6 +784,7 @@ class MmuServer:
                 return await self._send_gate_map_update(gate_ids, replace=True, silent=silent)
             return True
 
+
     async def unset_spool_gate(self, spool_id=None, gate=None, sync=False, silent=False) -> bool:
         '''
         Removes the printer + gate allocation in Spoolman db for gate or spool_id (if supplied)
@@ -765,6 +827,7 @@ class MmuServer:
                 return await self._send_gate_map_update(gate_ids, replace=True, silent=silent)
             return True
 
+
     async def _send_next_spoolid(self, value):
         '''
         Send a bare 'MMU_GATE_MAP NEXT_SPOOLID=<value>' back to Happy Hare. Used to
@@ -780,10 +843,18 @@ class MmuServer:
         except Exception as e:
             logging.error(f"NFC: failed to send NEXT_SPOOLID={value}: {str(e)}")
 
-    async def get_spool_by_uid(self, uid=None, gate=None, silent=False) -> bool:
+
+    async def get_spool_by_uid(self, uid=None, gate=None, metadata=None, save=False, silent=False) -> bool:
         '''
         Resolve a scanned NFC/RFID tag UID to a spool_id and hand it back to
         Happy Hare.
+
+        When the UID is unknown to Spoolman, 'save' is True and 'metadata' (the
+        parsed tag payload from the Klipper-side reader) carries a usable
+        'material', a new vendor/filament/spool is auto-created from the tag data
+        and the UID registered against it (see the RFID SPOOL AUTO-CREATE section
+        below). This turns what would be a NEXT_SPOOLID=-2 "unknown" into a
+        positive resolution. Otherwise the unknown-tag path is unchanged.
 
         This is the async counterpart to the NFC reader on the Klipper side
         (see mmu_nfc_manager): the reader reads only the tag UID and calls this
@@ -830,6 +901,22 @@ class MmuServer:
                     return False
                 spool_id = self.uid_to_spool_id.get(uid_norm)
 
+            if spool_id is None and save and metadata and metadata.get("material"):
+                # Tag isn't registered but carried usable filament metadata and
+                # auto-create is enabled: build the vendor/filament/spool now and
+                # register this UID against the new spool.
+                new_id = await self._create_spool_from_metadata(metadata, uid_norm)
+                if new_id is not None:
+                    # Targeted cache insert - no full rebuild (see _cache_insert_spool)
+                    spool_info = await self._fetch_spool_info(new_id)
+                    if spool_info:
+                        self._cache_insert_spool(spool_info)
+                    else:
+                        self.uid_to_spool_id[uid_norm] = new_id
+                    self.uid_miss_cache.pop(uid_norm, None)
+                    await self._log_n_send(f"NFC: created Spoolman spool {new_id} for new tag {uid_norm}", silent=silent)
+                    spool_id = new_id
+
             if spool_id is None:
                 # Remember the miss for a while and prune any expired entries
                 now = time.monotonic()
@@ -860,6 +947,432 @@ class MmuServer:
                     await self._log_n_send(f"NFC: exception running '{cmd}': {str(e)}", error=True, silent=silent)
                     return False
             return True
+
+
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # RFID SPOOL AUTO-CREATE
+    #
+    # Build a Spoolman vendor -> filament -> spool from parsed NFC/RFID tag
+    # metadata when a scanned UID isn't yet registered, and register the UID
+    # against the new spool. Entry point: _create_spool_from_metadata(), called
+    # from the unknown-tag branch of get_spool_by_uid() above.
+    #
+    # Ported from the standalone lameandboard Spoolman client so that it runs
+    # Moonraker-side (async, self.http_client) - all Spoolman *and* SpoolmanDB
+    # socket traffic originates here rather than from Klipper. Reference
+    # enrichment (density, temps, canonical vendor name) comes from SpoolmanDB
+    # (donkie.github.io) and degrades gracefully to the module-level fallbacks.
+    # ══════════════════════════════════════════════════════════════════════════
+
+    async def _create_spool_from_metadata(self, metadata, uid_norm) -> int | None:
+        '''
+        Create a Spoolman vendor -> filament -> spool from parsed tag metadata.
+        Returns the new spool_id, or None if the metadata is insufficient or any
+        Spoolman call fails.
+
+        'metadata' is the flat dict produced by the Klipper-side tag parser
+        (keys: material, material_detail, color_hex, brand, weight_g,
+        spool_weight_g, diameter_mm, material_id, tray_uid, min/max/bed_temp,
+        tag_format, is_bambu, ...). The UID is written into the spool's
+        '{MMU_RFID_FIELD}' extra field at creation time.
+        '''
+        material = str(metadata.get("material") or "").strip()
+        if not material:
+            logging.info("NFC: auto-create skipped - tag metadata has no material")
+            return None
+
+        color_hex = str(metadata.get("color_hex") or "").strip().lstrip("#").upper() or None
+        diameter  = self._to_float(metadata.get("diameter_mm"), 1.75)
+        weight    = self._to_float(metadata.get("weight_g"), DEFAULT_SPOOL_WEIGHT_G)
+        brand     = str(metadata.get("brand") or "").strip()
+        if not brand:
+            brand = TAG_FORMAT_BRANDS.get(str(metadata.get("tag_format") or ""), "Generic")
+        is_bambu    = bool(metadata.get("is_bambu")) or "bambu" in brand.lower()
+        material_id = str(metadata.get("material_id") or "").strip() or None
+
+        logging.info(f"NFC: auto-creating spool material={material!r} brand={brand!r} "
+                     f"color={color_hex} material_id={material_id} weight={weight}g")
+
+        # 1. Density + Bambu enrichment (may adopt the DB's canonical colour hex)
+        density, bambu_match, canonical_color_hex = await self._resolve_density(
+            material, color_hex, material_id, is_bambu)
+        if canonical_color_hex:
+            color_hex = canonical_color_hex
+
+        # 2. Vendor (find or create, with Generic fallback)
+        vendor_id, vendor_name = await self._resolve_vendor(brand, is_bambu)
+
+        # 3+4. Filament (find existing or create from tag + SpoolmanDB data)
+        filament_id = await self._find_or_create_filament(
+            metadata, brand, color_hex, density, diameter, weight, vendor_id, vendor_name, bambu_match)
+        if filament_id is None:
+            return None
+
+        # 5. Spool, with the UID written inline into the extra field
+        return await self._create_spool(filament_id, metadata, uid_norm, weight, bambu_match)
+
+
+    async def _resolve_density(self, material, color_hex, material_id, is_bambu):
+        '''
+        Determine filament density (g/cm³) and, for Bambu tags, locate the
+        matching SpoolmanDB entry (which carries temps/name/spool_weight).
+        Order: SpoolmanDB Bambu (by SKU then material+colour) -> SpoolmanDB
+        materials.json -> DENSITY_FALLBACK table -> DENSITY_DEFAULT.
+        Returns (density, bambu_match, canonical_color_hex): bambu_match is None
+        unless a usable Bambu entry (with density) was found; canonical_color_hex
+        is the DB's hex for a matched SKU (else None).
+        '''
+        material_lower = material.lower().strip()
+        bambu_match = None
+        canonical_color_hex = None
+
+        if is_bambu:
+            bambu_filaments = await self._fetch_spoolmandb_bambu()
+            # By Bambu SKU (material_id) via colors[].id - most precise match
+            if material_id:
+                for entry in bambu_filaments:
+                    for c in (entry.get("colors") or []):
+                        if str(c.get("id") or "").upper() == material_id.upper():
+                            bambu_match = entry
+                            if c.get("hex"):
+                                canonical_color_hex = str(c["hex"]).upper().lstrip("#")
+                            break
+                    if bambu_match is not None:
+                        break
+            # Fall back to material type + colour hex
+            if bambu_match is None:
+                for entry in bambu_filaments:
+                    if str(entry.get("material") or "").lower().strip() == material_lower:
+                        bambu_match = entry
+                        if color_hex:
+                            for c in (entry.get("colors") or []):
+                                if str(c.get("hex") or "").upper().lstrip("#") == color_hex:
+                                    canonical_color_hex = color_hex
+                                    break
+                        break
+            if bambu_match is not None:
+                try:
+                    return float(bambu_match["density"]), bambu_match, canonical_color_hex
+                except (KeyError, TypeError, ValueError):
+                    bambu_match = None  # no usable density - fall through to materials
+
+        mat_db = await self._fetch_spoolmandb_materials()
+        density = mat_db.get(material_lower)
+        if density is None:
+            density = DENSITY_FALLBACK.get(material_lower, DENSITY_DEFAULT)
+        return density, bambu_match, canonical_color_hex
+
+
+    async def _resolve_vendor(self, brand, is_bambu):
+        '''
+        Resolve a Spoolman vendor_id, creating the vendor if needed. Candidate
+        order: SpoolmanDB manufacturer (Bambu) -> tag brand -> "Generic".
+        Returns (vendor_id, vendor_name), or (None, None) if all candidates fail.
+        '''
+        candidates = []
+        mfr = self._spoolmandb_bambu_mfr
+        if is_bambu and mfr and mfr.lower() != "generic":
+            candidates.append(mfr)
+            if brand and brand.lower() != "generic" and brand != mfr:
+                candidates.append(brand)
+        elif brand and brand.lower() != "generic":
+            candidates.append(brand)
+        candidates.append("Generic")
+
+        for name in candidates:
+            vendor_id = await self._vendor_id_for_name(name)
+            if vendor_id is not None:
+                return vendor_id, name
+        return None, None
+
+
+    async def _vendor_id_for_name(self, name):
+        '''Find (case-insensitive) or create a Spoolman vendor by name. Returns id or None.'''
+        base = self.spoolman.spoolman_url
+        resp = await self.http_client.get(url=f"{base}/v1/vendor?{urllib.parse.urlencode({'name': name})}")
+        if not resp.has_error():
+            items = resp.json()
+            if not isinstance(items, list):
+                items = items.get("items", []) if isinstance(items, dict) else []
+            for v in items:
+                if str(v.get("name", "")).lower() == name.lower():
+                    return int(v["id"])
+        resp = await self.http_client.post(url=f"{base}/v1/vendor", body={"name": name})
+        if resp.has_error():
+            logging.warning(f"NFC: vendor create failed for {name!r}: {self.spoolman._get_response_error(resp)}")
+            return None
+        created = resp.json()
+        if isinstance(created, dict) and created.get("id") is not None:
+            return int(created["id"])
+        return None
+
+
+    async def _find_or_create_filament(self, metadata, brand, color_hex, density,
+                                       diameter, weight, vendor_id, vendor_name, bambu_match) -> int | None:
+        '''
+        Find an existing filament (by Bambu external_id, then material + vendor
+        with colour preference) or create one from tag + SpoolmanDB metadata.
+        Returns filament_id, or None on failure.
+        '''
+        base = self.spoolman.spoolman_url
+        material = str(metadata.get("material") or "").strip()
+        material_id = str(metadata.get("material_id") or "").strip() or None
+
+        # --- Search by Bambu SKU (external_id) first ---
+        if material_id:
+            resp = await self.http_client.get(
+                url=f"{base}/v1/filament?{urllib.parse.urlencode({'external_id': material_id})}")
+            if not resp.has_error():
+                items = resp.json()
+                if isinstance(items, list) and items:
+                    return int(items[0]["id"])
+
+        # --- Search by material (+ vendor), preferring a colour match ---
+        params = {"material": material}
+        if vendor_id is not None and vendor_name:
+            params["vendor_name"] = vendor_name
+        resp = await self.http_client.get(url=f"{base}/v1/filament?{urllib.parse.urlencode(params)}")
+        if resp.has_error():
+            logging.warning(f"NFC: filament search failed: {self.spoolman._get_response_error(resp)}")
+            return None
+        items = resp.json()
+        if isinstance(items, list) and items:
+            if color_hex:
+                for f in items:
+                    if str(f.get("color_hex") or "").upper() == color_hex:
+                        return int(f["id"])
+            return int(items[0]["id"])
+
+        # --- Create: tag data first, filling gaps from SpoolmanDB (Bambu) ---
+        db_name = str(bambu_match.get("name") or "").strip() if bambu_match else ""
+        if db_name:
+            name = f"{vendor_name} {db_name}" if vendor_name else db_name
+        else:
+            label = str(metadata.get("material_detail") or material).strip().replace("_", " ")
+            name = f"{brand} {label}".strip() if brand else label
+
+        body = {
+            "name": name,
+            "material": material,
+            "density": float(density),
+            "diameter": float(diameter),
+            "weight": float(weight),
+        }
+        if color_hex:
+            body["color_hex"] = color_hex
+        if vendor_id is not None:
+            body["vendor_id"] = vendor_id
+        if material_id:
+            body["external_id"] = material_id
+
+        # Temperatures: tag data first, then SpoolmanDB (Bambu). Spoolman treats
+        # settings_extruder_temp as a recommended default, so use the median of
+        # the min/max range when both are known (safer than running at the
+        # ceiling), falling back to whichever bound is available. The max is kept
+        # separately in settings_extruder_temp_max.
+        min_temp = metadata.get("min_temp")
+        max_temp = metadata.get("max_temp")
+        bed_temp = metadata.get("bed_temp")
+        if bambu_match is not None:
+            if min_temp is None:
+                min_temp = bambu_match.get("extruder_temp")
+            if max_temp is None:
+                max_temp = bambu_match.get("extruder_temp_max")
+            if bed_temp is None:
+                bed_temp = bambu_match.get("bed_temp")
+        ext_min = self._to_int_safe(min_temp)
+        ext_max = self._to_int_safe(max_temp)
+        bed     = self._to_int_safe(bed_temp)
+        if ext_min is not None and ext_max is not None:
+            body["settings_extruder_temp"] = round((ext_min + ext_max) / 2)
+        elif ext_max is not None:
+            body["settings_extruder_temp"] = ext_max
+        elif ext_min is not None:
+            body["settings_extruder_temp"] = ext_min
+        if ext_max is not None:
+            body["settings_extruder_temp_max"] = ext_max
+        if bed is not None:
+            body["settings_bed_temp"] = bed
+
+        logging.info(f"NFC: creating Spoolman filament: {json.dumps(body, default=str)}")
+        resp = await self.http_client.post(url=f"{base}/v1/filament", body=body)
+        if resp.has_error():
+            logging.warning(f"NFC: filament create failed: {self.spoolman._get_response_error(resp)}")
+            return None
+        created = resp.json()
+        if not isinstance(created, dict) or created.get("id") is None:
+            logging.warning(f"NFC: filament create returned unexpected response: {created!r}")
+            return None
+        return int(created["id"])
+
+
+    async def _create_spool(self, filament_id, metadata, uid_norm, weight, bambu_match) -> int | None:
+        '''
+        Create a Spoolman spool for filament_id, writing the RFID UID into the
+        '{MMU_RFID_FIELD}' extra field inline (so no follow-up PATCH is needed -
+        the field already exists, created during _init_spoolman). Returns the new
+        spool_id, or None on failure.
+        '''
+        base = self.spoolman.spoolman_url
+
+        spool_weight = metadata.get("spool_weight_g")
+        if spool_weight is None and bambu_match is not None:
+            spool_weight = bambu_match.get("spool_weight")
+        tray_uid = self._valid_tray_uid(metadata.get("tray_uid"))
+
+        # A freshly registered tag is assumed to be a full spool: remaining_weight
+        # equals the filament's net weight (initial_weight is left for Spoolman to infer).
+        body = {
+            "filament_id": int(filament_id),
+            "remaining_weight": float(weight),
+            "extra": {MMU_RFID_FIELD: json.dumps(uid_norm)},
+        }
+        sw = self._to_float(spool_weight, None)
+        if sw is not None:
+            body["spool_weight"] = sw
+        if tray_uid:
+            body["lot_nr"] = tray_uid
+
+        logging.info(f"NFC: creating Spoolman spool: {json.dumps(body, default=str)}")
+        resp = await self.http_client.post(url=f"{base}/v1/spool", body=body)
+        if resp.has_error():
+            logging.warning(f"NFC: spool create failed: {self.spoolman._get_response_error(resp)}")
+            return None
+        created = resp.json()
+        if not isinstance(created, dict) or created.get("id") is None:
+            logging.warning(f"NFC: spool create returned unexpected response: {created!r}")
+            return None
+        return int(created["id"])
+
+
+    def _cache_insert_spool(self, spool_info) -> int:
+        '''
+        Insert/refresh a single spool in the location + UID caches without a full
+        rebuild. Mirrors the per-spool logic in _build_spool_location_cache so a
+        freshly auto-created spool resolves on the very next scan.
+        '''
+        spool_id = spool_info['id']
+        extra = spool_info.get('extra') or {}
+        printer_name = json.loads(extra.get(MMU_NAME_FIELD, "\"\"")).strip('"')
+        mmu_gate = int(extra.get(MMU_GATE_FIELD, -1))
+        filament_attr = self._get_filament_attr(spool_info)
+        self.spool_location[spool_id] = (printer_name, mmu_gate, filament_attr)
+        uid = filament_attr.get('rfid')
+        if uid:
+            self.uid_to_spool_id[uid] = spool_id
+        return spool_id
+
+
+    async def _fetch_spoolmandb_materials(self) -> dict:
+        '''
+        Fetch + cache the SpoolmanDB materials.json density table
+        ({material_lower: density}). Returns {} on failure (cached so it isn't
+        retried on every scan); callers then fall back to DENSITY_FALLBACK.
+        '''
+        if self._spoolmandb_materials is not None:
+            return self._spoolmandb_materials
+        result = {}
+        try:
+            resp = await self.http_client.get(url=SPOOLMANDB_MATERIALS_URL)
+            if resp.has_error():
+                raise RuntimeError(f"HTTP {resp.status_code}")
+            raw = resp.json()
+            if isinstance(raw, list):
+                for entry in raw:
+                    name = str(entry.get("name") or "").strip().lower()
+                    density = entry.get("density")
+                    if name and density is not None:
+                        try:
+                            result[name] = float(density)
+                        except (TypeError, ValueError):
+                            pass
+            elif isinstance(raw, dict):
+                for name, entry in raw.items():
+                    density = entry.get("density") if isinstance(entry, dict) else entry
+                    if density is not None:
+                        try:
+                            result[str(name).lower()] = float(density)
+                        except (TypeError, ValueError):
+                            pass
+            logging.info(f"NFC: SpoolmanDB materials loaded ({len(result)} entries)")
+        except Exception as e:
+            logging.info(f"NFC: SpoolmanDB materials fetch failed ({e}); using fallback densities")
+        self._spoolmandb_materials = result
+        return result
+
+
+    async def _fetch_spoolmandb_bambu(self) -> list:
+        '''
+        Fetch + cache the SpoolmanDB Bambu Lab filament list (bambulab.json) and
+        the top-level manufacturer name (used for vendor normalisation). Returns
+        [] on failure (cached so it isn't retried on every scan).
+        '''
+        if self._spoolmandb_bambu is not None:
+            return self._spoolmandb_bambu
+        filaments = []
+        self._spoolmandb_bambu_mfr = None
+        try:
+            resp = await self.http_client.get(url=SPOOLMANDB_BAMBU_URL)
+            if resp.has_error():
+                raise RuntimeError(f"HTTP {resp.status_code}")
+            raw = resp.json()
+            if isinstance(raw, dict):
+                filaments = raw.get("filaments") or []
+                mfr = str(raw.get("manufacturer") or "").strip()
+                if mfr:
+                    self._spoolmandb_bambu_mfr = mfr
+            elif isinstance(raw, list):
+                filaments = raw
+            if not isinstance(filaments, list):
+                filaments = []
+            logging.info(f"NFC: SpoolmanDB Bambu filaments loaded ({len(filaments)} entries, "
+                         f"manufacturer={self._spoolmandb_bambu_mfr!r})")
+        except Exception as e:
+            logging.info(f"NFC: SpoolmanDB Bambu fetch failed ({e}); falling back to materials lookup")
+            filaments = []
+            self._spoolmandb_bambu_mfr = None
+        self._spoolmandb_bambu = filaments
+        return filaments
+
+
+    @staticmethod
+    def _to_int_safe(val):
+        '''Coerce to int, or None on failure/None.'''
+        if val is None:
+            return None
+        try:
+            return int(val)
+        except (TypeError, ValueError):
+            return None
+
+
+    @staticmethod
+    def _to_float(val, default):
+        '''Coerce to float, or return default on failure/None.'''
+        if val is None:
+            return default
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            return default
+
+
+    @staticmethod
+    def _valid_tray_uid(raw):
+        '''
+        Return an uppercase even-length hex string (a spool lot_nr), or None.
+        Guards against sending a malformed value Spoolman would reject with 422.
+        '''
+        if not raw:
+            return None
+        if isinstance(raw, (bytes, bytearray)):
+            return raw.hex().upper()
+        s = str(raw).strip()
+        if re.fullmatch(r"[0-9A-Fa-f]+", s) and len(s) % 2 == 0:
+            return s.upper()
+        return None
+
 
     async def set_spool_uid(self, spool_id=None, uid=None, silent=False) -> bool:
         '''
@@ -906,6 +1419,7 @@ class MmuServer:
             await self._log_n_send(f"NFC: tag {uid_norm} registered against spool {spool_id} in Spoolman db", silent=silent)
             return True
 
+
     async def display_spool_info(self, spool_id: int | None = None):
         '''
         Gets info for active spool id and sends it to the klipper console. Does not require Spoolman db extension
@@ -949,6 +1463,7 @@ class MmuServer:
             await self._log_n_send(msg)
             return True
 
+
     async def display_spool_location(self, printer=None):
         '''
         Builds a sorted table of gate to spool association for the specified printer and sends to klipper console
@@ -976,6 +1491,7 @@ class MmuServer:
             else:
                 msg = f"No gates assigned for printer: {printer_name}"
             await self._log_n_send(msg)
+
 
     async def push_lane_data(self, gate_ids):
         '''
@@ -1051,6 +1567,7 @@ class MmuServer:
         except Exception as e:
             logging.error(f"Error pushing lane data: {e}")
 
+
     async def cleanup_lane_data(self, num_gates):
         '''
         Removes lane data for gates that no longer exist (e.g., if MMU size was reduced)
@@ -1090,16 +1607,21 @@ class MmuServer:
         from .file_manager import file_manager
         file_manager.METADATA_SCRIPT = os.path.abspath(__file__) + args
 
+
 def load_component(config):
     return MmuServer(config)
 
 
 
 
-##################################################################################
+
+# ══════════════════════════════════════════════════════════════════════════
+# Gcode file Metadata parsing extension
 #
 # Beyond this point this module acts like an extended file_manager/metadata module
 #
+# ══════════════════════════════════════════════════════════════════════════
+
 AUTHORZIED_SLICERS = ['PrusaSlicer', 'SuperSlicer', 'OrcaSlicer', 'BambuStudio']
 
 HAPPY_HARE_FINGERPRINT = "; processed by HappyHare"
@@ -1142,6 +1664,7 @@ METADATA_FILAMENT_NAMES = "!filament_names!"
 T_PATTERN  = r'^T(\d+)\s*(?:;.*)?$'
 G1_PATTERN = r'^G[01](?=.*\sX(-?[\d.]+))(?=.*\sY(-?[\d.]+)).*$'
 
+
 def _parse_version_tuple(version_str: str, parts: int = 3):
     """Parse a version like '2.3.2-dev'/'2.3.2' into a comparable tuple (2, 3, 2).
 
@@ -1163,11 +1686,13 @@ def _parse_version_tuple(version_str: str, parts: int = 3):
         out.append(0)
     return tuple(out)
 
+
 def _format_volume(v: float) -> str:
     """Format a purge volume number without trailing .0, keeping up to 1 decimal place."""
     v = round(float(v), 1)
     s = f"{v:.1f}"
     return s.rstrip("0").rstrip(".")
+
 
 def gcode_processed_already(file_path):
     """Expects first line of gcode to be the HAPPY_HARE_FINGERPRINT '; processed by HappyHare'"""
@@ -1177,6 +1702,7 @@ def gcode_processed_already(file_path):
     with open(file_path, 'r') as in_file:
         line = in_file.readline()
         return mmu_regex.match(line)
+
 
 def parse_gcode_file(file_path):
     slicer_regex = re.compile(SLICER_REGEX, re.IGNORECASE)
@@ -1211,6 +1737,7 @@ def parse_gcode_file(file_path):
                 mver = orca_version_regex.match(line)
                 if mver:
                     orca_version = _parse_version_tuple(mver.group(1))
+
     if slicer in AUTHORZIED_SLICERS:
         if isinstance(TOOL_DISCOVERY_REGEX, dict):
             tools_regex = re.compile(TOOL_DISCOVERY_REGEX[slicer], re.IGNORECASE)
@@ -1346,6 +1873,7 @@ def parse_gcode_file(file_path):
     return (has_tools_placeholder or has_total_toolchanges or has_colors_placeholder or has_temps_placeholder or has_materials_placeholder or has_purge_volumes_placeholder or filament_names_placeholder,
             sorted(tools_used), total_toolchanges, colors, temps, materials, purge_volumes, filament_names, slicer)
 
+
 def process_file(input_filename, output_filename, insert_nextpos, tools_used, total_toolchanges, colors, temps, materials, purge_volumes, filament_names):
 
     t_pattern = re.compile(T_PATTERN)
@@ -1391,6 +1919,7 @@ def process_file(input_filename, output_filename, insert_nextpos, tools_used, to
         # Finally append "; referenced_tools =" as new metadata (why won't Prusa pick up my PR?)
         outfile.write("; referenced_tools = %s\n" % ",".join(map(str, tools_used)))
 
+
 def add_placeholder(line, tools_used, total_toolchanges, colors, temps, materials, purge_volumes, filament_names):
     # Ignore comment lines to preserve slicer metadata comments
     if not line.startswith(";"):
@@ -1417,6 +1946,7 @@ def add_placeholder(line, tools_used, total_toolchanges, colors, temps, material
         elif METADATA_END_PURGING in line:
             line = line + "_MMU_STEP_SET_ACTION RESTORE=1\n"
     return line
+
 
 def main(path, filename, insert_placeholders=False, insert_nextpos=False):
     file_path = os.path.join(path, filename)
@@ -1461,6 +1991,7 @@ def main(path, filename, insert_placeholders=False, insert_nextpos=False):
     except Exception:
         metadata.logger.info(traceback.format_exc())
         sys.exit(-1)
+
 
 # When run separately this module wraps metadata to extend pre-processing functionality
 if __name__ == "__main__":

@@ -117,7 +117,8 @@ class MmuMachineParameters(TunableParametersBase):
         ParamSpec('macro_toolhead_min_cruise_ratio','float', 0.0, section="TOOLHEAD/EXTRUDER", limits=dict(minval=0.0, below=1.0)),
 
         # Optional features
-        ParamSpec('spoolman_support',              'choice', SPOOLMAN_OFF,         section="FEATURES", choices={o: o for o in SPOOLMAN_OPTIONS},      on_change=_on_spoolman_support),
+        ParamSpec('spoolman_support',              'choice', SPOOLMAN_OFF, section="FEATURES", choices={o: o for o in SPOOLMAN_OPTIONS}, on_change=_on_spoolman_support),
+        ParamSpec('spoolman_nfc_auto_create',      'int',      0, section="FEATURES", limits=dict(minval=0, maxval=1)),
         ParamSpec('t_macro_color',                 'choice', T_MACRO_COLOR_SLICER, section="FEATURES", choices={o: o for o in T_MACRO_COLOR_OPTIONS}, on_change=_on_t_macro_color),
         ParamSpec('endless_spool_groups',          'intlist', [], section="FEATURES"),
         ParamSpec('endless_spool_enabled',         'int',      0, section="FEATURES", limits=dict(minval=0, maxval=1)),
@@ -192,6 +193,7 @@ class MmuMachineParameters(TunableParametersBase):
         self.default_gate_color           = list(self.default_gate_color)
         self.default_gate_temperature     = list(self.default_gate_temperature)
         self.default_gate_spool_id        = list(self.default_gate_spool_id)
+        self.default_gate_spool_rfid      = list(self.default_gate_spool_rfid)
         self.default_gate_speed_override  = list(self.default_gate_speed_override)
         self.default_endless_spool_groups = list(self.default_endless_spool_groups)
 
