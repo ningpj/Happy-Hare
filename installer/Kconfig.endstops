@@ -12,7 +12,7 @@
 # Gate homing preference flags (hidden)
 config PREFERS_CHOICE_GATE_HOMING_ENDSTOP_EXTRUDER
   def_bool n
-  depends on MMU_HAS_SENSOR_EXTRUDER && !REQUIRE_BOWDEN_MOVE
+  depends on MMU_HAS_SENSOR_EXTRUDER && !BOOL_REQUIRE_BOWDEN_MOVE
 
 config PREFERS_CHOICE_GATE_HOMING_ENDSTOP_EXIT
   def_bool n
@@ -70,19 +70,19 @@ menu "Endstops and Bowden movement"
     # Heuristic fallbacks
     default CHOICE_GATE_HOMING_ENDSTOP_EXIT        if MMU_HAS_SENSOR_EXIT
     default CHOICE_GATE_HOMING_ENDSTOP_SHARED_EXIT if MMU_HAS_SENSOR_SHARED_EXIT
-    default CHOICE_GATE_HOMING_ENDSTOP_EXTRUDER    if MMU_HAS_SENSOR_EXTRUDER && !REQUIRE_BOWDEN_MOVE
+    default CHOICE_GATE_HOMING_ENDSTOP_EXTRUDER    if MMU_HAS_SENSOR_EXTRUDER && !BOOL_REQUIRE_BOWDEN_MOVE
     default CHOICE_GATE_HOMING_ENDSTOP_ENCODER     if MMU_HAS_ENCODER
     default CHOICE_GATE_HOMING_ENDSTOP_NONE
 
     config CHOICE_GATE_HOMING_ENDSTOP_EXTRUDER
-      bool "Individual lane exit sensors"
-      depends on MMU_HAS_SENSOR_EXTRUDER && !REQUIRE_BOWDEN_MOVE
+      bool "Extruder entry sensor"
+      depends on MMU_HAS_SENSOR_EXTRUDER && !BOOL_REQUIRE_BOWDEN_MOVE
       help
         Use individual per-gate (mmu_exit) endstop sensor after drive gear.
         Often also implemented as per-gate entry sensors on the filament combiner ("aka hub")
 
     config CHOICE_GATE_HOMING_ENDSTOP_EXIT
-      bool "Individual lane exit sensors"
+      bool "Individual per-gate exit sensor"
       depends on MMU_HAS_SENSOR_EXIT
       help
         Use individual per-gate (mmu_exit) endstop sensor after drive gear.
@@ -105,14 +105,14 @@ menu "Endstops and Bowden movement"
 
     config CHOICE_GATE_HOMING_ENDSTOP_EXTRUDER
       bool "Extruder entry sensor"
-      depends on MMU_HAS_SENSOR_EXTRUDER && !REQUIRE_BOWDEN_MOVE
+      depends on MMU_HAS_SENSOR_EXTRUDER && !BOOL_REQUIRE_BOWDEN_MOVE
       help 
         Use extruder entry sensor (Only for some type-B designs,
         where multiple bowdens are combined near the toolhead).
 
     config CHOICE_GATE_HOMING_ENDSTOP_NONE
       bool "No homing endstop available"
-      depends on !(MMU_HAS_SENSOR_EXTRUDER && !REQUIRE_BOWDEN_MOVE) && !MMU_HAS_SENSOR_EXIT && !MMU_HAS_SENSOR_SHARED_EXIT && !MMU_HAS_ENCODER
+      depends on !(MMU_HAS_SENSOR_EXTRUDER && !BOOL_REQUIRE_BOWDEN_MOVE) && !MMU_HAS_SENSOR_EXIT && !MMU_HAS_SENSOR_SHARED_EXIT && !MMU_HAS_ENCODER
       help
         Ensure you have specified all filament sensors and encoder because
         current configuration has no way to home at the MMU gate.
