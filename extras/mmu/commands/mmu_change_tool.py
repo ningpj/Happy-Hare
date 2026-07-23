@@ -83,13 +83,13 @@ class MmuChangeToolCommand(BaseCommand):
         slicer_purge = gcmd.get_float('SLICER_PURGE', -1)
         slicer_retraction = gcmd.get_float('SLICER_RETRACTION', -1)
         slicer_fw_retraction_raw = gcmd.get('SLICER_FW_RETRACTION', '0').lower().strip()
-        if slicer_fw_retraction_raw in ('true', 'yes', '1'):
+        if slicer_fw_retraction_raw in ('true', '1'):
             slicer_fw_retraction = True
-        elif slicer_fw_retraction_raw in ('false', 'no', '0'):
+        elif slicer_fw_retraction_raw in ('false', '0'):
             slicer_fw_retraction = False
         else:
             raise gcmd.error(
-                f"SLICER_FW_RETRACTION must be true|false|yes|no|0|1, "
+                f"SLICER_FW_RETRACTION must be true|false|0|1, "
                 f"got '{gcmd.get('SLICER_FW_RETRACTION')}'"
             )
 
@@ -97,7 +97,7 @@ class MmuChangeToolCommand(BaseCommand):
         if slicer_fw_retraction:
             fw_retraction_obj = mmu.printer.lookup_object('firmware_retraction', None)
             if fw_retraction_obj:
-                slicer_retraction = 0.0
+                slicer_retraction = -1
             else:
                 slicer_fw_retraction = False 
 
