@@ -20,8 +20,6 @@ from ..mmu_utils       import MmuError
 from .mmu_base_command import *
 
 
-
-
 class MmuChangeToolCommand(BaseCommand):
 
     CMD = "MMU_CHANGE_TOOL"
