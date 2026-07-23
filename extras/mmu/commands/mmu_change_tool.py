@@ -87,7 +87,7 @@ class MmuChangeToolCommand(BaseCommand):
             slicer_fw_retraction = False
         else:
             slicer_fw_retraction = False
-            mmu.log_error("Error - incorrect slicer FW retraction setting - ignored")
+            mmu.log_error("Error - incorrect slicer FW retraction setting ignored")
      
         # validate retraction settings - if FW & printer supports it, disable slicer retraction, else disable FW
         if slicer_fw_retraction:
