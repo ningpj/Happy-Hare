@@ -86,11 +86,9 @@ class MmuChangeToolCommand(BaseCommand):
         elif slicer_fw_retraction_raw in ('false', '0'):
             slicer_fw_retraction = False
         else:
-            raise gcmd.error(
-                f"SLICER_FW_RETRACTION must be true|false|0|1, "
-                f"got '{gcmd.get('SLICER_FW_RETRACTION')}'"
-            )
-
+            slicer_fw_retraction = False
+            mmu.log_error("Error - incorrect slicer FW retraction setting - ignored")
+     
         # validate retraction settings - if FW & printer supports it, disable slicer retraction, else disable FW
         if slicer_fw_retraction:
             fw_retraction_obj = mmu.printer.lookup_object('firmware_retraction', None)
